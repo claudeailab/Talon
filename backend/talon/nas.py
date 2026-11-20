@@ -150,7 +150,10 @@ class Nas:
                 volume = array_to_vol.get(array)
                 status, detail = "raid", f"Member of RAID {array}"
             elif d["md"]:
-                status, detail = "raid_member", "Member of RAID " + ", ".join(d["md"])
+                # a RAID array from another system: it can be erased unless it is in use
+                in_use = bool(d["mounts"]) or d.get("busy", False)
+                status = "raid_member"
+                detail = f"Old RAID {', '.join(d['md'])} - " + ("in use" if in_use else "will be erased")
             elif any(m in SYSTEM_MOUNTS for m in d["mounts"]):
                 status, detail = "system", "Operating system disk"
             elif any(m in mp_to_vol for m in d["mounts"]):
@@ -160,10 +163,12 @@ class Nas:
                 status, detail = "mounted", "Mounted at " + ", ".join(d["mounts"])
             elif d["has_signature"]:
                 fs = ", ".join(d["fstypes"]) or "partitions"
-                status, detail = "has_data", f"Contains existing data ({fs}) - will be erased"
+                status, detail = "has_data", f"Existing data ({fs}) - will be erased"
             smart = self.p.smart_cached(d["name"])
             out.append({**d, "status": status, "status_detail": detail, "volume": volume,
-                        "array": array, "selectable": status in ("available", "has_data"),
+                        "array": array,
+                        "selectable": status in ("available", "has_data") or (
+                            status == "raid_member" and not d["mounts"] and not d.get("busy")),
                         "health": self._health(smart),
                         "temperature": smart.get("temperature") or None,
                         "power_on_hours": smart.get("power_on_hours")})
@@ -200,7 +205,12 @@ class Nas:
         d = self._disk(name)
         if not d["selectable"]:
             raise UserError(f"Disk {name} is in use ({d['status_detail']})")
-        return self.jobs.submit(f"Wipe disk {name}", user, lambda log: self.p.wipe_disk(name, log))
+        def work(log):
+            self.p.wipe_disk(name, log)       # stops an old RAID array on it first
+            if d["status"] == "raid_member":
+                self.p.save_mdadm_conf(log)
+
+        return self.jobs.submit(f"Wipe disk {name}", user, work)
 
     # ---------------------------------------------------------------- RAID arrays
     def raid_options(self, disks: List[str], spares: int) -> List[dict]:

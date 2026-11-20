@@ -305,7 +305,8 @@ export const GUIDE: Topic[] = [
         title: "Wipe a disk",
         blocks: [
           { p: "**Wipe disk** in a disk's **⋯** menu removes old partitions and RAID information, so the disk can be used for a new RAID array or volume." },
-          { warn: "Everything on the disk is lost. Disks that belong to a RAID array or volume cannot be wiped." },
+          { warn: "Everything on the disk is lost. Disks that belong to one of Talon's RAID arrays or volumes cannot be wiped." },
+          { p: "**Foreign RAID** means the disk belongs to a RAID array from another system. Wipe it, or select it directly when you create a RAID array or volume: Talon stops the old array first, then erases the disk. Its other disks then show **Has data** and can be used the same way. A foreign array that is mounted or in use is left alone." },
           { tip: "USB disks work, but can disconnect under load. For RAID, use SATA or NVMe disks, or a powered USB hub." },
         ],
       },

@@ -91,6 +91,8 @@ class RealPlatform:
             acc["mounts"].add(m)
         if node.get("type", "").startswith("raid"):
             acc["md"].add(node["name"])
+        if node.get("type") in ("lvm", "crypt"):
+            acc["busy"] = True
         if node.get("fstype"):
             acc["fstypes"].add(node["fstype"])
         for c in node.get("children") or []:
@@ -106,7 +108,7 @@ class RealPlatform:
                 continue
             if re.match(r"mmcblk\d+boot\d+$", name) or re.match(r"mmcblk\d+rpmb$", name):
                 continue
-            acc = {"mounts": set(), "md": set(), "fstypes": set()}
+            acc = {"mounts": set(), "md": set(), "fstypes": set(), "busy": False}
             self._walk(d, acc)
             tran = (d.get("tran") or "").lower()
             rota = d.get("rota") in (True, "1", 1)
@@ -136,7 +138,7 @@ class RealPlatform:
                 "rotational": rota, "transport": tran or None, "kind": kind,
                 "removable": d.get("rm") in (True, "1", 1),
                 "partitions": parts, "mounts": sorted(acc["mounts"]),
-                "md": sorted(acc["md"]), "fstypes": sorted(acc["fstypes"]),
+                "md": sorted(acc["md"]), "fstypes": sorted(acc["fstypes"]), "busy": acc["busy"],
                 "has_signature": bool(d.get("fstype")) or bool(parts),
             })
         return out
@@ -218,8 +220,19 @@ class RealPlatform:
     def _settle(self, log: Optional[Logger] = None) -> None:
         run(["udevadm", "settle", "--timeout=30"], check=False, log=log)
 
+    def _stop_holders(self, disk: str, log: Logger) -> None:
+        """Stop RAID arrays that use the disk or its partitions (an old array from
+        another system is assembled automatically at boot and keeps the disk busy)."""
+        nodes = [disk] + [os.path.basename(p) for p in glob.glob(f"/sys/class/block/{disk}/{disk}*")]
+        for node in nodes:
+            for h in glob.glob(f"/sys/class/block/{node}/holders/md*"):
+                md = os.path.basename(h)
+                log(f"-- stopping old RAID {md}")
+                run(["mdadm", "--stop", _dev(md)], log=log)
+
     def wipe_disk(self, disk: str, log: Logger) -> None:
         dev = _dev(disk)
+        self._stop_holders(disk, log)
         for p in glob.glob(f"/sys/class/block/{disk}/{disk}*"):
             pn = os.path.basename(p)
             run(["mdadm", "--zero-superblock", _dev(pn)], check=False, log=log)

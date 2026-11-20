@@ -39,6 +39,8 @@ class DemoPlatform:
             ("sde", "ST8000VN004-3CP101", 8 * TB, "hdd", "ZR14E2"),
             ("sdf", "ST8000VN004-3CP101", 8 * TB, "hdd", "ZR14F5"),
             ("sdg", "Samsung PSSD T7", 1 * TB, "usb", "S5SXNG0R"),
+            ("sdh", "ST2000VN004-2E4164", 2 * TB, "hdd", "Z52A1H7K"),
+            ("sdi", "ST2000VN004-2E4164", 2 * TB, "hdd", "Z52A1J2M"),
         ]:
             self.disks[name] = {"name": name, "model": model, "size": size, "kind": kind,
                                 "serial": serial, "parts": [], "signature": None,
@@ -73,6 +75,10 @@ class DemoPlatform:
         u = self.mkfs(md["dev"], "ext4", "tank", log)
         self.mount_persist(u, "ext4", "/srv/nas/tank", log)
         self.fs[u]["used"] = int(3.1 * TB)
+        # disks from another NAS: an old RAID 1 that is assembled but not Talon's
+        old = [self.make_partition(d, True, log) for d in ("sdh", "sdi")]
+        md_old = self.md_create("oldnas", "raid1", old, [], log)
+        self.arrays[md_old["dev"]]["sync_start"] = 0
         p = self.make_partition("sde", False, log)
         u2 = self.mkfs(p, "xfs", "backup", log)
         self.mount_persist(u2, "xfs", "/srv/nas/backup", log)
@@ -144,7 +150,7 @@ class DemoPlatform:
                     "partitions": [{"name": p["name"], "size": p["size"],
                                     "fstype": p.get("fstype"), "label": None,
                                     "mountpoints": p["mounts"]} for p in d["parts"]],
-                    "mounts": mounts, "md": md, "fstypes": fstypes,
+                    "mounts": mounts, "md": md, "fstypes": fstypes, "busy": False,
                     "has_signature": bool(d["parts"] or d["signature"]),
                 })
             return out
@@ -180,9 +186,12 @@ class DemoPlatform:
 
     def wipe_disk(self, disk: str, log) -> None:
         with self.lock:
-            log(f"$ wipefs -a /dev/{disk}")
             d = self.disks[disk]
             names = {p["name"] for p in d["parts"]}
+            for dev in [k for k, a in self.arrays.items() if {m["part"] for m in a["members"]} & names]:
+                log(f"$ mdadm --stop /dev/{dev}")
+                self.arrays.pop(dev)
+            log(f"$ wipefs -a /dev/{disk}")
             for u in [u for u, f in self.fs.items() if f["dev"] in names]:
                 self.fs.pop(u)
             d["parts"], d["signature"] = [], None

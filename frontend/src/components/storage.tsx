@@ -121,6 +121,7 @@ export function DiskRow({
           <span className="font-mono text-[13px] font-semibold">{d.name}</span>
           <Badge>{kindLabel[d.kind] ?? d.kind}</Badge>
           {d.status === "has_data" && <Badge tone="amber">Has data</Badge>}
+          {d.status === "raid_member" && <Badge tone="amber">Foreign RAID</Badge>}
           {d.health === "failing" && <Badge tone="red">SMART failing</Badge>}
         </div>
         <div className="truncate text-xs text-zinc-500">

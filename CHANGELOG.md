@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.35
+- Disks from another system's RAID can be wiped or used for a new RAID or volume
+
 ## 1.0.34
 - Support page: a searchable guide to every feature, with steps and screenshots
 

@@ -176,3 +176,29 @@ def test_activity_paging(client):
     second = client.get("/api/activity?offset=10&limit=10").json()
     assert second["items"][0]["message"] == "event 14"
     assert len(client.get("/api/activity?limit=1000").json()["items"]) <= 100
+
+
+def test_disks_from_another_raid_can_be_reused(client):
+    disks = {d["name"]: d for d in client.get("/api/disks").json()}
+    old = disks["sdh"]
+    assert old["status"] == "raid_member" and old["selectable"]
+    assert "will be erased" in old["status_detail"]
+    assert disks["sdi"]["md"] == old["md"]
+    # wiping one disk stops the old array; its other disk then just has data
+    j = wait_job(client, client.post("/api/disks/sdh/wipe").json())
+    assert j["status"] == "success", j
+    disks = {d["name"]: d for d in client.get("/api/disks").json()}
+    assert disks["sdh"]["status"] == "available"
+    assert disks["sdi"]["status"] == "has_data" and disks["sdi"]["selectable"]
+    # and both can go straight into a new RAID
+    r = client.post("/api/raid", json={"name": "mirror", "level": "raid1", "disks": ["sdh", "sdi"]})
+    assert wait_job(client, r.json())["status"] == "success"
+    assert any(a["name"] == "mirror" for a in client.get("/api/raid").json())
+
+
+def test_old_raid_disks_go_straight_into_a_new_raid(client):
+    r = client.post("/api/raid", json={"name": "reuse", "level": "raid1", "disks": ["sdh", "sdi"]})
+    assert r.status_code == 200, r.text
+    assert wait_job(client, r.json())["status"] == "success"
+    disks = {d["name"]: d for d in client.get("/api/disks").json()}
+    assert disks["sdh"]["array"] == "reuse" and disks["sdi"]["array"] == "reuse"

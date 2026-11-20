@@ -13,6 +13,7 @@ export interface Disk {
   mounts: string[];
   status: "available" | "has_data" | "volume" | "raid" | "raid_member" | "system" | "mounted";
   status_detail: string;
+  md?: string[];
   volume: string | null;
   array: string | null;
   selectable: boolean;

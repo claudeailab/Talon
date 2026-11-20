@@ -130,6 +130,7 @@ export default function DisksPage() {
         message={
           <>
             All partitions and data on <b>{wipe?.model}</b> ({bytes(wipe?.size)}) will be permanently erased.
+            {wipe?.status === "raid_member" && <OldRaidNote disk={wipe} disks={data ?? []} />}
           </>
         }
       />
@@ -241,5 +242,24 @@ function SmartDialog({ disk, onClose }: { disk: Disk; onClose: () => void }) {
         </div>
       )}
     </Modal>
+  );
+}
+
+/** Wiping one disk of an old RAID stops that whole array first. */
+function OldRaidNote({ disk, disks }: { disk: Disk; disks: Disk[] }) {
+  const md = disk.md ?? [];
+  const others = disks.filter((d) => d.name !== disk.name && d.md?.some((m) => md.includes(m))).map((d) => d.name);
+  return (
+    <>
+      {" "}
+      The old RAID <b>{md.join(", ")}</b> is stopped first
+      {others.length ? (
+        <>
+          ; its other disks (<b>{others.join(", ")}</b>) can then be wiped or used too.
+        </>
+      ) : (
+        "."
+      )}
+    </>
   );
 }
