@@ -20,8 +20,8 @@
   </g>
 </g>
   <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif">
-    <text x="136" y="56" font-size="44" font-weight="700" fill="#f0f6fc">Talon</text>
-    <text x="137" y="88" font-size="19" textLength="572" lengthAdjust="spacingAndGlyphs" fill="#9198a1">Turn any Debian or Ubuntu computer into a NAS, with a modern</text>
-    <text x="137" y="113" font-size="19" textLength="499" lengthAdjust="spacingAndGlyphs" fill="#9198a1">web interface, software RAID, shared folders and users.</text>
+    <text x="422" y="56" text-anchor="middle" font-size="44" font-weight="700" fill="#f0f6fc">Talon</text>
+    <text x="422" y="88" text-anchor="middle" font-size="19" textLength="572" lengthAdjust="spacingAndGlyphs" fill="#9198a1">Turn any Debian or Ubuntu computer into a NAS, with a modern</text>
+    <text x="422" y="113" text-anchor="middle" font-size="19" textLength="499" lengthAdjust="spacingAndGlyphs" fill="#9198a1">web interface, software RAID, shared folders and users.</text>
   </g>
 </svg>
