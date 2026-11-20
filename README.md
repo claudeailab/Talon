@@ -1,12 +1,14 @@
-<p align="center"><img src="docs/logo.svg" width="112" alt="Talon logo"></p>
+<img src="docs/logo.svg" width="96" align="left" alt="Talon logo">
 
-<h1 align="center">Talon</h1>
+# Talon
 
-Turn any Debian/Ubuntu computer — x86 PC, mini-PC or Raspberry Pi — into a NAS with a modern web interface for disks, software RAID, shared folders and users.
+Turn any Debian or Ubuntu computer into a NAS, with a modern web interface, software RAID, shared folders and users.
+
+<br clear="left">
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
-## Install (single command)
+## Install
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/claudeailab/Talon/main/install.sh | sudo bash
@@ -21,8 +23,6 @@ Re-running the same command upgrades Talon and keeps your settings.
 | Debian 12 (bookworm), 13 (trixie) | amd64, arm64 |
 | Ubuntu Server 22.04, 24.04, 26.04 LTS | amd64, arm64 |
 | Raspberry Pi OS 64-bit (bookworm, trixie) — Pi 3/4/5 | arm64 |
-
-Options (environment variables before `bash`): `TALON_PORT=8443`, `TALON_ADMIN=<user>`, `TALON_REF=<branch|tag>`.
 
 ## Features
 
@@ -84,16 +84,3 @@ sudo /opt/talon/uninstall.sh
 ```
 
 Add `--purge` to also remove the configuration and stop publishing shares. Volumes, RAID arrays and data are never touched.
-
-## Development
-
-```bash
-# backend in demo mode (simulated disks, nothing on your machine is changed)
-cd backend && python3 -m venv .venv && .venv/bin/pip install -r requirements.txt pytest httpx
-.venv/bin/python -m talon --demo --port 8080 --host 127.0.0.1   # login admin / talon
-.venv/bin/python -m pytest tests
-
-# frontend with hot reload (proxies /api to :8080)
-cd frontend && npm install && npm run dev
-npm run build    # writes the production UI into backend/talon/web
-```

@@ -7,15 +7,13 @@
 # on amd64 and arm64.  Re-running the installer upgrades an existing installation
 # and keeps its configuration.
 #
-# Environment overrides:
-#   TALON_PORT=8443        web UI port (default 443, or 8443 if 443 is taken)
-#   TALON_ADMIN=<user>     existing Linux user to make administrator
-#   TALON_REF=<branch|tag> version to install from GitHub (default main)
+# The web UI runs on https://<nas-ip>/ (port 443). The Linux user who runs the
+# installer with sudo becomes the administrator.
+#
 #   TALON_FORCE=1          skip the OS/architecture check
 set -Eeuo pipefail
 
-REPO="${TALON_REPO:-claudeailab/Talon}"
-REF="${TALON_REF:-main}"
+REPO=claudeailab/Talon
 PREFIX=/opt/talon
 CONF_DIR=/etc/talon
 STATE_DIR=/var/lib/talon
@@ -95,10 +93,10 @@ if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/backend/talon/__init__.py" ]; then
   SRC="$SCRIPT_DIR"
   step "Installing from local checkout $SRC"
 else
-  step "Downloading Talon ($REPO@$REF)"
+  step "Downloading Talon"
   TMP="$(mktemp -d)"
   trap 'rm -rf "$TMP"' EXIT
-  curl -fsSL "https://codeload.github.com/${REPO}/tar.gz/${REF}" -o "$TMP/src.tgz" \
+  curl -fsSL "https://codeload.github.com/${REPO}/tar.gz/main" -o "$TMP/src.tgz" \
     || die "download failed - is the repository public and reachable?"
   tar -xzf "$TMP/src.tgz" -C "$TMP"
   SRC="$(find "$TMP" -mindepth 1 -maxdepth 1 -type d | head -n1)"
@@ -145,11 +143,8 @@ if "repo" not in d:
 PYEOF
   ok "keeping existing configuration (port $PORT)"
 else
-  PORT="${TALON_PORT:-}"
-  if [ -z "$PORT" ]; then
-    PORT=443
-    if port_in_use 443; then PORT=8443; warn "port 443 is in use, using $PORT"; fi
-  fi
+  PORT=443
+  port_in_use 443 && die "port 443 is already used by another program; stop it and run the installer again"
   cat > "$CONF_DIR/config.json" <<EOF
 {
   "port": $PORT,
@@ -187,7 +182,7 @@ step "Setting up users and groups"
 getent group "$USERS_GROUP" >/dev/null || groupadd "$USERS_GROUP"
 getent group "$ADMIN_GROUP" >/dev/null || groupadd "$ADMIN_GROUP"
 
-ADMIN="${TALON_ADMIN:-${SUDO_USER:-}}"
+ADMIN="${SUDO_USER:-}"
 NEW_ADMIN_PW=""
 if [ -n "$ADMIN" ] && [ "$ADMIN" != root ] && id "$ADMIN" >/dev/null 2>&1; then
   usermod -aG "$ADMIN_GROUP,$USERS_GROUP" "$ADMIN"

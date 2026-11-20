@@ -40,8 +40,6 @@ def load(demo: bool = False) -> Config:
                 setattr(cfg, k, v)
     except FileNotFoundError:
         pass
-    if os.environ.get("TALON_PORT"):
-        cfg.port = int(os.environ["TALON_PORT"])
     if demo or os.environ.get("TALON_DEMO") == "1":
         cfg.demo = True
         cfg.state_file = os.environ.get("TALON_STATE", "/tmp/talon-demo-state.json")
