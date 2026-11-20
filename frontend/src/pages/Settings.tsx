@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { CheckCircle2, Download, Info, RefreshCw, Server, Sparkles } from "lucide-react";
 import { api } from "../lib/api";
-import { ago, bytes } from "../lib/format";
+import { ago, bytes, date } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Settings, SysInfo, UpdateInfo } from "../lib/types";
 import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Field, Input, PageHeader, PageLoader, Select, Switch, Tabs } from "../components/ui";
@@ -192,7 +192,7 @@ function SoftwareUpdate() {
                 </div>
                 <div className="text-[13px] text-zinc-500">
                   You have {data.current}
-                  {data.published_at && ` · released ${new Date(data.published_at).toLocaleDateString()}`}
+                  {data.published_at && ` · released ${date(new Date(data.published_at).getTime() / 1000)}`}
                   {data.url && (
                     <>
                       {" · "}

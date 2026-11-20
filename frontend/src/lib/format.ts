@@ -36,11 +36,43 @@ export function ago(ts: number): string {
   if (s < 60) return "just now";
   if (s < 3600) return `${Math.floor(s / 60)} min ago`;
   if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
-  return new Date(ts * 1000).toLocaleDateString();
+  return date(ts);
 }
 
+/* Dates are shown as dd-mm-yyyy and times on the 24-hour clock everywhere. */
+const p2 = (n: number) => String(n).padStart(2, "0");
+
+/** 20-11-2026 (from a Unix timestamp in seconds) */
+export function date(ts: number): string {
+  const d = new Date(ts * 1000);
+  return `${p2(d.getDate())}-${p2(d.getMonth() + 1)}-${d.getFullYear()}`;
+}
+
+/** 17:43 */
+export function clock(ts: number, seconds = false): string {
+  const d = new Date(ts * 1000);
+  return `${p2(d.getHours())}:${p2(d.getMinutes())}${seconds ? `:${p2(d.getSeconds())}` : ""}`;
+}
+
+/** 20-11-2026 17:43 */
 export function dateTime(ts: number): string {
-  return new Date(ts * 1000).toLocaleString();
+  return `${date(ts)} ${clock(ts)}`;
+}
+
+/** "2028-11-20" -> "20-11-2028" ("" stays "") */
+export function isoToDmy(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : iso;
+}
+
+/** "20-11-2028" -> "2028-11-20"; null when it is not a real date */
+export function dmyToIso(dmy: string): string | null {
+  const m = /^(\d{1,2})[-./](\d{1,2})[-./](\d{4})$/.exec(dmy.trim());
+  if (!m) return null;
+  const [d, mo, y] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d) return null;
+  return `${y}-${p2(mo)}-${p2(d)}`;
 }
 
 export const levelLabel: Record<string, string> = {

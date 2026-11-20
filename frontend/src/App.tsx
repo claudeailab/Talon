@@ -13,6 +13,7 @@ import {
   Layers,
   Loader2,
   LogOut,
+  Clock,
   LifeBuoy,
   Mail,
   Menu as MenuIcon,
@@ -48,6 +49,7 @@ import ServicesPage from "./pages/Services";
 import SettingsPage from "./pages/Settings";
 import ActivityPage from "./pages/Activity";
 import SupportPage from "./pages/Support";
+import ScheduledPage from "./pages/Scheduled";
 
 type Me = { user: string; version: string; demo: boolean };
 
@@ -76,6 +78,7 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
       { to: "/services", label: "Services", icon: Server, page: ServicesPage },
       { to: "/settings", label: "Settings", icon: SettingsIcon, page: SettingsPage },
       { to: "/activity", label: "Activity", icon: ActivityIcon, page: ActivityPage },
+      { to: "/scheduled", label: "Scheduled", icon: Clock, page: ScheduledPage },
       { to: "/notifications", label: "Notifications", icon: Mail, page: NotificationsPage },
       { to: "/support", label: "Support", icon: LifeBuoy, page: SupportPage },
     ],
@@ -209,7 +212,7 @@ function Shell({ me }: { me: Me }) {
                     key={i.to}
                     to={i.to}
                     className={cx(
-                      "group flex items-center gap-3 rounded-xl px-3 py-[7px] text-sm font-medium transition",
+                      "group flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-medium transition",
                       active
                         ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200/70 dark:bg-white/[0.07] dark:text-white dark:ring-white/5"
                         : "text-zinc-600 hover:bg-zinc-200/40 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.04] dark:hover:text-zinc-100",

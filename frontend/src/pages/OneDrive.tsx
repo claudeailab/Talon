@@ -41,6 +41,7 @@ import {
   PageLoader,
   Progress,
   Select,
+  TimeInput,
   Switch,
   useToast,
 } from "../components/ui";
@@ -683,13 +684,9 @@ function TaskDialog({
                 ))}
               </Select>
               {f.schedule === "daily" && (
-                <Input
-                  type="time"
-                  value={f.time}
-                  onChange={(e) => set("time", e.target.value)}
-                  className="shrink-0"
-                  style={{ width: "9rem" }}
-                />
+                <div className="w-[6rem] shrink-0">
+                  <TimeInput value={f.time} onChange={(v) => set("time", v)} />
+                </div>
               )}
             </div>
           </Field>
@@ -798,7 +795,7 @@ function PathButton({
   );
 }
 
-function ToggleBox({
+export function ToggleBox({
   title,
   text,
   checked,

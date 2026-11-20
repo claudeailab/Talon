@@ -1,6 +1,6 @@
 /* The user guide shown on the Support page.
  *
- * Text supports **bold** (names of buttons, fields and pages) and [links](/path)
+ * Text supports **bold** (names of buttons, fields and pages), `code` and [links](/path)
  * to pages in Talon or to other topics (/support?topic=<id>). Screenshots live in
  * frontend/public/guide/<name>.webp. Keep wording identical to the interface. */
 
@@ -433,7 +433,7 @@ export const GUIDE: Topic[] = [
         title: "Linux",
         blocks: [
           { p: "SMB: in the file manager, open **smb://<NAS IP address>/**." },
-          { p: "NFS: add the computer under **Allowed clients** of the share, then run: **sudo mount -t nfs <NAS IP address>:/srv/nas/<volume>/<share> /mnt/<share>**" },
+          { p: "NFS: add the computer under **Allowed clients** of the share, then run: `sudo mount -t nfs <NAS IP address>:/srv/nas/<volume>/<share> /mnt/<share>`" },
         ],
       },
     ],
@@ -562,7 +562,7 @@ export const GUIDE: Topic[] = [
               "Go to **entra.microsoft.com** and sign in with an account that can register apps.",
               "**App registrations → New registration**, name it **Talon NAS**. For account types, pick the option that includes **personal Microsoft accounts**. Redirect URI: platform **Web**, paste the address from Talon's **Redirect URI** field, then click **Register**.",
               "Copy the **Application (client) ID** from the app's **Overview** page into Talon.",
-              "**Certificates & secrets → New client secret**, expiry **24 months**. Copy the secret **Value** (not the Secret ID) into Talon. It is shown only once.",
+              "**Certificates & secrets → New client secret**, expiry **24 months**. Copy the secret **Value** (not the Secret ID) into Talon. It is shown only once. Enter its **Expires** date in Talon under **Secret expires on**.",
               "**API permissions → Add a permission → Microsoft Graph → Delegated**. Add **Files.ReadWrite** and **offline_access**. Work accounts: click **Grant admin consent**.",
               "In Talon, choose the **Supported account types** you picked in step 2, click **Save**, then **Test**.",
             ],
@@ -583,6 +583,23 @@ export const GUIDE: Topic[] = [
             ],
           },
           { warn: "Client secrets expire (after 24 months with the recommended setting). Create a new one in Entra before then and save it in Talon, or OneDrive tasks stop." },
+        ],
+      },
+      {
+        id: "expiry",
+        title: "Get reminded before the secret expires",
+        blocks: [
+          {
+            steps: [
+              "In [Settings → Entra ID](/settings?tab=entra), under **Client secret expiry**, enter the date in **Secret expires on**. Entra shows it under **Certificates & secrets**.",
+              "Choose when to **Send a reminder**: 7 to 90 days before.",
+              "Enter the addresses in **Send the reminder to**, separated by commas. Leave it empty to use the recipients from the [Notifications](/notifications) page.",
+              "Click **Save**.",
+            ],
+          },
+          { img: "settings-entra", alt: "Entra ID settings with the client secret expiry" },
+          { p: "Talon sends one email when the reminder period starts and one more if the secret expires. The dashboard also shows the expiry as an issue. Emails need [SMTP](" + t("email") + ") to be set up." },
+          { p: "After you create a new secret, paste its Value and its new expiry date and click **Save**; the reminders start again for the new date." },
         ],
       },
     ],
@@ -701,6 +718,65 @@ export const GUIDE: Topic[] = [
     ],
   },
   {
+    id: "scheduled",
+    title: "Scheduled tasks",
+    group: "System",
+    summary: "Run commands and scripts on the NAS on a schedule.",
+    page: { to: "/scheduled", label: "Open Scheduled" },
+    sections: [
+      {
+        id: "create",
+        title: "Create a task",
+        blocks: [
+          {
+            steps: [
+              "On the [Scheduled](/scheduled) page, click **New task**.",
+              "Enter a **Task name** and choose **Run as**: **root** (full access to the system) or a NAS user (only that user's access).",
+              "Under **What to run**, type one or more commands, one per line. They run with bash. Volumes are at /srv/nas/<volume>.",
+              "Click **Test run** to try it. The output and the result appear below the commands; a test run stops after 1 minute.",
+              "Choose a **Schedule**: **Manually**, every 15 minutes up to every 12 hours, **Daily**, **Weekly** or **Monthly** at a time, **At startup** (once each time the NAS starts) or **Custom (cron)**.",
+              "Choose **Stop after**: the task is stopped if it runs longer than this.",
+              "Click **Create task**.",
+            ],
+          },
+          { img: "scheduled-task", alt: "New scheduled task" },
+          {
+            list: [
+              "**Email me if it fails**: sends the last output when a run ends with an error. Uses the [Notifications](/notifications) recipients.",
+              "**Skip if still running**: when a run is due while the previous one is still running, it is skipped. Off: it runs as soon as the previous one ends.",
+            ],
+          },
+          { warn: "Tasks that run as root can change or delete anything on the NAS. Test new commands with **Test run** first." },
+        ],
+      },
+      {
+        id: "cron",
+        title: "Custom (cron) schedules",
+        blocks: [
+          { p: "A custom schedule has five fields: minute, hour, day of the month, month and weekday (0 or 7 is Sunday). Use `*` for any value, commas for lists, `-` for ranges and `/` for steps." },
+          {
+            list: [
+              "`0 3 * * *`: every day at 03:00.",
+              "`*/10 * * * *`: every 10 minutes.",
+              "`30 22 * * 1-5`: Monday to Friday at 22:30.",
+              "`0 4 1 * *`: on the 1st of every month at 04:00.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "manage",
+        title: "Run, pause and check tasks",
+        blocks: [
+          { img: "scheduled", alt: "Scheduled page" },
+          { p: "Each task shows who it runs as, its schedule, its last run and its status: **Succeeded**, **Running**, **Failed** with the exit code, **Stopped** or **Paused**. **Run now** starts it at once and **Stop** ends a running task." },
+          { p: "The **⋯** menu has **Edit**, **View output** (the last 20 runs with their full output, start time, duration and exit code), **Pause** or **Resume**, **Duplicate** and **Delete**." },
+          { p: "Every change is recorded in [Activity](/activity)." },
+        ],
+      },
+    ],
+  },
+  {
     id: "activity",
     title: "Activity",
     group: "System",
@@ -764,7 +840,7 @@ export const GUIDE: Topic[] = [
       {
         id: "uninstall",
         title: "Uninstall Talon",
-        blocks: [{ p: "Run **/opt/talon/uninstall.sh** on the NAS. Add **--purge** to also remove the settings. Your data on the volumes is never touched." }],
+        blocks: [{ p: "Run `/opt/talon/uninstall.sh` on the NAS. Add `--purge` to also remove the settings. Your data on the volumes is never touched." }],
       },
     ],
   },
@@ -777,5 +853,5 @@ export function blockText(b: Block): string {
 }
 
 export function plain(s: string): string {
-  return s.replace(/\*\*/g, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  return s.replace(/\*\*/g, "").replace(/`/g, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
 }

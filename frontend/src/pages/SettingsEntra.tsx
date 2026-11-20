@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { BookOpen, Copy, KeyRound, PlugZap } from "lucide-react";
 import { api } from "../lib/api";
+import { dmyToIso, isoToDmy } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { EntraCheck, EntraConfig } from "../lib/types";
 import { TestResult } from "../components/testresult";
@@ -37,6 +38,10 @@ export default function EntraTab() {
   const [tenantId, setTenantId] = useState("");
   const [clientId, setClientId] = useState("");
   const [secret, setSecret] = useState("");
+  const [expires, setExpires] = useState("");
+  const [remindDays, setRemindDays] = useState(30);
+  const [remindTo, setRemindTo] = useState("");
+  const smtp = useQuery({ queryKey: ["smtp"], queryFn: () => api.get<{ configured: boolean }>("/settings/smtp") });
   const [guide, setGuide] = useState(false);
   const [checks, setChecks] = useState<EntraCheck[] | null>(null);
   useEffect(() => {
@@ -46,10 +51,14 @@ export default function EntraTab() {
     setTenantId(["common", "organizations", "consumers"].includes(t) ? "" : t);
     setClientId(q.data.client_id);
     setSecret("");
+    setExpires(isoToDmy(q.data.secret_expires));
+    setRemindDays(q.data.remind_days);
+    setRemindTo(q.data.remind_to.join(", "));
   }, [q.data]);
   const tenant = kind === "tenant" ? tenantId.trim() : kind;
+  const expiresIso = expires.trim() === "" ? "" : dmyToIso(expires);
   const body = { tenant, client_id: clientId.trim(), client_secret: secret };
-  const save = useAction(() => api.put<EntraConfig>("/settings/entra", body), {
+  const save = useAction(() => api.put<EntraConfig>("/settings/entra", { ...body, secret_expires: expiresIso ?? "", remind_days: remindDays, remind_to: remindTo }), {
     success: "Entra ID app saved",
     invalidate: ["entra", "onedrive"],
   });
@@ -57,7 +66,15 @@ export default function EntraTab() {
     onSuccess: (r) => setChecks(r.checks),
   });
   if (!q.data) return <PageLoader />;
-  const changed = tenant !== q.data.tenant || clientId.trim() !== q.data.client_id || secret !== "";
+  const recipients = remindTo.split(/[\s,;]+/).filter(Boolean);
+  const expiresBad = expires.trim() !== "" && !expiresIso;
+  const changed =
+    tenant !== q.data.tenant ||
+    clientId.trim() !== q.data.client_id ||
+    secret !== "" ||
+    (expiresIso ?? expires) !== q.data.secret_expires ||
+    remindDays !== q.data.remind_days ||
+    recipients.join(",") !== q.data.remind_to.join(",");
 
   return (
     <Card>
@@ -77,7 +94,7 @@ export default function EntraTab() {
             <Button icon={<PlugZap className="size-4" />} loading={test.isPending} onClick={() => test.mutate()}>
               Test
             </Button>
-            <Button variant="primary" disabled={!changed} loading={save.isPending} onClick={() => save.mutate()}>
+            <Button variant="primary" disabled={!changed || expiresBad} loading={save.isPending} onClick={() => save.mutate()}>
               Save
             </Button>
           </div>
@@ -114,6 +131,31 @@ export default function EntraTab() {
           </Field>
         )}
       </div>
+      <div className="border-t border-zinc-100 px-5 pt-4 pb-5 dark:border-white/5">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
+          Client secret expiry <ExpiryBadge expiry={q.data.expiry} />
+        </div>
+        <div className="grid gap-x-8 gap-y-4 md:grid-cols-3 [&>*]:min-w-0">
+          <Field label="Secret expires on" hint="Shown in Entra under Certificates & secrets" error={expiresBad ? "Enter the date as dd-mm-yyyy" : null}>
+            <Input value={expires} onChange={(e) => setExpires(e.target.value)} placeholder="dd-mm-yyyy" inputMode="numeric" maxLength={10} className="tabular" />
+          </Field>
+          <Field label="Send a reminder">
+            <Select value={remindDays} onChange={(e) => setRemindDays(Number(e.target.value))}>
+              {[7, 14, 30, 60, 90].map((d) => (
+                <option key={d} value={d}>
+                  {d} days before
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field
+            label="Send the reminder to"
+            hint={smtp.data && !smtp.data.configured ? <span className="text-amber-600 dark:text-amber-400">Set up SMTP first</span> : "Empty: the Notifications recipients"}
+          >
+            <Input value={remindTo} onChange={(e) => setRemindTo(e.target.value)} placeholder="it@example.com, me@example.com" />
+          </Field>
+        </div>
+      </div>
       {checks && <TestResult checks={checks} />}
       {guide && <SetupGuide onClose={() => setGuide(false)} />}
     </Card>
@@ -134,6 +176,17 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 
 function B({ children }: { children: ReactNode }) {
   return <b className="font-semibold text-zinc-900 dark:text-zinc-100">{children}</b>;
+}
+
+function ExpiryBadge({ expiry }: { expiry: EntraConfig["expiry"] }) {
+  if (!expiry) return <Badge dot>Not set</Badge>;
+  const d = expiry.days;
+  const text = d < 0 ? "Expired" : d === 0 ? "Expires today" : d === 1 ? "Expires tomorrow" : `Expires in ${d} days`;
+  return (
+    <Badge tone={d < 0 ? "red" : expiry.remind ? "amber" : "green"} dot>
+      {text}
+    </Badge>
+  );
 }
 
 export function SetupGuide({ onClose }: { onClose: () => void }) {
@@ -171,7 +224,7 @@ export function SetupGuide({ onClose }: { onClose: () => void }) {
             <B>Certificates & secrets</B> → <B>New client secret</B>, expiry <B>24 months</B>.
           </p>
           <p>
-            Copy the secret <B>Value</B> (not the Secret ID) into Talon. It is shown once.
+            Copy the secret <B>Value</B> (not the Secret ID) into Talon. It is shown once. Enter its <B>Expires</B> date under <B>Secret expires on</B>.
           </p>
         </Step>
         <Step n={5} title="Add the permissions">

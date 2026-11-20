@@ -528,6 +528,48 @@ def create_app(cfg, platform) -> FastAPI:
     def onedrive_task_log(tid: str, _u: str = Depends(current_user)):
         return nas.cloud.task_log(tid)
 
+    # ------------------------------------------------------------ scheduled tasks
+    @app.get("/api/scheduled")
+    def scheduled_list(_u: str = Depends(current_user)):
+        return {"tasks": nas.scheduler.list(), "run_as": nas.scheduler.run_as_options()}
+
+    @app.post("/api/scheduled")
+    def scheduled_create(body: dict = Body(...), user: str = Depends(current_user)):
+        return nas.scheduler.create(body, user)
+
+    @app.post("/api/scheduled/test")
+    def scheduled_test(body: dict = Body(...), user: str = Depends(current_user)):
+        return nas.scheduler.test_run(body, user)
+
+    @app.put("/api/scheduled/{tid}")
+    def scheduled_update(tid: str, body: dict = Body(...), user: str = Depends(current_user)):
+        return nas.scheduler.update(tid, body, user)
+
+    @app.delete("/api/scheduled/{tid}")
+    def scheduled_delete(tid: str, user: str = Depends(current_user)):
+        nas.scheduler.delete(tid, user)
+        return {"ok": True}
+
+    @app.post("/api/scheduled/{tid}/run")
+    def scheduled_run(tid: str, user: str = Depends(current_user)):
+        nas.scheduler.run_now(tid, user)
+        return {"ok": True}
+
+    @app.post("/api/scheduled/{tid}/stop")
+    def scheduled_stop(tid: str, user: str = Depends(current_user)):
+        nas.scheduler.stop_task(tid)
+        return {"ok": True}
+
+    @app.post("/api/scheduled/{tid}/{action}")
+    def scheduled_pause(tid: str, action: str, user: str = Depends(current_user)):
+        if action not in ("pause", "resume"):
+            raise HTTPException(404, "Not found")
+        return nas.scheduler.set_enabled(tid, action == "resume", user)
+
+    @app.get("/api/scheduled/{tid}/runs")
+    def scheduled_runs(tid: str, _u: str = Depends(current_user)):
+        return nas.scheduler.runs(tid)
+
     @app.get("/api/settings")
     def settings(_u: str = Depends(current_user)):
         return nas.settings()

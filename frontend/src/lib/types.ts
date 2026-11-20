@@ -265,6 +265,10 @@ export interface EntraConfig {
   client_id: string;
   secret_set: boolean;
   configured: boolean;
+  secret_expires: string;
+  remind_days: number;
+  remind_to: string[];
+  expiry: { date: string; days: number; remind: boolean } | null;
 }
 
 export interface EntraCheck {
@@ -318,4 +322,40 @@ export interface OneDriveStatus {
   account: { name: string; email: string; drive_type: string; used: number; total: number; connected_at: number } | null;
   rclone: { installed: boolean; installing: boolean };
   tasks: CloudTask[];
+}
+
+export type TaskSchedule =
+  | { kind: "manual" }
+  | { kind: "startup" }
+  | { kind: "interval"; minutes: number }
+  | { kind: "daily"; time: string }
+  | { kind: "weekly"; weekday: number; time: string }
+  | { kind: "monthly"; day: number; time: string }
+  | { kind: "cron"; cron: string };
+
+export interface ScheduledTask {
+  id: string;
+  name: string;
+  script: string;
+  run_as: string;
+  timeout: number;
+  schedule: TaskSchedule;
+  schedule_label: string;
+  notify: boolean;
+  skip_if_running: boolean;
+  enabled: boolean;
+  created: number;
+  next_run: number | null;
+  last: { started: number; finished: number; status: "success" | "error" | "cancelled"; exit_code: number } | null;
+  running: { started: number } | null;
+}
+
+export interface TaskRun {
+  id: string;
+  started: number;
+  finished: number | null;
+  status: "running" | "success" | "error" | "cancelled";
+  exit_code: number | null;
+  trigger: string;
+  output: string;
 }

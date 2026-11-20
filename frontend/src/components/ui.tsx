@@ -230,6 +230,38 @@ export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputEleme
   return <input className={cx(inputCls, className)} {...rest} />;
 }
 
+/** 24-hour time as hh:mm, whatever the browser's language (type="time" follows it). */
+export function TimeInput({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  const commit = (text: string) => {
+    const m = /^(\d{1,2}):?(\d{2})$/.exec(text.trim());
+    if (m && Number(m[1]) < 24 && Number(m[2]) < 60) {
+      const v = `${m[1].padStart(2, "0")}:${m[2]}`;
+      setDraft(v);
+      if (v !== value) onChange(v);
+      return true;
+    }
+    return false;
+  };
+  return (
+    <input
+      value={draft}
+      inputMode="numeric"
+      maxLength={5}
+      placeholder="hh:mm"
+      aria-label="Time (24-hour)"
+      onChange={(e) => {
+        const t = e.target.value.replace(/[^\d:]/g, "");
+        setDraft(t);
+        if (/^\d{2}:\d{2}$/.test(t)) commit(t);
+      }}
+      onBlur={() => commit(draft) || setDraft(value)}
+      className={cx(inputCls, "tabular", className)}
+    />
+  );
+}
+
 export function Select({ className, children, ...rest }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select className={cx(inputCls, "appearance-auto pr-8", className)} {...rest}>

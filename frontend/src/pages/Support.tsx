@@ -269,15 +269,17 @@ function BlockView({ b, onTopic }: { b: Block; onTopic: (id: string) => void }) 
   return <Callout tone="warning"><Inline text={b.warn} onTopic={onTopic} /></Callout>;
 }
 
-/** **bold** and [text](/path); links to other topics open inside the guide. */
+/** **bold**, `code` and [text](/path); links to other topics open inside the guide. */
 function Inline({ text, onTopic }: { text: string; onTopic: (id: string) => void }) {
   const out: ReactNode[] = [];
-  const re = /\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)/g;
+  const re = /\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)|`([^`]+)`/g;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     if (m.index > last) out.push(text.slice(last, m.index));
-    if (m[1] !== undefined) {
+    if (m[4] !== undefined) {
+      out.push(<code key={m.index} className="rounded-md bg-zinc-100 px-1.5 py-0.5 font-mono text-[12.5px] whitespace-nowrap text-zinc-800 dark:bg-white/10 dark:text-zinc-200">{m[4]}</code>);
+    } else if (m[1] !== undefined) {
       out.push(<b key={m.index} className="font-semibold text-zinc-900 dark:text-zinc-100">{m[1]}</b>);
     } else {
       const href = m[3];

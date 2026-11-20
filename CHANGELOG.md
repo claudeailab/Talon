@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.36
+- Scheduled: run commands and scripts on a schedule, with output history
+- Entra ID: client secret expiry date with email reminders
+- Dates shown as dd-mm-yyyy and times on the 24-hour clock
+
 ## 1.0.35
 - Disks from another system's RAID can be wiped or used for a new RAID or volume
 

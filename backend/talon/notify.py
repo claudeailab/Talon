@@ -199,17 +199,21 @@ class Notifier:
                               "events": events}))
         return self.settings()
 
-    def send(self, event: str, subject: str, body: str, sync: bool = False) -> None:
+    def send(self, event: str, subject: str, body: str, sync: bool = False,
+             force: bool = False, to: Optional[List[str]] = None) -> None:
+        """`force`: send even if the event is turned off (the caller has its own
+        switch). `to`: send to these addresses instead of the usual recipients."""
         s = self.settings()
         smtp = self.state.get("smtp") or {}
-        if not s["events"].get(event) or not s["recipients"] or not smtp.get("host"):
+        recipients = to or s["recipients"]
+        if not (force or to or s["events"].get(event)) or not recipients or not smtp.get("host"):
             return
         subject = f"[Talon {self.hostname()}] {subject}"
         body = body + f"\n\n-- \nTalon on {self.hostname()}. Change notifications in Talon > Notifications."
 
         def go():
             try:
-                send_mail(smtp, s["recipients"], subject, body, self.demo)
+                send_mail(smtp, recipients, subject, body, self.demo)
                 self.state.log_activity("talon", f"Notification sent: {subject}")
             except UserError as e:
                 self.state.log_activity("talon", f"Notification failed: {e}", "warning")

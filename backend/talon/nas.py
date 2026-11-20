@@ -13,6 +13,7 @@ from .cloudsync import CloudSync
 from .files import FileBrowser
 from .jobs import JobRunner
 from .notify import Notifier
+from .scheduler import Scheduler
 from .state import State
 from .util import (NFS_CLIENT_RE, RESERVED_SHARES, SHARE_NAME_RE, USER_NAME_RE,
                    VOLUME_NAME_RE, UserError, require, unique)
@@ -41,6 +42,7 @@ class Nas:
                                  demo)
         self.cloud = CloudSync(cfg, self.state, self, demo)
         self.files = FileBrowser(self, demo)
+        self.scheduler = Scheduler(cfg, self.state, self, demo)
         self.history: collections.deque = collections.deque(maxlen=90)
         self._last_sample: Optional[dict] = None
         self._stop = threading.Event()
@@ -71,10 +73,12 @@ class Nas:
         threading.Thread(target=self._smart_refresher, daemon=True, name="smart").start()
         threading.Thread(target=self._watcher, daemon=True, name="notify").start()
         self.cloud.start()
+        self.scheduler.start()
 
     def stop(self) -> None:
         self._stop.set()
         self.cloud.stop()
+        self.scheduler.stop()
 
     def _watcher(self) -> None:
         """Every 5 minutes: mail new alerts and newly published updates."""
@@ -84,6 +88,7 @@ class Nas:
         while not self._stop.is_set():
             try:
                 self.notifier.check_alerts(self.alerts())
+                self.cloud.check_secret_expiry()
                 upd = self.state.get("update_check") or {}
                 latest = upd.get("latest")
                 if latest and is_newer(latest, __version__) and \
@@ -852,6 +857,14 @@ class Nas:
             if d.get("temperature") and d["temperature"] >= 55:
                 out.append({"level": "warning", "title": f"Disk {d['name']} is hot",
                             "detail": f"{d['temperature']} °C", "link": "/disks"})
+        exp = self.cloud.secret_expiry()
+        if exp and exp["remind"]:
+            out.append({"level": "critical" if exp["days"] < 0 else "warning",
+                        "title": "Entra ID client secret " + (
+                            "has expired" if exp["days"] < 0 else f"expires in {exp['days']} days"
+                            if exp["days"] != 1 else "expires tomorrow"),
+                        "detail": "Create a new secret in Entra and save it in Settings > Entra ID",
+                        "link": "/settings?tab=entra"})
         return out
 
     def dashboard(self) -> dict:

@@ -29,6 +29,9 @@ from typing import Dict, Optional
 from . import entra
 from .util import UserError, write_atomic
 
+REMIND_DAYS = (7, 14, 30, 60, 90)
+REMIND_DEFAULT = 30
+
 RCLONE_DIR = "/opt/talon/bin"
 RCLONE_MIN = (1, 66, 0)
 DIRECTIONS = {"pull": "Backup from OneDrive", "push": "Backup to OneDrive", "bisync": "Two-way sync"}
@@ -92,16 +95,86 @@ class CloudSync:
     def entra_public(self) -> dict:
         e = self._entra()
         return {"tenant": e.get("tenant", "common"), "client_id": e.get("client_id", ""),
-                "secret_set": bool(e.get("client_secret")), "configured": entra.configured(e)}
+                "secret_set": bool(e.get("client_secret")), "configured": entra.configured(e),
+                "secret_expires": e.get("secret_expires", ""),
+                "remind_days": e.get("remind_days", REMIND_DEFAULT),
+                "remind_to": e.get("remind_to", []),
+                "expiry": self.secret_expiry()}
 
     def entra_save(self, data: dict, user: str) -> dict:
+        from .notify import parse_recipients
         old = self._entra()
         merged = {**data, "client_secret": data.get("client_secret") or old.get("client_secret", "")}
         clean = entra.validate(merged)
         clean["tenant"] = (data.get("tenant") or "common").strip()
+        expires = str(data.get("secret_expires") or "").strip()
+        if expires:
+            try:                                    # yyyy-mm-dd from the UI, or dd-mm-yyyy
+                if re.match(r"^\d{1,2}[-./]\d{1,2}[-./]\d{4}$", expires):
+                    d, m, y = map(int, re.split(r"[-./]", expires))
+                    expires = datetime.date(y, m, d).isoformat()
+                else:
+                    expires = datetime.date.fromisoformat(expires).isoformat()
+            except ValueError:
+                raise UserError("Enter the expiry date as dd-mm-yyyy") from None
+        try:
+            days = int(data.get("remind_days", REMIND_DEFAULT))
+        except (TypeError, ValueError):
+            days = -1
+        if days not in REMIND_DAYS:
+            raise UserError("Choose when to send the reminder")
+        clean.update(secret_expires=expires, remind_days=days,
+                     remind_to=parse_recipients(data.get("remind_to") or []))
+        # a new date (or a new secret) starts the reminders again
+        if expires != old.get("secret_expires") or data.get("client_secret"):
+            clean["reminded"] = []
+        else:
+            clean["reminded"] = old.get("reminded", [])
         self.state.update(lambda d: d.__setitem__("entra", clean))
         self.state.log_activity(user, "Updated the Entra ID app settings")
         return self.entra_public()
+
+    def secret_expiry(self) -> Optional[dict]:
+        """Days until the client secret expires and whether a reminder is due."""
+        e = self._entra()
+        if not e.get("secret_expires"):
+            return None
+        try:
+            date = datetime.date.fromisoformat(e["secret_expires"])
+        except ValueError:
+            return None
+        days = (date - datetime.date.today()).days
+        return {"date": e["secret_expires"], "days": days,
+                "remind": days <= e.get("remind_days", REMIND_DEFAULT)}
+
+    def check_secret_expiry(self) -> None:
+        """Mail one reminder when the reminder period starts and one when it expires."""
+        exp = self.secret_expiry()
+        if not exp or not exp["remind"]:
+            return
+        stage = "expired" if exp["days"] < 0 else "soon"
+        e = self._entra()
+        if stage in e.get("reminded", []):
+            return
+        dmy = datetime.date.fromisoformat(exp["date"]).strftime("%d-%m-%Y")
+        if stage == "soon":
+            subject = f"Entra ID client secret expires on {dmy}"
+            when = "tomorrow" if exp["days"] == 1 else ("today" if exp["days"] == 0 else f"in {exp['days']} days")
+            body = (f"The client secret of the Entra ID app used by Talon for OneDrive expires {when} "
+                    f"({dmy}).\n\n")
+        else:
+            subject = "Entra ID client secret has expired"
+            body = f"The client secret of the Entra ID app used by Talon expired on {dmy}. " \
+                   "OneDrive tasks cannot sign in until it is replaced.\n\n"
+        body += ("To replace it: in entra.microsoft.com open the app > Certificates & secrets > "
+                 "New client secret, then paste the new Value and its expiry date in "
+                 "Talon > Settings > Entra ID and click Save.")
+        to = e.get("remind_to") or self.nas.notifier.settings()["recipients"]
+        if not to or not (self.state.get("smtp") or {}).get("host"):
+            return                      # nowhere to send it yet; try again later
+        self.nas.notifier.send("entra_secret", subject, body, force=True, to=to)
+        self.state.update(lambda d: d["entra"].__setitem__(
+            "reminded", sorted(set(d["entra"].get("reminded", [])) | {stage})))
 
     def entra_test(self, data: dict, origin: str) -> list:
         old = self._entra()
