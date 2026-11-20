@@ -5,12 +5,44 @@ import { api } from "../lib/api";
 import { ago, bytes } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Settings, SysInfo, UpdateInfo } from "../lib/types";
-import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Field, Input, PageHeader, PageLoader, Select, Switch } from "../components/ui";
+import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Field, Input, PageHeader, PageLoader, Select, Switch, Tabs } from "../components/ui";
+import EntraTab from "./SettingsEntra";
+import SmtpTab from "./SettingsSmtp";
+
+type TabId = "general" | "entra" | "smtp" | "update" | "about";
+const TABS: { value: TabId; label: string }[] = [
+  { value: "general", label: "General" },
+  { value: "entra", label: "Entra ID" },
+  { value: "smtp", label: "SMTP" },
+  { value: "update", label: "Update" },
+  { value: "about", label: "About" },
+];
 
 export default function SettingsPage() {
+  const initial = new URLSearchParams(location.search).get("tab") as TabId | null;
+  const [tab, setTab] = useState<TabId>(TABS.some((t) => t.value === initial) ? initial! : "general");
+  const change = (t: TabId) => {
+    setTab(t);
+    history.replaceState(null, "", t === "general" ? location.pathname : `${location.pathname}?tab=${t}`);
+  };
+  return (
+    <>
+      <PageHeader title="Settings" description="System, Microsoft sign-in, e-mail and updates." />
+      <div className="mb-5">
+        <Tabs value={tab} onChange={change} tabs={TABS} />
+      </div>
+      {tab === "general" && <GeneralTab />}
+      {tab === "entra" && <EntraTab />}
+      {tab === "smtp" && <SmtpTab />}
+      {tab === "update" && <SoftwareUpdate />}
+      {tab === "about" && <AboutTab />}
+    </>
+  );
+}
+
+function GeneralTab() {
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.get<Settings>("/settings") });
   const tz = useQuery({ queryKey: ["timezones"], queryFn: () => api.get<string[]>("/settings/timezones"), staleTime: Infinity });
-  const sys = useQuery({ queryKey: ["system"], queryFn: () => api.get<SysInfo>("/system") });
   const [form, setForm] = useState<Settings | null>(null);
   useEffect(() => {
     if (settings.data) setForm(settings.data);
@@ -19,94 +51,92 @@ export default function SettingsPage() {
     success: "Settings saved",
     invalidate: ["settings", "system", "dashboard"],
   });
-  if (!form || !sys.data) return <PageLoader />;
+  if (!form) return <PageLoader />;
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setForm({ ...form, [k]: v });
   const FIELDS = ["hostname", "timezone", "workgroup", "smb_min_protocol", "smb_macos_compat"] as const;
   const changed = !!settings.data && FIELDS.some((k) => form[k] !== settings.data![k]);
-
   return (
-    <>
-      <PageHeader title="Settings" description="Name, file sharing and software updates." />
-      <div className="grid gap-5 xl:grid-cols-2">
-        <SoftwareUpdate />
-        <Card className="xl:col-span-2">
-          <CardHeader
-            icon={<Server className="size-4.5" />}
-            title="General & file sharing"
-            subtitle="Name, time zone and Windows/macOS sharing"
-            actions={
-              <Button
-                variant="primary"
-                disabled={!changed}
-                loading={save.isPending}
-                onClick={() =>
-                  save.mutate({
-                    hostname: form.hostname,
-                    timezone: form.timezone,
-                    workgroup: form.workgroup,
-                    smb_min_protocol: form.smb_min_protocol,
-                    smb_macos_compat: form.smb_macos_compat,
-                  })
-                }
-              >
-                Save
-              </Button>
+    <Card>
+      <CardHeader
+        icon={<Server className="size-4.5" />}
+        title="General & file sharing"
+        subtitle="Name, time zone and Windows/macOS sharing"
+        actions={
+          <Button
+            variant="primary"
+            disabled={!changed}
+            loading={save.isPending}
+            onClick={() =>
+              save.mutate({
+                hostname: form.hostname,
+                timezone: form.timezone,
+                workgroup: form.workgroup,
+                smb_min_protocol: form.smb_min_protocol,
+                smb_macos_compat: form.smb_macos_compat,
+              })
             }
-          />
-          <div className="grid gap-x-8 gap-y-4 px-5 pb-5 md:grid-cols-2 [&>*]:min-w-0">
-            <Field label="Hostname" hint={`Reachable as ${form.hostname}.local`}>
-              <Input value={form.hostname} onChange={(e) => set("hostname", e.target.value)} />
-            </Field>
-            <div className="grid gap-4 sm:grid-cols-2 [&>*]:min-w-0">
-              <Field label="Workgroup">
-                <Input value={form.workgroup} onChange={(e) => set("workgroup", e.target.value.toUpperCase())} maxLength={15} />
-              </Field>
-              <Field label="Minimum SMB protocol" hint="SMB2_10+ recommended">
-                <Select value={form.smb_min_protocol} onChange={(e) => set("smb_min_protocol", e.target.value)}>
-                  {form.smb_protocols.map((p) => (
-                    <option key={p}>{p}</option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
-            <Field label="Time zone">
-              <Select value={form.timezone} onChange={(e) => set("timezone", e.target.value)}>
-                {(tz.data ?? [form.timezone]).map((t) => (
-                  <option key={t}>{t}</option>
-                ))}
-              </Select>
-            </Field>
-            <div>
-              <div className="mb-1.5 text-[13px] font-medium">macOS compatibility</div>
-              <div className="flex h-10 items-center justify-between gap-4 rounded-xl bg-zinc-50 px-3.5 dark:bg-white/[0.03]">
-                <span className="truncate text-[13px] text-zinc-600 dark:text-zinc-400">Faster Finder browsing and correct metadata</span>
-                <Switch checked={form.smb_macos_compat} onChange={(v) => set("smb_macos_compat", v)} label="macOS compatibility" />
-              </div>
-            </div>
-          </div>
-        </Card>
-
-        <Card className="xl:col-span-2">
-          <CardHeader icon={<Info className="size-4.5" />} title="About" />
-          <dl className="space-y-2.5 px-5 pb-5 text-[13px]">
-            {[
-              ["Talon version", sys.data.version],
-              ["Hardware", sys.data.model],
-              ["Processor", `${sys.data.cpu} (${sys.data.cores} cores, ${sys.data.arch})`],
-              ["Memory", bytes(sys.data.memory)],
-              ["Operating system", sys.data.os],
-              ["Kernel", sys.data.kernel],
-            ].map(([k, v]) => (
-              <div key={k} className="flex justify-between gap-4">
-                <dt className="text-zinc-500">{k}</dt>
-                <dd className="text-right font-medium">{v}</dd>
-              </div>
+          >
+            Save
+          </Button>
+        }
+      />
+      <div className="grid gap-x-8 gap-y-4 px-5 pb-5 md:grid-cols-2 [&>*]:min-w-0">
+        <Field label="Hostname" hint={`Reachable as ${form.hostname}.local`}>
+          <Input value={form.hostname} onChange={(e) => set("hostname", e.target.value)} />
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2 [&>*]:min-w-0">
+          <Field label="Workgroup">
+            <Input value={form.workgroup} onChange={(e) => set("workgroup", e.target.value.toUpperCase())} maxLength={15} />
+          </Field>
+          <Field label="Minimum SMB protocol" hint="SMB2_10+ recommended">
+            <Select value={form.smb_min_protocol} onChange={(e) => set("smb_min_protocol", e.target.value)}>
+              {form.smb_protocols.map((p) => (
+                <option key={p}>{p}</option>
+              ))}
+            </Select>
+          </Field>
+        </div>
+        <Field label="Time zone">
+          <Select value={form.timezone} onChange={(e) => set("timezone", e.target.value)}>
+            {(tz.data ?? [form.timezone]).map((t) => (
+              <option key={t}>{t}</option>
             ))}
-          </dl>
-        </Card>
-
+          </Select>
+        </Field>
+        <div>
+          <div className="mb-1.5 text-[13px] font-medium">macOS compatibility</div>
+          <div className="flex h-10 items-center justify-between gap-4 rounded-xl bg-zinc-50 px-3.5 dark:bg-white/[0.03]">
+            <span className="truncate text-[13px] text-zinc-600 dark:text-zinc-400">Faster Finder browsing and correct metadata</span>
+            <Switch checked={form.smb_macos_compat} onChange={(v) => set("smb_macos_compat", v)} label="macOS compatibility" />
+          </div>
+        </div>
       </div>
-    </>
+    </Card>
+  );
+}
+
+function AboutTab() {
+  const sys = useQuery({ queryKey: ["system"], queryFn: () => api.get<SysInfo>("/system") });
+  if (!sys.data) return <PageLoader />;
+  return (
+    <Card>
+      <CardHeader icon={<Info className="size-4.5" />} title="About" subtitle="This NAS and its software" />
+      <dl className="space-y-2.5 px-5 pb-5 text-[13px]">
+        {[
+          ["Talon version", sys.data.version],
+          ["Hardware", sys.data.model],
+          ["Processor", `${sys.data.cpu} (${sys.data.cores} cores, ${sys.data.arch})`],
+          ["Memory", bytes(sys.data.memory)],
+          ["Operating system", sys.data.os],
+          ["Kernel", sys.data.kernel],
+        ].map(([k, v]) => (
+          <div key={k} className="flex justify-between gap-4">
+            <dt className="text-zinc-500">{k}</dt>
+            <dd className="text-right font-medium">{v}</dd>
+          </div>
+        ))}
+      </dl>
+    </Card>
   );
 }
 
@@ -137,7 +167,7 @@ function SoftwareUpdate() {
   });
   if (!data) return null;
   return (
-    <Card className="xl:col-span-2">
+    <Card>
       <CardHeader
         icon={<Sparkles className="size-4.5" />}
         title="Software update"

@@ -51,6 +51,8 @@ https://<nas-ip>/
 - **Users & groups:** NAS accounts with Samba passwords kept in sync
 - **Discovery:** appears in Windows Network and macOS Finder
 - **Dashboard:** live system stats, storage health and alerts
+- **OneDrive:** back up to or from OneDrive, or two-way sync (beta)
+- **Notifications:** e-mail alerts for RAID, disks, tasks and updates
 
 ---
 

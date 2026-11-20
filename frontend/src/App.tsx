@@ -4,6 +4,7 @@ import {
   Activity as ActivityIcon,
   Bell,
   ChevronsUpDown,
+  Cloud,
   Database,
   FolderOpen,
   HardDrive,
@@ -11,6 +12,7 @@ import {
   Layers,
   Loader2,
   LogOut,
+  Mail,
   Menu as MenuIcon,
   Moon,
   Power,
@@ -25,13 +27,15 @@ import { api, setUnauthorizedHandler } from "./lib/api";
 import { cx } from "./lib/format";
 import { useTheme } from "./lib/hooks";
 import { Link, navigate, usePath } from "./lib/router";
-import type { Alert, Job, UpdateInfo } from "./lib/types";
+import type { Alert, Job, OneDriveStatus, UpdateInfo } from "./lib/types";
 import { ConfirmDialog, IconButton, Menu, MenuItem, PageLoader } from "./components/ui";
 import { useAction } from "./lib/hooks";
 import { JobDialog } from "./components/jobs";
 import { Reconnecting, UpdateOverlay, UpdatePill } from "./components/update";
 import Login from "./pages/Login";
 import DashboardPage from "./pages/Dashboard";
+import NotificationsPage from "./pages/Notifications";
+import OneDrivePage from "./pages/OneDrive";
 import RaidPage from "./pages/Raid";
 import VolumesPage from "./pages/Volumes";
 import DisksPage from "./pages/Disks";
@@ -51,6 +55,7 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
       { to: "/raid", label: "RAID", icon: Layers, page: RaidPage },
       { to: "/volumes", label: "Volumes", icon: Database, page: VolumesPage },
       { to: "/disks", label: "Disks", icon: HardDrive, page: DisksPage },
+      { to: "/onedrive", label: "OneDrive", icon: Cloud, page: OneDrivePage },
     ],
   },
   {
@@ -66,6 +71,7 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
       { to: "/services", label: "Services", icon: Server, page: ServicesPage },
       { to: "/settings", label: "Settings", icon: SettingsIcon, page: SettingsPage },
       { to: "/activity", label: "Activity", icon: ActivityIcon, page: ActivityPage },
+      { to: "/notifications", label: "Notifications", icon: Mail, page: NotificationsPage },
     ],
   },
 ];
@@ -118,6 +124,7 @@ function Shell({ me }: { me: Me }) {
     refetchInterval: 30000,
   });
   const update = useQuery({ queryKey: ["update"], queryFn: () => api.get<UpdateInfo>("/update"), refetchInterval: 15 * 60000 });
+  const onedrive = useQuery({ queryKey: ["onedrive"], queryFn: () => api.get<OneDriveStatus>("/onedrive"), refetchInterval: 30000 });
   const running = (jobs.data ?? []).filter((j) => j.status === "running" || j.status === "queued");
 
   // refresh storage views when a job finishes
@@ -133,6 +140,9 @@ function Shell({ me }: { me: Me }) {
   }, [path]);
 
   const all = NAV.flatMap((s) => s.items);
+  // the OneDrive link is shown only while the OneDrive service is enabled
+  const onedriveOn = !!onedrive.data?.enabled;
+  const visible = (to: string) => to !== "/onedrive" || onedriveOn || path === "/onedrive";
   const current = all.find((i) => i.to === path) ?? (path === "/" ? all[0] : null);
   const Page = current?.page ?? (() => <NotFound />);
 
@@ -186,7 +196,7 @@ function Shell({ me }: { me: Me }) {
           <div key={s.section}>
             {s.section && <div className="mb-1.5 px-3 text-[11px] font-semibold tracking-wider text-zinc-400 uppercase dark:text-zinc-500">{s.section}</div>}
             <div className="space-y-0.5">
-              {s.items.map((i) => {
+              {s.items.filter((i) => visible(i.to)).map((i) => {
                 const active = i.to === path;
                 return (
                   <Link

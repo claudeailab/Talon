@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { Apple, Globe, Monitor, Network, RotateCw, Server, Terminal } from "lucide-react";
+import { Apple, Cloud, Globe, Monitor, Network, RotateCw, Server, Settings2, Terminal } from "lucide-react";
 import { api } from "../lib/api";
 import { useAction } from "../lib/hooks";
+import { navigate } from "../lib/router";
 import type { Service } from "../lib/types";
 import { Badge, Button, Card, PageHeader, PageLoader, StatusDot, Switch } from "../components/ui";
 
@@ -12,13 +13,17 @@ const ICONS: Record<string, React.ReactNode> = {
   wsdd: <Network className="size-5" />,
   mdns: <Apple className="size-5" />,
   ssh: <Terminal className="size-5" />,
+  onedrive: <Cloud className="size-5" />,
 };
 
 export default function ServicesPage() {
   const { data } = useQuery({ queryKey: ["services"], queryFn: () => api.get<Service[]>("/services"), refetchInterval: 10000 });
   const act = useAction(({ id, action }: { id: string; action: string }) => api.post(`/services/${id}/${action}`), {
     success: (_r, v) => `Service ${v.action === "enable" ? "enabled" : v.action === "disable" ? "disabled" : "restarted"}`,
-    invalidate: ["services"],
+    invalidate: ["services", "onedrive"],
+    onSuccess: (_r, v) => {
+      if (v.id === "onedrive" && v.action === "enable") navigate("/onedrive"); // straight to setup
+    },
   });
   if (!data) return <PageLoader />;
   return (
@@ -49,10 +54,22 @@ export default function ServicesPage() {
               {s.description}
             </p>
             <div className="mt-4 flex items-center justify-between">
-              {s.enabled ? <Badge tone="green">Starts at boot</Badge> : <Badge>Disabled at boot</Badge>}
-              <Button size="sm" variant="ghost" icon={<RotateCw className="size-3.5" />} disabled={!s.installed || !s.active} onClick={() => act.mutate({ id: s.id, action: "restart" })}>
-                Restart
-              </Button>
+              {s.app ? (
+                s.enabled ? <Badge tone="green">Enabled</Badge> : <Badge>Disabled</Badge>
+              ) : s.enabled ? (
+                <Badge tone="green">Starts at boot</Badge>
+              ) : (
+                <Badge>Disabled at boot</Badge>
+              )}
+              {s.app ? (
+                <Button size="sm" variant="ghost" icon={<Settings2 className="size-3.5" />} disabled={!s.enabled} onClick={() => navigate("/onedrive")}>
+                  Configure
+                </Button>
+              ) : (
+                <Button size="sm" variant="ghost" icon={<RotateCw className="size-3.5" />} disabled={!s.installed || !s.active} onClick={() => act.mutate({ id: s.id, action: "restart" })}>
+                  Restart
+                </Button>
+              )}
             </div>
           </Card>
         ))}

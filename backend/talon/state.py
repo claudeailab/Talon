@@ -22,6 +22,10 @@ DEFAULT_STATE: dict = {
         "smb_min_protocol": "SMB2_10",
         "smb_macos_compat": True,
     },
+    "entra": {},
+    "smtp": {},
+    "notifications": {},
+    "onedrive": {"enabled": False, "tasks": {}},
     "activity": [],
 }
 

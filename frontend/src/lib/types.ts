@@ -156,6 +156,7 @@ export interface Service {
   enabled: boolean;
   label: string;
   description: string;
+  app?: boolean;
 }
 
 export interface SysInfo {
@@ -245,4 +246,63 @@ export interface UpdateInfo {
   error: string | null;
   repo: string;
   status: UpdateStatus;
+}
+
+export interface EntraConfig {
+  tenant: string;
+  client_id: string;
+  secret_set: boolean;
+  configured: boolean;
+}
+
+export interface EntraCheck {
+  name: string;
+  ok: boolean;
+  detail: string;
+}
+
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  security: "starttls" | "ssl" | "none";
+  username: string;
+  sender: string;
+  password_set: boolean;
+  configured: boolean;
+}
+
+export interface NotificationSettings {
+  recipients: string[];
+  events: Record<string, boolean>;
+  labels: Record<string, string>;
+  smtp: boolean;
+}
+
+export type Schedule = { kind: "manual" } | { kind: "interval"; minutes: number } | { kind: "daily"; time: string };
+
+export interface CloudTask {
+  id: string;
+  name: string;
+  direction: "pull" | "push" | "bisync";
+  remote: string;
+  volume: string;
+  folder: string;
+  schedule: Schedule;
+  bwlimit: string;
+  delete: boolean;
+  versions: boolean;
+  max_delete: number;
+  created: number;
+  next_run: number | null;
+  last: { started: number; finished: number; status: "success" | "error" | "cancelled"; files: number; bytes: number; error: string | null } | null;
+  running: { started: number; files: number; total_files: number; bytes: number; total_bytes: number; speed: number } | null;
+}
+
+export interface OneDriveStatus {
+  enabled: boolean;
+  entra: EntraConfig;
+  connected: boolean;
+  account: { name: string; email: string; drive_type: string; used: number; total: number; connected_at: number } | null;
+  rclone: { installed: boolean; installing: boolean };
+  tasks: CloudTask[];
 }

@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.22
+- OneDrive service: back up to or from OneDrive, or two-way sync (beta), on a schedule
+- Settings now use tabs, with new Entra ID and SMTP tabs
+- New Notifications page for e-mail alerts
+
 ## 1.0.21
 - All messages, service cards and hints fit on a single line
 - Shorter service names, e.g. "Bonjour (mDNS)" and "NetBIOS"

@@ -9,7 +9,9 @@ import time
 from typing import Dict, List, Optional
 
 from . import raid, sharecfg
+from .cloudsync import CloudSync
 from .jobs import JobRunner
+from .notify import Notifier
 from .state import State
 from .util import (NFS_CLIENT_RE, RESERVED_SHARES, SHARE_NAME_RE, USER_NAME_RE,
                    VOLUME_NAME_RE, UserError, require, unique)
@@ -33,6 +35,10 @@ class Nas:
             platform.seed_state(self.state)
         self._migrate()
         self.jobs = JobRunner(on_done=self._job_done)
+        demo = bool(getattr(platform, "demo", False))
+        self.notifier = Notifier(self.state, lambda: self.p.system_info().get("hostname", "nas"),
+                                 demo)
+        self.cloud = CloudSync(cfg, self.state, self, demo)
         self.history: collections.deque = collections.deque(maxlen=90)
         self._last_sample: Optional[dict] = None
         self._stop = threading.Event()
@@ -61,9 +67,32 @@ class Nas:
     def start(self) -> None:
         threading.Thread(target=self._sampler, daemon=True, name="sampler").start()
         threading.Thread(target=self._smart_refresher, daemon=True, name="smart").start()
+        threading.Thread(target=self._watcher, daemon=True, name="notify").start()
+        self.cloud.start()
 
     def stop(self) -> None:
         self._stop.set()
+        self.cloud.stop()
+
+    def _watcher(self) -> None:
+        """Every 5 minutes: mail new alerts and newly published updates."""
+        from . import __version__
+        from .update import is_newer
+        self._stop.wait(60)
+        while not self._stop.is_set():
+            try:
+                self.notifier.check_alerts(self.alerts())
+                upd = self.state.get("update_check") or {}
+                latest = upd.get("latest")
+                if latest and is_newer(latest, __version__) and \
+                        self.state.get("notify_update") != latest:
+                    self.notifier.send("update", f"Talon {latest} is available",
+                                       f"Talon {latest} is available (you have {__version__}).\n"
+                                       "Install it in Settings > Update.")
+                    self.state.update(lambda d: d.__setitem__("notify_update", latest))
+            except Exception:
+                pass
+            self._stop.wait(300)
 
     def _sampler(self) -> None:
         while not self._stop.is_set():
@@ -98,6 +127,8 @@ class Nas:
         level = "info" if job.status == "success" else "error"
         msg = job.title + (" completed" if job.status == "success" else f" failed: {job.error}")
         self.state.log_activity(job.user, msg, level)
+        if job.status == "error":
+            self.notifier.send("task_failed", f"{job.title} failed", f"{job.title} failed:\n{job.error}")
 
     # ---------------------------------------------------------------- disks
     def disks(self) -> List[dict]:
@@ -820,7 +851,7 @@ class Nas:
             "volumes": volumes,
             "disks": [{k: d[k] for k in ("name", "model", "size", "kind", "status", "health",
                                          "temperature", "volume", "array")} for d in disks],
-            "services": self.p.services(),
+            "services": self.p.services() + [self.cloud.service_info()],
             "alerts": self.alerts(volumes, disks),
             "shares": len(self.state.get("shares")),
             "users": len(self.users()),

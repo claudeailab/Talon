@@ -2,22 +2,38 @@
 from __future__ import annotations
 
 import contextlib
+import html as htmllib
+import json
 import os
 import threading
 import time
 from typing import List, Optional
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from pydantic import BaseModel
 
-from . import __version__
+from . import __version__, notify
 from .auth import COOKIE, Sessions
 from .nas import Nas
 from .update import DemoUpdater, Updater, health as health_info
 from .util import CommandError, UserError
 
 WEB_DIR = os.path.join(os.path.dirname(__file__), "web")
+
+
+def callback_page(ok: bool, text: str) -> str:
+    """Page shown in the Microsoft sign-in popup after it returns to Talon."""
+    msg = json.dumps({"talon": "onedrive", "ok": ok, "message": text})
+    color = "#047857" if ok else "#be123c"
+    return f"""<!doctype html><html><head><meta charset="utf-8"><title>Talon</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;
+height:100vh;margin:0;background:#fafafa"><div style="text-align:center;padding:24px">
+<p style="font-size:18px;font-weight:600;color:{color}">{htmllib.escape(text)}</p>
+<p style="color:#71717a">You can close this window.</p></div>
+<script>try{{window.opener&&window.opener.postMessage({msg},location.origin)}}catch(e){{}}
+setTimeout(function(){{window.close()}},{1200 if ok else 6000});</script></body></html>"""
 
 
 class LoginIn(BaseModel):
@@ -120,6 +136,7 @@ def create_app(cfg, platform) -> FastAPI:
         if not ok:
             sessions.failed(ip)
             nas.state.log_activity(user or "?", f"Failed login from {ip}", "warning")
+            nas.notifier.login_failed(user or "?", ip)
             raise HTTPException(401, "Invalid user name or password, or not an administrator")
         sessions.succeeded(ip)
         token = sessions.create(user)
@@ -315,13 +332,132 @@ def create_app(cfg, platform) -> FastAPI:
     # ------------------------------------------------------------ services & system
     @app.get("/api/services")
     def services(_u: str = Depends(current_user)):
-        return platform.services()
+        return platform.services() + [nas.cloud.service_info()]
 
     @app.post("/api/services/{sid}/{action}")
     def service_action(sid: str, action: str, user: str = Depends(current_user)):
+        if sid == "onedrive":
+            if action not in ("enable", "disable"):
+                raise HTTPException(400, "OneDrive can only be enabled or disabled")
+            job = nas.cloud.set_enabled(action == "enable", user)
+            return {"ok": True, "job": job.to_dict() if job else None}
         platform.service_action(sid, action)
         nas.state.log_activity(user, f"Service {sid}: {action}")
         return {"ok": True}
+
+    # ------------------------------------------------------------ Entra ID, SMTP, notifications
+    @app.get("/api/settings/entra")
+    def entra_get(_u: str = Depends(current_user)):
+        return nas.cloud.entra_public()
+
+    @app.put("/api/settings/entra")
+    def entra_put(body: dict = Body(...), user: str = Depends(current_user)):
+        return nas.cloud.entra_save(body, user)
+
+    @app.post("/api/settings/entra/test")
+    def entra_test(body: dict = Body(...), _u: str = Depends(current_user)):
+        return {"checks": nas.cloud.entra_test(body.get("config") or {}, body.get("origin", ""))}
+
+    @app.get("/api/settings/smtp")
+    def smtp_get(_u: str = Depends(current_user)):
+        return notify.smtp_public(nas.state.get("smtp") or {})
+
+    @app.put("/api/settings/smtp")
+    def smtp_put(body: dict = Body(...), user: str = Depends(current_user)):
+        clean = notify.smtp_validate(body, nas.state.get("smtp") or {})
+        nas.state.update(lambda d: d.__setitem__("smtp", clean))
+        nas.state.log_activity(user, "Updated the SMTP settings")
+        return notify.smtp_public(clean)
+
+    @app.post("/api/settings/smtp/test")
+    def smtp_test(body: dict = Body(...), _u: str = Depends(current_user)):
+        cfg_ = notify.smtp_validate(body.get("config") or {}, nas.state.get("smtp") or {})
+        to = notify.parse_recipients(body.get("to", ""))
+        host = platform.system_info().get("hostname", "nas")
+        notify.send_mail(cfg_, to, f"[Talon {host}] SMTP test",
+                         "This test e-mail confirms that Talon can send notifications.", cfg.demo)
+        return {"ok": True}
+
+    @app.get("/api/notifications")
+    def notifications_get(_u: str = Depends(current_user)):
+        return {**nas.notifier.settings(),
+                "smtp": notify.smtp_public(nas.state.get("smtp") or {})["configured"]}
+
+    @app.put("/api/notifications")
+    def notifications_put(body: dict = Body(...), user: str = Depends(current_user)):
+        out = nas.notifier.save(body)
+        nas.state.log_activity(user, "Updated the notification settings")
+        return {**out, "smtp": notify.smtp_public(nas.state.get("smtp") or {})["configured"]}
+
+    @app.post("/api/notifications/test")
+    def notifications_test(_u: str = Depends(current_user)):
+        nas.notifier.test()
+        return {"ok": True}
+
+    # ------------------------------------------------------------ OneDrive
+    @app.get("/api/onedrive")
+    def onedrive(_u: str = Depends(current_user)):
+        return nas.cloud.status()
+
+    @app.post("/api/onedrive/connect")
+    def onedrive_connect(body: dict = Body(...), _u: str = Depends(current_user)):
+        return {"url": nas.cloud.connect_start(body.get("origin", ""))}
+
+    @app.get("/api/onedrive/callback", response_class=HTMLResponse)
+    def onedrive_callback(code: str = "", state: str = "", error: str = "",
+                          error_description: str = ""):
+        # Microsoft redirects the sign-in popup here. The unguessable, single-use
+        # state value (created by a signed-in administrator) authorises the call.
+        try:
+            acct = nas.cloud.callback(code, state, error, error_description)
+            ok, text = True, f"OneDrive connected: {acct['email']}"
+        except UserError as e:
+            ok, text = False, str(e)
+        return HTMLResponse(callback_page(ok, text))
+
+    @app.post("/api/onedrive/disconnect")
+    def onedrive_disconnect(user: str = Depends(current_user)):
+        nas.cloud.disconnect(user)
+        return {"ok": True}
+
+    @app.post("/api/onedrive/refresh")
+    def onedrive_refresh(_u: str = Depends(current_user)):
+        return {"account": nas.cloud.refresh_account()}
+
+    @app.get("/api/onedrive/folders")
+    def onedrive_folders(path: str = "", _u: str = Depends(current_user)):
+        return nas.cloud.folders(path)
+
+    @app.get("/api/onedrive/local-folders")
+    def onedrive_local_folders(volume: str, path: str = "", _u: str = Depends(current_user)):
+        return nas.cloud.local_folders(volume, path)
+
+    @app.post("/api/onedrive/tasks")
+    def onedrive_task_create(body: dict = Body(...), user: str = Depends(current_user)):
+        return nas.cloud.create_task(body, user)
+
+    @app.put("/api/onedrive/tasks/{tid}")
+    def onedrive_task_update(tid: str, body: dict = Body(...), user: str = Depends(current_user)):
+        return nas.cloud.update_task(tid, body, user)
+
+    @app.delete("/api/onedrive/tasks/{tid}")
+    def onedrive_task_delete(tid: str, user: str = Depends(current_user)):
+        nas.cloud.delete_task(tid, user)
+        return {"ok": True}
+
+    @app.post("/api/onedrive/tasks/{tid}/run")
+    def onedrive_task_run(tid: str, user: str = Depends(current_user)):
+        nas.cloud.run_task(tid, user)
+        return {"ok": True}
+
+    @app.post("/api/onedrive/tasks/{tid}/stop")
+    def onedrive_task_stop(tid: str, _u: str = Depends(current_user)):
+        nas.cloud.stop_task(tid)
+        return {"ok": True}
+
+    @app.get("/api/onedrive/tasks/{tid}/log")
+    def onedrive_task_log(tid: str, _u: str = Depends(current_user)):
+        return nas.cloud.task_log(tid)
 
     @app.get("/api/settings")
     def settings(_u: str = Depends(current_user)):
