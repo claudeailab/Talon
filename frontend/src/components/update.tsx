@@ -180,7 +180,7 @@ export function UpdatePill({ onClick, version }: { onClick: () => void; version:
   return (
     <button
       onClick={onClick}
-      className="hidden items-center gap-1.5 rounded-full bg-gradient-to-r from-brand-600 to-violet-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm shadow-brand-600/30 transition hover:brightness-110 sm:flex"
+      className="flex w-full items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-brand-600 to-violet-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm shadow-brand-600/30 transition hover:brightness-110"
     >
       <Sparkles className="size-3.5" /> Update {version} available
     </button>

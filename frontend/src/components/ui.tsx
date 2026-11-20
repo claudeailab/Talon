@@ -564,7 +564,19 @@ export function PageHeader({ title, description, actions }: { title: string; des
 }
 
 /* ------------------------------------------------------------------ Menu */
-export function Menu({ trigger, children, align = "right" }: { trigger: ReactNode; children: ReactNode; align?: "left" | "right" }) {
+export function Menu({
+  trigger,
+  children,
+  align = "right",
+  placement = "bottom",
+  className,
+}: {
+  trigger: ReactNode;
+  children: ReactNode;
+  align?: "left" | "right";
+  placement?: "bottom" | "top";
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -579,14 +591,15 @@ export function Menu({ trigger, children, align = "right" }: { trigger: ReactNod
     };
   }, [open]);
   return (
-    <div className="relative" ref={ref}>
+    <div className={cx("relative", className)} ref={ref}>
       <div onClick={() => setOpen((o) => !o)}>{trigger}</div>
       {open && (
         <div
           onClick={() => setOpen(false)}
           className={cx(
-            "absolute z-40 mt-1.5 min-w-52 animate-pop rounded-xl bg-white p-1.5 shadow-xl ring-1 ring-zinc-900/10 dark:bg-zinc-800 dark:ring-white/10",
+            "absolute z-40 min-w-52 animate-pop rounded-xl bg-white p-1.5 shadow-xl ring-1 ring-zinc-900/10 dark:bg-zinc-800 dark:ring-white/10",
             align === "right" ? "right-0" : "left-0",
+            placement === "top" ? "bottom-full mb-1.5" : "mt-1.5",
           )}
         >
           {children}

@@ -3,6 +3,7 @@ import { useEffect, useState, type ComponentType } from "react";
 import {
   Activity as ActivityIcon,
   Bell,
+  ChevronsUpDown,
   Database,
   FolderOpen,
   HardDrive,
@@ -11,6 +12,8 @@ import {
   LogOut,
   Menu as MenuIcon,
   Moon,
+  Power,
+  RotateCcw,
   Server,
   Settings as SettingsIcon,
   Sun,
@@ -22,7 +25,8 @@ import { cx } from "./lib/format";
 import { useTheme } from "./lib/hooks";
 import { Link, navigate, usePath } from "./lib/router";
 import type { Alert, Job, UpdateInfo } from "./lib/types";
-import { IconButton, Menu, MenuItem, PageLoader } from "./components/ui";
+import { ConfirmDialog, IconButton, Menu, MenuItem, PageLoader } from "./components/ui";
+import { useAction } from "./lib/hooks";
 import { JobDialog } from "./components/jobs";
 import { Reconnecting, UpdateOverlay, UpdatePill } from "./components/update";
 import Login from "./pages/Login";
@@ -99,7 +103,11 @@ function Shell({ me }: { me: Me }) {
   const [dark, toggleTheme] = useTheme();
   const [mobileNav, setMobileNav] = useState(false);
   const [openJob, setOpenJob] = useState<string | null>(null);
-  const host = useQuery({ queryKey: ["system"], queryFn: () => api.get<{ hostname: string; version: string }>("/system"), staleTime: 60000 });
+  const [power, setPower] = useState<"reboot" | "poweroff" | null>(null);
+  const doPower = useAction((action: string) => api.post("/system/power", { action }), {
+    success: (_r, a) => (a === "reboot" ? "Restarting… this page reconnects when the NAS is back." : "Shutting down…"),
+    onSuccess: () => setPower(null),
+  });
   const jobs = useQuery({ queryKey: ["jobs"], queryFn: () => api.get<Job[]>("/jobs"), refetchInterval: 3000 });
   const alerts = useQuery({
     queryKey: ["alerts"],
@@ -128,10 +136,41 @@ function Shell({ me }: { me: Me }) {
     navigate("/");
   };
 
+  const notifications = (align: "left" | "right") => (
+    <Menu
+      align={align}
+      trigger={
+        <IconButton label="Notifications" className="relative">
+          <Bell className="size-5" />
+          {!!alerts.data?.length && (
+            <span className="absolute top-1.5 right-1.5 flex size-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white ring-2 ring-zinc-50 dark:ring-zinc-950">
+              {alerts.data.length}
+            </span>
+          )}
+        </IconButton>
+      }
+    >
+      <div className="w-72 px-2 py-1.5 text-xs font-semibold text-zinc-500">Notifications</div>
+      {alerts.data?.length ? (
+        alerts.data.map((a, i) => (
+          <MenuItem key={i} onClick={() => navigate(a.link)}>
+            <div>
+              <div className={a.level === "critical" ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400"}>{a.title}</div>
+              <div className="text-xs font-normal text-zinc-500">{a.detail}</div>
+            </div>
+          </MenuItem>
+        ))
+      ) : (
+        <div className="px-2.5 pb-3 text-[13px] text-zinc-500">All clear — no issues detected.</div>
+      )}
+    </Menu>
+  );
+
   const sidebar = (
     <div className="flex h-full flex-col">
       <div className="flex h-16 items-center justify-between px-5">
         <Logo />
+        <div className="hidden lg:block">{notifications("left")}</div>
         <IconButton label="Close menu" className="lg:hidden" onClick={() => setMobileNav(false)}>
           <X className="size-5" />
         </IconButton>
@@ -163,22 +202,67 @@ function Shell({ me }: { me: Me }) {
           </div>
         ))}
       </nav>
-      <div className="border-t border-zinc-200/70 p-3 dark:border-white/5">
-        <div className="flex items-center gap-3 rounded-xl px-2 py-2">
-          <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-violet-500 text-sm font-semibold text-white uppercase">
-            {me.user.slice(0, 1)}
-          </div>
-          <div className="min-w-0 flex-1 leading-tight">
-            <div className="truncate text-sm font-medium">{me.user}</div>
-            <div className="truncate text-xs text-zinc-500">
-              {host.data?.hostname ?? "…"} · v{me.version}
+      {(me.demo || running.length > 0 || (update.data?.available && update.data.status.state !== "running")) && (
+        <div className="space-y-2 px-3 pb-3">
+          {me.demo && (
+            <div className="rounded-full bg-amber-100 px-3 py-1.5 text-center text-xs font-medium text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+              Demo mode — simulated hardware
             </div>
-          </div>
+          )}
+          {update.data?.available && update.data.status.state !== "running" && (
+            <UpdatePill version={update.data.latest!} onClick={() => navigate("/settings")} />
+          )}
+          {running.length > 0 && (
+            <Menu
+              align="left"
+              placement="top"
+              trigger={
+                <button className="flex w-full items-center justify-center gap-2 rounded-full bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  {running.length} task{running.length > 1 ? "s" : ""} running
+                </button>
+              }
+            >
+              {running.map((j) => (
+                <MenuItem key={j.id} onClick={() => setOpenJob(j.id)} icon={<Loader2 className="animate-spin" />}>
+                  {j.title}
+                </MenuItem>
+              ))}
+            </Menu>
+          )}
+        </div>
+      )}
+      <div className="border-t border-zinc-200/70 p-3 dark:border-white/5">
+        <div className="flex items-center gap-1">
+          <Menu
+            align="left"
+            placement="top"
+            className="min-w-0 flex-1"
+            trigger={
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-xl px-2 py-2 text-left transition hover:bg-zinc-200/40 dark:hover:bg-white/[0.04]"
+              >
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand-500 to-violet-500 text-sm font-semibold text-white uppercase">
+                  {me.user.slice(0, 1)}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">{me.user}</span>
+                <ChevronsUpDown className="size-4 shrink-0 text-zinc-400" />
+              </button>
+            }
+          >
+            <MenuItem icon={<LogOut />} onClick={logout}>
+              Log out
+            </MenuItem>
+            <MenuItem icon={<RotateCcw />} onClick={() => setPower("reboot")}>
+              Restart
+            </MenuItem>
+            <MenuItem icon={<Power />} danger onClick={() => setPower("poweroff")}>
+              Shut down
+            </MenuItem>
+          </Menu>
           <IconButton label={dark ? "Light mode" : "Dark mode"} onClick={toggleTheme}>
             {dark ? <Sun className="size-4.5" /> : <Moon className="size-4.5" />}
-          </IconButton>
-          <IconButton label="Sign out" onClick={logout}>
-            <LogOut className="size-4.5" />
           </IconButton>
         </div>
       </div>
@@ -197,64 +281,13 @@ function Shell({ me }: { me: Me }) {
         </div>
       )}
       <div className="lg:pl-64">
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-zinc-200/70 bg-zinc-50/80 px-4 backdrop-blur-xl sm:px-6 lg:px-8 dark:border-white/5 dark:bg-zinc-950/70">
-          <IconButton label="Open menu" className="lg:hidden" onClick={() => setMobileNav(true)}>
+        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-zinc-200/70 bg-zinc-50/80 px-4 backdrop-blur-xl sm:px-6 lg:hidden dark:border-white/5 dark:bg-zinc-950/70">
+          <IconButton label="Open menu" onClick={() => setMobileNav(true)}>
             <MenuIcon className="size-5" />
           </IconButton>
-          <div className="lg:hidden">
-            <Logo />
-          </div>
+          <Logo />
           <div className="flex-1" />
-          {me.demo && (
-            <span className="hidden rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 sm:inline dark:bg-amber-500/15 dark:text-amber-300">
-              Demo mode — simulated hardware
-            </span>
-          )}
-          {update.data?.available && update.data.status.state !== "running" && (
-            <UpdatePill version={update.data.latest!} onClick={() => navigate("/settings")} />
-          )}
-          {running.length > 0 && (
-            <Menu
-              trigger={
-                <button className="flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1.5 text-xs font-medium text-brand-700 ring-1 ring-brand-200 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20">
-                  <Loader2 className="size-3.5 animate-spin" />
-                  {running.length} task{running.length > 1 ? "s" : ""} running
-                </button>
-              }
-            >
-              {running.map((j) => (
-                <MenuItem key={j.id} onClick={() => setOpenJob(j.id)} icon={<Loader2 className="animate-spin" />}>
-                  {j.title}
-                </MenuItem>
-              ))}
-            </Menu>
-          )}
-          <Menu
-            trigger={
-              <IconButton label="Notifications" className="relative">
-                <Bell className="size-5" />
-                {!!alerts.data?.length && (
-                  <span className="absolute top-1.5 right-1.5 flex size-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white ring-2 ring-zinc-50 dark:ring-zinc-950">
-                    {alerts.data.length}
-                  </span>
-                )}
-              </IconButton>
-            }
-          >
-            <div className="w-72 px-2 py-1.5 text-xs font-semibold text-zinc-500">Notifications</div>
-            {alerts.data?.length ? (
-              alerts.data.map((a, i) => (
-                <MenuItem key={i} onClick={() => navigate(a.link)}>
-                  <div>
-                    <div className={a.level === "critical" ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400"}>{a.title}</div>
-                    <div className="text-xs font-normal text-zinc-500">{a.detail}</div>
-                  </div>
-                </MenuItem>
-              ))
-            ) : (
-              <div className="px-2.5 pb-3 text-[13px] text-zinc-500">All clear — no issues detected.</div>
-            )}
-          </Menu>
+          {notifications("right")}
         </header>
         <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
           <div key={path} className="animate-in">
@@ -263,6 +296,20 @@ function Shell({ me }: { me: Me }) {
         </main>
       </div>
       <JobDialog jobId={openJob} onClose={() => setOpenJob(null)} />
+      <ConfirmDialog
+        open={!!power}
+        onClose={() => setPower(null)}
+        onConfirm={() => power && doPower.mutate(power)}
+        loading={doPower.isPending}
+        danger={power === "poweroff"}
+        title={power === "reboot" ? "Restart the NAS?" : "Shut down the NAS?"}
+        confirmText={power === "reboot" ? "Restart" : "Shut down"}
+        message={
+          power === "reboot"
+            ? "Shares will be unavailable for a minute or two while the system restarts."
+            : "Shares become unavailable. You will need physical access to switch it back on."
+        }
+      />
       <UpdateOverlay />
     </div>
   );

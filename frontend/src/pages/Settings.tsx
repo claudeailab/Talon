@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Download, Info, MonitorSmartphone, Power, RefreshCw, RotateCcw, Server, Sparkles } from "lucide-react";
+import { CheckCircle2, Download, Info, MonitorSmartphone, RefreshCw, Server, Sparkles } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, bytes } from "../lib/format";
 import { useAction } from "../lib/hooks";
@@ -12,7 +12,6 @@ export default function SettingsPage() {
   const tz = useQuery({ queryKey: ["timezones"], queryFn: () => api.get<string[]>("/settings/timezones"), staleTime: Infinity });
   const sys = useQuery({ queryKey: ["system"], queryFn: () => api.get<SysInfo>("/system") });
   const [form, setForm] = useState<Settings | null>(null);
-  const [power, setPower] = useState<"reboot" | "poweroff" | null>(null);
   useEffect(() => {
     if (settings.data) setForm(settings.data);
   }, [settings.data]);
@@ -20,16 +19,12 @@ export default function SettingsPage() {
     success: "Settings saved",
     invalidate: ["settings", "system", "dashboard"],
   });
-  const doPower = useAction((action: string) => api.post("/system/power", { action }), {
-    success: (_r, a) => (a === "reboot" ? "Rebooting… this page reconnects when the NAS is back." : "Shutting down…"),
-    onSuccess: () => setPower(null),
-  });
   if (!form || !sys.data) return <PageLoader />;
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setForm({ ...form, [k]: v });
 
   return (
     <>
-      <PageHeader title="Settings" description="System identity, file sharing defaults and power." />
+      <PageHeader title="Settings" description="System identity, file sharing defaults and software updates." />
       <div className="grid gap-5 xl:grid-cols-2">
         <SoftwareUpdate />
         <Card>
@@ -96,7 +91,7 @@ export default function SettingsPage() {
           </div>
         </Card>
 
-        <Card>
+        <Card className="xl:col-span-2">
           <CardHeader icon={<Info className="size-4.5" />} title="About" />
           <dl className="space-y-2.5 px-5 pb-5 text-[13px]">
             {[
@@ -115,32 +110,7 @@ export default function SettingsPage() {
           </dl>
         </Card>
 
-        <Card>
-          <CardHeader icon={<Power className="size-4.5" />} title="Power" subtitle="Restart or shut down the NAS" />
-          <div className="flex flex-wrap gap-3 px-5 pb-5">
-            <Button icon={<RotateCcw className="size-4" />} onClick={() => setPower("reboot")}>
-              Restart
-            </Button>
-            <Button variant="danger" icon={<Power className="size-4" />} onClick={() => setPower("poweroff")}>
-              Shut down
-            </Button>
-          </div>
-        </Card>
       </div>
-      <ConfirmDialog
-        open={!!power}
-        onClose={() => setPower(null)}
-        onConfirm={() => power && doPower.mutate(power)}
-        loading={doPower.isPending}
-        danger={power === "poweroff"}
-        title={power === "reboot" ? "Restart the NAS?" : "Shut down the NAS?"}
-        confirmText={power === "reboot" ? "Restart" : "Shut down"}
-        message={
-          power === "reboot"
-            ? "Shares will be unavailable for a minute or two while the system restarts."
-            : "Shares become unavailable. You will need physical access to switch it back on."
-        }
-      />
     </>
   );
 }
