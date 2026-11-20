@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.19
+- Save buttons are greyed out until something is changed
+
 ## 1.0.18
 - Settings: one compact "General & file sharing" card; Server description removed
 - Disks without health data (e.g. virtual disks) show their use instead of "Unknown" and no 0°C

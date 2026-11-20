@@ -55,3 +55,25 @@ export const levelLabel: Record<string, string> = {
 export function cx(...c: (string | false | null | undefined)[]) {
   return c.filter(Boolean).join(" ");
 }
+
+/** Stable JSON (object keys sorted) for comparing form values. */
+function stable(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(stable);
+  if (v && typeof v === "object")
+    return Object.fromEntries(
+      Object.keys(v as Record<string, unknown>)
+        .sort()
+        .map((k) => [k, stable((v as Record<string, unknown>)[k])]),
+    );
+  return v;
+}
+
+/** True when two form values are equal (ignores object key order). */
+export function sameValue(a: unknown, b: unknown): boolean {
+  return JSON.stringify(stable(a)) === JSON.stringify(stable(b));
+}
+
+/** True when two lists hold the same items, in any order. */
+export function sameSet(a: string[], b: string[]): boolean {
+  return a.length === b.length && sameValue([...a].sort(), [...b].sort());
+}

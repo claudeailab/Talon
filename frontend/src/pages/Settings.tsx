@@ -21,6 +21,8 @@ export default function SettingsPage() {
   });
   if (!form || !sys.data) return <PageLoader />;
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setForm({ ...form, [k]: v });
+  const FIELDS = ["hostname", "timezone", "workgroup", "smb_min_protocol", "smb_macos_compat"] as const;
+  const changed = !!settings.data && FIELDS.some((k) => form[k] !== settings.data![k]);
 
   return (
     <>
@@ -35,6 +37,7 @@ export default function SettingsPage() {
             actions={
               <Button
                 variant="primary"
+                disabled={!changed}
                 loading={save.isPending}
                 onClick={() =>
                   save.mutate({

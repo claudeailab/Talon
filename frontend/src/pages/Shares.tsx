@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Apple, Check, Copy, FolderOpen, Globe, MonitorSmartphone, Pencil, Plus, Recycle, Server, Trash2, Users as UsersIcon, X } from "lucide-react";
 import { api } from "../lib/api";
-import { cx } from "../lib/format";
+import { cx, sameValue } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Access, Group, Share, User, Volume } from "../lib/types";
 import {
@@ -257,7 +257,12 @@ function ShareEditor({ initial, isNew, volumes, onClose }: { initial: Share; isN
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" loading={save.isPending} disabled={!s.name || !!nameErr} onClick={() => save.mutate()}>
+          <Button
+            variant="primary"
+            loading={save.isPending}
+            disabled={!s.name || !!nameErr || (!isNew && sameValue(s, initial))}
+            onClick={() => save.mutate()}
+          >
             {isNew ? "Create share" : "Save"}
           </Button>
         </>

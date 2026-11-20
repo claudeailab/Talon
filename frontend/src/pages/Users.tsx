@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { KeyRound, MoreHorizontal, Pencil, Plus, ShieldCheck, Trash2, UserPlus, Users as UsersIcon, UserX } from "lucide-react";
 import { api } from "../lib/api";
-import { cx } from "../lib/format";
+import { cx, sameSet } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Group, User } from "../lib/types";
 import {
@@ -252,6 +252,8 @@ function UserDialog({ user, groups, isSelf, onClose }: { user: User | null; grou
     { success: isNew ? `User ${name} created` : "User saved", invalidate: ["users", "groups"], onSuccess: onClose },
   );
   const valid = !!name && !nameErr && !pwErr && (isNew ? pw.length >= 8 && pw === pw2 : !pw || pw === pw2);
+  const changed =
+    isNew || fullName !== user!.full_name || admin !== user!.admin || !sameSet(sel, user!.groups) || pw !== "";
   return (
     <Modal
       open
@@ -262,7 +264,7 @@ function UserDialog({ user, groups, isSelf, onClose }: { user: User | null; grou
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={!valid} loading={save.isPending} onClick={() => save.mutate()}>
+          <Button variant="primary" disabled={!valid || !changed} loading={save.isPending} onClick={() => save.mutate()}>
             {isNew ? "Create user" : "Save"}
           </Button>
         </>
@@ -340,7 +342,12 @@ function GroupDialog({ group, users, onClose }: { group: Group | null; users: Us
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={!name || !!err} loading={save.isPending} onClick={() => save.mutate()}>
+          <Button
+            variant="primary"
+            disabled={!name || !!err || (!isNew && sameSet(members, group!.members))}
+            loading={save.isPending}
+            onClick={() => save.mutate()}
+          >
             {isNew ? "Create group" : "Save"}
           </Button>
         </>
