@@ -12,7 +12,9 @@ export function setUnauthorizedHandler(fn: () => void) {
 }
 
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
-  const res = await fetch(url, {
+  let res: Response;
+  try {
+    res = await fetch(url, {
     method,
     credentials: "same-origin",
     headers: {
@@ -20,7 +22,11 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
     },
     body: body !== undefined ? JSON.stringify(body) : undefined,
-  });
+    });
+  } catch {
+    // network error: the NAS is restarting or unreachable
+    throw new ApiError(0, "Cannot reach the NAS");
+  }
   if (res.status === 401 && !url.endsWith("/auth/login")) onUnauthorized();
   const text = await res.text();
   let data: any = null;

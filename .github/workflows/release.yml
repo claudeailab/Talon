@@ -1,0 +1,31 @@
+# Publishes a GitHub Release whenever backend/talon/__init__.py gets a new
+# __version__ on main. Installed Talon systems detect the release and offer the
+# update in the web interface (Settings → Software update).
+name: Release
+on:
+  push:
+    branches: [main]
+    paths: [backend/talon/__init__.py]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Read version
+        id: v
+        run: |
+          v=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' backend/talon/__init__.py)
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          if git rev-parse "v$v" >/dev/null 2>&1; then echo "exists=1" >> "$GITHUB_OUTPUT"; fi
+      - name: Verify web build is committed
+        if: steps.v.outputs.exists != '1'
+        run: test -f backend/talon/web/index.html
+      - name: Create release
+        if: steps.v.outputs.exists != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "v${{ steps.v.outputs.version }}" --target "$GITHUB_SHA" --title "Talon v${{ steps.v.outputs.version }}" --generate-notes

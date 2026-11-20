@@ -21,9 +21,10 @@ import { api, setUnauthorizedHandler } from "./lib/api";
 import { cx } from "./lib/format";
 import { useTheme } from "./lib/hooks";
 import { Link, navigate, usePath } from "./lib/router";
-import type { Alert, Job } from "./lib/types";
+import type { Alert, Job, UpdateInfo } from "./lib/types";
 import { IconButton, Menu, MenuItem, PageLoader } from "./components/ui";
 import { JobDialog } from "./components/jobs";
+import { Reconnecting, UpdateOverlay, UpdatePill } from "./components/update";
 import Login from "./pages/Login";
 import DashboardPage from "./pages/Dashboard";
 import VolumesPage from "./pages/Volumes";
@@ -74,6 +75,8 @@ export default function App() {
         <Loader2 className="size-6 animate-spin text-zinc-400" />
       </div>
     );
+  if (me.error && (me.error as { status?: number }).status !== 401)
+    return <Reconnecting onBack={() => me.refetch()} />;
   if (!me.data) return <Login onLogin={() => qc.invalidateQueries()} />;
   return <Shell me={me.data} />;
 }
@@ -103,6 +106,7 @@ function Shell({ me }: { me: Me }) {
     queryFn: () => api.get<{ alerts: Alert[] }>("/dashboard").then((d) => d.alerts),
     refetchInterval: 30000,
   });
+  const update = useQuery({ queryKey: ["update"], queryFn: () => api.get<UpdateInfo>("/update"), refetchInterval: 15 * 60000 });
   const running = (jobs.data ?? []).filter((j) => j.status === "running" || j.status === "queued");
 
   // refresh storage views when a job finishes
@@ -166,7 +170,9 @@ function Shell({ me }: { me: Me }) {
           </div>
           <div className="min-w-0 flex-1 leading-tight">
             <div className="truncate text-sm font-medium">{me.user}</div>
-            <div className="truncate text-xs text-zinc-500">{host.data?.hostname ?? "…"}</div>
+            <div className="truncate text-xs text-zinc-500">
+              {host.data?.hostname ?? "…"} · v{me.version}
+            </div>
           </div>
           <IconButton label={dark ? "Light mode" : "Dark mode"} onClick={toggleTheme}>
             {dark ? <Sun className="size-4.5" /> : <Moon className="size-4.5" />}
@@ -203,6 +209,9 @@ function Shell({ me }: { me: Me }) {
             <span className="hidden rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 sm:inline dark:bg-amber-500/15 dark:text-amber-300">
               Demo mode — simulated hardware
             </span>
+          )}
+          {update.data?.available && update.data.status.state !== "running" && (
+            <UpdatePill version={update.data.latest!} onClick={() => navigate("/settings")} />
           )}
           {running.length > 0 && (
             <Menu
@@ -254,6 +263,7 @@ function Shell({ me }: { me: Me }) {
         </main>
       </div>
       <JobDialog jobId={openJob} onClose={() => setOpenJob(null)} />
+      <UpdateOverlay />
     </div>
   );
 }

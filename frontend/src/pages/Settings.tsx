@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Info, MonitorSmartphone, Power, RotateCcw, Server } from "lucide-react";
+import { CheckCircle2, Download, Info, MonitorSmartphone, Power, RefreshCw, RotateCcw, Server, Sparkles } from "lucide-react";
 import { api } from "../lib/api";
-import { bytes } from "../lib/format";
+import { ago, bytes } from "../lib/format";
 import { useAction } from "../lib/hooks";
-import type { Settings, SysInfo } from "../lib/types";
-import { Button, Card, CardHeader, ConfirmDialog, Field, Input, PageHeader, PageLoader, Select, ToggleRow } from "../components/ui";
+import type { Settings, SysInfo, UpdateInfo } from "../lib/types";
+import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Field, Input, PageHeader, PageLoader, Select, ToggleRow } from "../components/ui";
 
 export default function SettingsPage() {
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.get<Settings>("/settings") });
@@ -31,6 +31,7 @@ export default function SettingsPage() {
     <>
       <PageHeader title="Settings" description="System identity, file sharing defaults and power." />
       <div className="grid gap-5 xl:grid-cols-2">
+        <SoftwareUpdate />
         <Card>
           <CardHeader icon={<Server className="size-4.5" />} title="General" subtitle="Name and time zone of this NAS" />
           <div className="space-y-4 px-5 pb-5">
@@ -141,5 +142,112 @@ export default function SettingsPage() {
         }
       />
     </>
+  );
+}
+
+function ReleaseNotes({ text }: { text: string }) {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim() && !l.startsWith("**Full Changelog"));
+  return (
+    <div className="max-h-64 space-y-1 overflow-y-auto text-[13px] text-zinc-600 dark:text-zinc-300">
+      {lines.map((l, i) => {
+        const t = l.replace(/\*\*/g, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1").replace(/https?:\/\/\S+/g, "").trim();
+        if (/^#+\s/.test(l)) return <div key={i} className="pt-2 font-semibold text-zinc-900 first:pt-0 dark:text-white">{t.replace(/^#+\s*/, "")}</div>;
+        if (/^\s*[-*]\s/.test(l)) return <div key={i} className="flex gap-2"><span className="text-brand-500">•</span><span>{t.replace(/^[-*]\s*/, "")}</span></div>;
+        return <div key={i}>{t}</div>;
+      })}
+    </div>
+  );
+}
+
+function SoftwareUpdate() {
+  const { data } = useQuery({ queryKey: ["update"], queryFn: () => api.get<UpdateInfo>("/update") });
+  const [confirm, setConfirm] = useState(false);
+  const check = useAction(() => api.post<UpdateInfo>("/update/check"), {
+    invalidate: ["update"],
+    success: (r) => (r.error ? "" : r.available ? `Talon ${r.latest} is available` : "Talon is up to date"),
+  });
+  const install = useAction(() => api.post("/update/install"), {
+    invalidate: ["update-status", "update"],
+    onSuccess: () => setConfirm(false),
+  });
+  if (!data) return null;
+  return (
+    <Card className="xl:col-span-2">
+      <CardHeader
+        icon={<Sparkles className="size-4.5" />}
+        title="Software update"
+        subtitle={
+          data.checked_at ? `Last checked ${ago(data.checked_at)} · checks automatically every 6 hours` : "Checks automatically every 6 hours"
+        }
+        actions={
+          <Button size="sm" icon={<RefreshCw className="size-3.5" />} loading={check.isPending} onClick={() => check.mutate()}>
+            Check now
+          </Button>
+        }
+      />
+      <div className="space-y-4 px-5 pb-5">
+        {data.error && <Callout tone="warning" title="Could not check for updates">{data.error}</Callout>}
+        {data.available ? (
+          <div className="rounded-2xl bg-gradient-to-br from-brand-50 to-violet-50 p-5 ring-1 ring-brand-200/70 dark:from-brand-500/10 dark:to-violet-500/10 dark:ring-brand-400/20">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-semibold">Talon {data.latest}</span>
+                  <Badge tone="violet">New</Badge>
+                </div>
+                <div className="text-[13px] text-zinc-500">
+                  You have {data.current}
+                  {data.published_at && ` · released ${new Date(data.published_at).toLocaleDateString()}`}
+                  {data.url && (
+                    <>
+                      {" · "}
+                      <a href={data.url} target="_blank" rel="noreferrer" className="text-brand-600 hover:underline dark:text-brand-400">
+                        Release page
+                      </a>
+                    </>
+                  )}
+                </div>
+              </div>
+              <Button variant="primary" icon={<Download className="size-4" />} onClick={() => setConfirm(true)}>
+                Install update
+              </Button>
+            </div>
+            {data.notes && (
+              <div className="mt-4 border-t border-brand-200/60 pt-4 dark:border-white/10">
+                <ReleaseNotes text={data.notes} />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-3 rounded-2xl bg-zinc-50 p-4 dark:bg-white/[0.03]">
+            <CheckCircle2 className="size-5 text-emerald-500" />
+            <div>
+              <div className="text-sm font-medium">Talon {data.current} is up to date</div>
+              <div className="text-xs text-zinc-500">Updates are published at github.com/{data.repo}/releases</div>
+            </div>
+          </div>
+        )}
+        {data.status.state === "failed" && (
+          <Callout tone="danger" title={`The last update to ${data.status.target} failed and was rolled back`}>
+            {data.status.error}
+          </Callout>
+        )}
+      </div>
+      <ConfirmDialog
+        open={confirm}
+        onClose={() => setConfirm(false)}
+        onConfirm={() => install.mutate()}
+        loading={install.isPending}
+        title={`Install Talon ${data.latest}?`}
+        confirmText="Install now"
+        message={
+          <ul className="list-disc space-y-1 pl-4">
+            <li>Takes about 1–3 minutes; the web interface restarts briefly and reloads by itself.</li>
+            <li>Shared folders (SMB/NFS) stay available and volumes are not touched.</li>
+            <li>The current version is backed up and restored automatically if anything fails.</li>
+          </ul>
+        }
+      />
+    </Card>
   );
 }

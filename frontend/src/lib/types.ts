@@ -189,3 +189,29 @@ export interface Activity {
   message: string;
   level: "info" | "warning" | "error";
 }
+
+export interface UpdateStatus {
+  state: "idle" | "running" | "success" | "failed";
+  step?: "starting" | "download" | "backup" | "install" | "restart" | "rollback" | "done";
+  from?: string;
+  target?: string;
+  user?: string;
+  started?: number;
+  finished?: number;
+  error?: string;
+  log?: string[];
+}
+
+export interface UpdateInfo {
+  current: string;
+  latest: string | null;
+  available: boolean;
+  name: string | null;
+  notes: string | null;
+  url: string | null;
+  published_at: string | null;
+  checked_at: number | null;
+  error: string | null;
+  repo: string;
+  status: UpdateStatus;
+}

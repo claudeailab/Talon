@@ -18,6 +18,11 @@ class Config:
     users_group: str = "nasusers"
     pam_service: str = "talon"
     session_hours: int = 12
+    sessions_file: str = "/var/lib/talon/sessions.json"
+    update_status_file: str = "/var/lib/talon/update.json"
+    repo: str = "claudeailab/Talon"          # GitHub repo checked for releases
+    update_check: bool = True
+    prefix: str = "/opt/talon"
     demo: bool = False
     extra: dict = field(default_factory=dict)
 
@@ -40,4 +45,5 @@ def load(demo: bool = False) -> Config:
     if demo or os.environ.get("TALON_DEMO") == "1":
         cfg.demo = True
         cfg.state_file = os.environ.get("TALON_STATE", "/tmp/talon-demo-state.json")
+        cfg.sessions_file = os.path.join(os.path.dirname(cfg.state_file), "talon-demo-sessions.json")
     return cfg

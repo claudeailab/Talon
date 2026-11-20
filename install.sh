@@ -57,21 +57,35 @@ echo "${c_blue}Talon installer${c_off} — ${PRETTY_NAME} (${ARCH})"
 echo
 
 # ---------------------------------------------------------------- packages
-step "Installing system packages (this can take a few minutes)"
+step "Checking system packages"
 export DEBIAN_FRONTEND=noninteractive
-apt-get update -q >/dev/null
 PKGS=(python3 python3-venv ca-certificates curl openssl tar iproute2 udev util-linux
       mdadm parted smartmontools e2fsprogs xfsprogs acl
       samba samba-common-bin nfs-kernel-server avahi-daemon)
-apt-get install -y -q --no-install-recommends "${PKGS[@]}" >/dev/null
-ok "core packages installed"
+is_installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "install ok installed"; }
+# Only install what is missing: never upgrade (and thereby restart) Samba/NFS
+# while clients may be connected, e.g. during an update from the web UI.
+MISSING=()
+for p in "${PKGS[@]}"; do is_installed "$p" || MISSING+=("$p"); done
+APT_UPDATED=0
+if [ "${#MISSING[@]}" -gt 0 ]; then
+  echo "    installing: ${MISSING[*]} (this can take a few minutes)"
+  apt-get update -q >/dev/null; APT_UPDATED=1
+  apt-get install -y -q --no-install-recommends "${MISSING[@]}" >/dev/null
+fi
+ok "system packages present"
 # Windows network discovery: wsdd (Debian 12+/Ubuntu 22.04+), wsdd2 as fallback
-if apt-get install -y -q --no-install-recommends wsdd >/dev/null 2>&1; then
-  ok "wsdd installed (Windows network discovery)"
-elif apt-get install -y -q --no-install-recommends wsdd2 >/dev/null 2>&1; then
-  ok "wsdd2 installed (Windows network discovery)"
+if is_installed wsdd || is_installed wsdd2; then
+  ok "WS-Discovery present (Windows network discovery)"
 else
-  warn "wsdd not available - the NAS will not appear automatically in Windows Network"
+  [ "$APT_UPDATED" = 1 ] || apt-get update -q >/dev/null
+  if apt-get install -y -q --no-install-recommends wsdd >/dev/null 2>&1; then
+    ok "wsdd installed (Windows network discovery)"
+  elif apt-get install -y -q --no-install-recommends wsdd2 >/dev/null 2>&1; then
+    ok "wsdd2 installed (Windows network discovery)"
+  else
+    warn "wsdd not available - the NAS will not appear automatically in Windows Network"
+  fi
 fi
 
 # ---------------------------------------------------------------- sources
@@ -121,6 +135,14 @@ chmod 755 /usr/local/sbin/talon
 port_in_use() { ss -Hltn "sport = :$1" 2>/dev/null | grep -q .; }
 if [ -f "$CONF_DIR/config.json" ]; then
   PORT="$("$PREFIX/venv/bin/python" -c "import json;print(json.load(open('$CONF_DIR/config.json')).get('port',443))")"
+  "$PREFIX/venv/bin/python" - "$CONF_DIR/config.json" "$REPO" <<'PYEOF'
+import json, sys
+p, repo = sys.argv[1], sys.argv[2]
+d = json.load(open(p))
+if "repo" not in d:
+    d["repo"] = repo
+    json.dump(d, open(p, "w"), indent=2)
+PYEOF
   ok "keeping existing configuration (port $PORT)"
 else
   PORT="${TALON_PORT:-}"
@@ -133,7 +155,8 @@ else
   "port": $PORT,
   "mount_root": "$MOUNT_ROOT",
   "admin_group": "$ADMIN_GROUP",
-  "users_group": "$USERS_GROUP"
+  "users_group": "$USERS_GROUP",
+  "repo": "$REPO"
 }
 EOF
   chmod 600 "$CONF_DIR/config.json"

@@ -44,6 +44,25 @@ Options (environment variables before `bash`): `TALON_PORT=8443`, `TALON_ADMIN=<
 
 ![RAID wizard](docs/screenshots/raid-wizard.png)
 
+## Updates
+
+Talon checks this repository's [GitHub Releases](https://github.com/claudeailab/Talon/releases) every 6 hours. When a newer version exists, an **Update available** button appears in the top bar; **Settings → Software update** shows the release notes and installs it with one click.
+
+What happens during an update:
+
+1. The release archive is downloaded from GitHub and checked (expected files, matching version).
+2. The current app and its Python environment are backed up.
+3. The release's own `install.sh` runs in upgrade mode. It only installs *missing* system packages, so Samba and NFS are not upgraded or restarted and connected clients are not interrupted.
+4. Talon restarts and the updater waits until the new version answers. If anything fails, the backup is restored automatically.
+
+The updater runs in its own systemd unit, so restarting the web service cannot interrupt it. While it runs, the web interface shows a progress screen that:
+- keeps working through the restart;
+- keeps you signed in (sessions persist across restarts);
+- still appears if you reload the page or open another tab;
+- reloads into the new version by itself when the update finishes.
+
+**Publishing a release (maintainers):** raise `__version__` in `backend/talon/__init__.py`, rebuild the web UI (`cd frontend && npm run build`) and merge to `main`. The `Release` workflow creates the `vX.Y.Z` tag and GitHub Release automatically.
+
 ## How it works
 
 | Part | Technology |

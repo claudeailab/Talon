@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import contextlib
 import os
+import threading
+import time
 from typing import List, Optional
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Request, Response
@@ -12,6 +14,7 @@ from pydantic import BaseModel
 from . import __version__
 from .auth import COOKIE, Sessions
 from .nas import Nas
+from .update import DemoUpdater, Updater, health as health_info
 from .util import CommandError, UserError
 
 WEB_DIR = os.path.join(os.path.dirname(__file__), "web")
@@ -47,11 +50,15 @@ class GroupIn(BaseModel):
 
 def create_app(cfg, platform) -> FastAPI:
     nas = Nas(cfg, platform)
-    sessions = Sessions(cfg.session_hours)
+    sessions = Sessions(cfg.session_hours, cfg.sessions_file)
+
+    updater = (DemoUpdater if cfg.demo else Updater)(cfg, nas.state)
 
     @contextlib.asynccontextmanager
     async def lifespan(_app):
         nas.start()
+        threading.Thread(target=updater.background_loop, args=(nas._stop,), daemon=True,
+                         name="update-check").start()
         yield
         nas.stop()
 
@@ -69,6 +76,9 @@ def create_app(cfg, platform) -> FastAPI:
 
     @app.middleware("http")
     async def _security(request: Request, call_next):
+        if cfg.demo and getattr(updater, "restarting_until", 0) > time.time() \
+                and request.url.path.startswith("/api/"):
+            return JSONResponse({"detail": "restarting"}, status_code=503)  # simulated restart
         # CSRF: state-changing API calls must carry a custom header, which a
         # cross-site form or simple request cannot add.
         if request.url.path.startswith("/api/") and request.method not in ("GET", "HEAD") \
@@ -120,7 +130,29 @@ def create_app(cfg, platform) -> FastAPI:
 
     @app.get("/api/auth/me")
     def me(user: str = Depends(current_user)):
-        return {"user": user, "version": __version__, "demo": cfg.demo}
+        return {"user": user, "version": updater.current, "demo": cfg.demo}
+
+    # ------------------------------------------------------------ updates
+    @app.get("/api/health")
+    def health():
+        return health_info(updater)
+
+    @app.get("/api/update")
+    def update_info(_u: str = Depends(current_user)):
+        return updater.info()
+
+    @app.post("/api/update/check")
+    def update_check(_u: str = Depends(current_user)):
+        updater.check(force=True)
+        return updater.info()
+
+    @app.get("/api/update/status")
+    def update_status(_u: str = Depends(current_user)):
+        return updater.status()
+
+    @app.post("/api/update/install")
+    def update_install(user: str = Depends(current_user)):
+        return updater.start(user)
 
     # ------------------------------------------------------------ dashboard
     @app.get("/api/dashboard")
@@ -284,7 +316,7 @@ def create_app(cfg, platform) -> FastAPI:
 
     @app.get("/api/system")
     def system(_u: str = Depends(current_user)):
-        return {**platform.system_info(), "version": __version__}
+        return {**platform.system_info(), "version": updater.current}
 
     @app.post("/api/system/power")
     def power(action: str = Body(..., embed=True), user: str = Depends(current_user)):
