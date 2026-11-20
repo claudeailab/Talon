@@ -1,11 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ExternalLink, Network } from "lucide-react";
+import { ExternalLink, Lock, Network } from "lucide-react";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Settings } from "../lib/types";
-import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Field, Input, Modal, PageLoader, Segmented, Select, useToast } from "../components/ui";
+import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Field, Input, Modal, PageLoader, Segmented, Select, ToggleRow, useToast } from "../components/ui";
 
 interface Iface {
   name: string;
@@ -184,9 +184,6 @@ export default function NetworkTab() {
             </div>
           )}
 
-          <Callout tone="info">
-            After saving, open Talon at its new address within 3 minutes. Otherwise the previous settings come back by themselves.
-          </Callout>
         </div>
       </Card>
 
@@ -216,7 +213,74 @@ export default function NetworkTab() {
         }
       />
       {moving && <Moving target={moving} onDone={() => setMoving(null)} />}
+      <WebCard />
     </>
+  );
+}
+
+/* ---------------------------------------------------------------- HTTPS on/off */
+
+type Web = { https: boolean; port: number; https_port: number; serving_https: boolean };
+
+function WebCard() {
+  const q = useQuery({ queryKey: ["web"], queryFn: () => api.get<Web>("/settings/web") });
+  const [ask, setAsk] = useState<boolean | null>(null);
+  const [restarting, setRestarting] = useState<string | null>(null);
+  const save = useAction((on: boolean) => api.put<{ https: boolean; port: number; restarting: boolean }>("/settings/web", { https: on }), {
+    invalidate: ["web"],
+    onSuccess: (r) => {
+      setAsk(null);
+      if (!r.restarting) return;
+      // Behind a proxy (a domain name) the address stays the same; on the LAN the scheme and port change.
+      const direct = /^(\d+\.){3}\d+$|\.local$|^localhost$/.test(location.hostname);
+      const port = (r.https && r.port === 443) || (!r.https && r.port === 80) ? "" : `:${r.port}`;
+      const url = direct ? `${r.https ? "https:" : "http:"}//${location.hostname}${port}/settings?tab=network` : location.href;
+      setRestarting(url);
+      setTimeout(() => (location.href = url), 6000);
+    },
+  });
+  if (!q.data) return null;
+  const on = q.data.https;
+  return (
+    <Card className="mt-5">
+      <CardHeader
+        icon={<Lock className="size-4.5" />}
+        title={
+          <span className="flex items-center gap-2">
+            Web interface {on ? <Badge tone="green" dot>HTTPS</Badge> : <Badge tone="amber" dot>HTTP</Badge>}
+          </span>
+        }
+        subtitle={on ? `https:// on port ${q.data.port}, with Talon's own certificate` : `Plain http:// on port ${q.data.port}`}
+      />
+      <div className="px-5 pb-3">
+        <ToggleRow
+          title="HTTPS"
+          description="Turn off when Cloudflare or another proxy provides HTTPS"
+          checked={on}
+          onChange={(v) => setAsk(v)}
+        />
+      </div>
+      <ConfirmDialog
+        open={ask !== null}
+        onClose={() => setAsk(null)}
+        onConfirm={() => ask !== null && save.mutate(ask)}
+        loading={save.isPending}
+        title={ask ? "Turn HTTPS on?" : "Turn HTTPS off?"}
+        confirmText={ask ? "Turn on" : "Turn off"}
+        message={
+          ask
+            ? `Talon restarts and is served over https:// on port ${q.data.https_port} again.`
+            : "Talon restarts and is served over plain http:// on port 80. Passwords then cross your network unencrypted unless a proxy such as Cloudflare adds HTTPS."
+        }
+      />
+      {restarting && (
+        <Modal open onClose={() => setRestarting(null)} title="Talon is restarting" description="This takes a few seconds">
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            Opening <span className="font-mono font-medium text-zinc-900 dark:text-zinc-100">{restarting.replace(/\/settings\?tab=network$/, "/")}</span>
+          </p>
+        </Modal>
+      )}
+    </Card>
   );
 }
 

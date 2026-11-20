@@ -194,6 +194,7 @@ chmod 755 /usr/local/sbin/talon
 port_in_use() { ss -Hltn "sport = :$1" 2>/dev/null | grep -q .; }
 if [ -f "$CONF_DIR/config.json" ]; then
   PORT="$("$PREFIX/venv/bin/python" -c "import json;print(json.load(open('$CONF_DIR/config.json')).get('port',443))")"
+  SCHEME="$("$PREFIX/venv/bin/python" -c "import json;print('https' if json.load(open('$CONF_DIR/config.json')).get('https',True) else 'http')")"
   "$PREFIX/venv/bin/python" - "$CONF_DIR/config.json" "$REPO" <<'PYEOF'
 import json, sys
 p, repo = sys.argv[1], sys.argv[2]
@@ -205,6 +206,7 @@ PYEOF
   ok "keeping existing configuration (port $PORT)"
 else
   PORT=443
+  SCHEME=https
   port_in_use 443 && die "port 443 is already used by another program; stop it and run the installer again"
   cat > "$CONF_DIR/config.json" <<EOF
 {
@@ -312,10 +314,10 @@ if has_systemd; then
   systemctl enable talon >/dev/null 2>&1
   systemctl restart talon
   for _ in $(seq 1 20); do
-    if curl -fsk -o /dev/null "https://127.0.0.1:$PORT/"; then break; fi
+    if curl -fsk -o /dev/null "$SCHEME://127.0.0.1:$PORT/"; then break; fi
     sleep 1
   done
-  if curl -fsk -o /dev/null "https://127.0.0.1:$PORT/"; then
+  if curl -fsk -o /dev/null "$SCHEME://127.0.0.1:$PORT/"; then
     ok "web interface is running"
   else
     warn "the service did not answer yet - check: journalctl -u talon -e"
@@ -325,17 +327,18 @@ else
 fi
 
 # ---------------------------------------------------------------- summary
-PORT_SUFFIX=""; [ "$PORT" = 443 ] || PORT_SUFFIX=":$PORT"
+PORT_SUFFIX=""
+if [ "$SCHEME" = https ]; then [ "$PORT" = 443 ] || PORT_SUFFIX=":$PORT"; else [ "$PORT" = 80 ] || PORT_SUFFIX=":$PORT"; fi
 echo
 echo "${c_green}Talon is installed.${c_off}"
 echo
 echo "  Open in your browser:"
 for ip in $(hostname -I 2>/dev/null); do
-  case "$ip" in *:*) ;; *) echo "    https://${ip}${PORT_SUFFIX}/" ;; esac
+  case "$ip" in *:*) ;; *) echo "    ${SCHEME}://${ip}${PORT_SUFFIX}/" ;; esac
 done
-echo "    https://${HOST}.local${PORT_SUFFIX}/"
+echo "    ${SCHEME}://${HOST}.local${PORT_SUFFIX}/"
 echo
-echo "  The certificate is self-signed: accept the browser warning on first visit."
+[ "$SCHEME" = https ] && echo "  The certificate is self-signed: accept the browser warning on first visit."
 if [ -n "$NEW_ADMIN_PW" ]; then
   echo
   echo "  Administrator login:  ${c_yellow}${ADMIN}${c_off} / ${c_yellow}${NEW_ADMIN_PW}${c_off}"

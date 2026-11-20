@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 class Config:
     host: str = "0.0.0.0"
     port: int = 443
+    https: bool = True                     # False: plain HTTP (e.g. behind Cloudflare)
+    https_port: int = 443                  # port to return to when HTTPS is turned on again
     tls_cert: str = "/etc/talon/tls/cert.pem"
     tls_key: str = "/etc/talon/tls/key.pem"
     state_file: str = "/var/lib/talon/state.json"

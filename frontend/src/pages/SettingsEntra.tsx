@@ -6,7 +6,7 @@ import { dmyToIso, isoToDmy } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { EntraCheck, EntraConfig } from "../lib/types";
 import { TestResult } from "../components/testresult";
-import { Badge, Button, Card, CardHeader, Field, Input, Modal, PageLoader, Select, useToast } from "../components/ui";
+import { Badge, Button, Card, CardHeader, DateInput, Field, Input, Modal, PageLoader, Select, useToast } from "../components/ui";
 
 const ACCOUNT_TYPES = [
   { value: "common", label: "Personal and work accounts" },
@@ -121,12 +121,12 @@ export default function EntraTab() {
             <Input value={tenantId} onChange={(e) => setTenantId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" className="font-mono text-[13px]" />
           </Field>
         ) : (
-          <Field label="Redirect URI" hint="Add this exact address to the app in Entra">
+          <Field label="Redirect URI">
             <CopyField value={redirectUri()} />
           </Field>
         )}
         {kind === "tenant" && (
-          <Field label="Redirect URI" hint="Add this exact address to the app in Entra">
+          <Field label="Redirect URI">
             <CopyField value={redirectUri()} />
           </Field>
         )}
@@ -136,8 +136,8 @@ export default function EntraTab() {
           Client secret expiry <ExpiryBadge expiry={q.data.expiry} />
         </div>
         <div className="grid gap-x-8 gap-y-4 md:grid-cols-3 [&>*]:min-w-0">
-          <Field label="Secret expires on" hint="Shown in Entra under Certificates & secrets" error={expiresBad ? "Enter the date as dd-mm-yyyy" : null}>
-            <Input value={expires} onChange={(e) => setExpires(e.target.value)} placeholder="dd-mm-yyyy" inputMode="numeric" maxLength={10} className="tabular" />
+          <Field label="Secret expires on" error={expiresBad ? "Enter the date as dd-mm-yyyy" : null}>
+            <DateInput value={expires} onChange={setExpires} />
           </Field>
           <Field label="Send a reminder">
             <Select value={remindDays} onChange={(e) => setRemindDays(Number(e.target.value))}>
@@ -150,7 +150,7 @@ export default function EntraTab() {
           </Field>
           <Field
             label="Send the reminder to"
-            hint={smtp.data && !smtp.data.configured ? <span className="text-amber-600 dark:text-amber-400">Set up SMTP first</span> : "Empty: the Notifications recipients"}
+            hint={smtp.data && !smtp.data.configured ? <span className="text-amber-600 dark:text-amber-400">Set up SMTP first</span> : undefined}
           >
             <Input value={remindTo} onChange={(e) => setRemindTo(e.target.value)} placeholder="it@example.com, me@example.com" />
           </Field>

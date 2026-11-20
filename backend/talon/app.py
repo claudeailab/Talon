@@ -15,7 +15,7 @@ from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request, Respo
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from . import __version__, notify
+from . import webconfig, __version__, notify
 from .auth import COOKIE, Sessions
 from .nas import Nas
 from .update import DemoUpdater, Updater, health as health_info
@@ -143,8 +143,11 @@ def create_app(cfg, platform) -> FastAPI:
             raise HTTPException(401, "Invalid user name or password, or not an administrator")
         sessions.succeeded(ip)
         token = sessions.create(user)
+        # Secure cookies only travel over HTTPS: the browser's view counts, so a
+        # proxy such as Cloudflare that serves HTTPS in front of plain HTTP keeps them.
+        https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
         response.set_cookie(COOKIE, token, httponly=True, samesite="strict",
-                            secure=not cfg.demo, max_age=cfg.session_hours * 3600, path="/")
+                            secure=https and not cfg.demo, max_age=cfg.session_hours * 3600, path="/")
         nas.state.log_activity(user, f"Signed in from {ip}")
         return {"user": user}
 
@@ -528,6 +531,17 @@ def create_app(cfg, platform) -> FastAPI:
     @app.get("/api/onedrive/tasks/{tid}/log")
     def onedrive_task_log(tid: str, _u: str = Depends(current_user)):
         return nas.cloud.task_log(tid)
+
+    # ------------------------------------------------------------ web interface (HTTPS)
+    @app.get("/api/settings/web")
+    def web_get(request: Request, _u: str = Depends(current_user)):
+        serving = getattr(app.state, "serving", {"https": request.url.scheme == "https", "port": cfg.port})
+        return {"https": cfg.https, "port": cfg.port, "https_port": cfg.https_port,
+                "serving_https": serving["https"]}
+
+    @app.put("/api/settings/web")
+    def web_put(body: dict = Body(...), user: str = Depends(current_user)):
+        return webconfig.set_https(cfg, bool(body.get("https", True)), user, nas.state)
 
     # ------------------------------------------------------------ networking
     @app.get("/api/network")

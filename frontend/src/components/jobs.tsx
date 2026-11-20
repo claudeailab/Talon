@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
 import { CheckCircle2, Loader2, XCircle } from "lucide-react";
 import { api } from "../lib/api";
@@ -17,6 +17,11 @@ export function JobDialog({ jobId, onClose }: { jobId: string | null; onClose: (
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
   }, [data?.log?.length]);
   const done = data && ["success", "error"].includes(data.status);
+  // when a job ends, refresh everything it may have changed (disks, RAID, volumes, ...)
+  const qc = useQueryClient();
+  useEffect(() => {
+    if (done) for (const k of ["disks", "raid", "raid-options", "volumes", "volume-sources", "shares", "files", "dashboard", "jobs"]) qc.invalidateQueries({ queryKey: [k] });
+  }, [done, jobId]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <Modal
       open={!!jobId}

@@ -44,7 +44,8 @@ def main(argv=None) -> int:
     from .app import create_app
     app = create_app(cfg, platform)
     kwargs = {}
-    use_tls = not args.no_tls and not cfg.demo and os.path.exists(cfg.tls_cert)
+    use_tls = cfg.https and not args.no_tls and not cfg.demo and os.path.exists(cfg.tls_cert)
+    app.state.serving = {"https": use_tls, "port": cfg.port}
     if use_tls:
         kwargs = {"ssl_certfile": cfg.tls_cert, "ssl_keyfile": cfg.tls_key}
     uvicorn.run(app, host=cfg.host, port=cfg.port, log_level="warning",

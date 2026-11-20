@@ -17,6 +17,7 @@ import {
 import { createPortal } from "react-dom";
 import {
   AlertTriangle,
+  CalendarDays,
   CheckCircle2,
   Info,
   Loader2,
@@ -335,6 +336,55 @@ export function TimeInput({
       onBlur={() => commit(draft) || setDraft(value)}
       className={cx(inputCls, "tabular", className)}
     />
+  );
+}
+
+/** A date typed as dd-mm-yyyy, with a calendar button. `value` is the text the user sees. */
+export function DateInput({ value, onChange, className }: { value: string; onChange: (dmy: string) => void; className?: string }) {
+  const picker = useRef<HTMLInputElement>(null);
+  const m = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(value.trim());
+  const iso = m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : "";
+  return (
+    <div className={cx("relative", className)}>
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/[^\d./-]/g, "").replace(/[./]/g, "-"))}
+        placeholder="dd-mm-yyyy"
+        inputMode="numeric"
+        maxLength={10}
+        className={cx(inputCls, "tabular pr-10")}
+      />
+      <button
+        type="button"
+        aria-label="Choose a date"
+        onClick={() => {
+          const el = picker.current;
+          if (!el) return;
+          try {
+            el.showPicker();
+          } catch {
+            el.focus();
+            el.click();
+          }
+        }}
+        className="absolute top-1/2 right-1.5 flex size-7 -translate-y-1/2 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-white/10 dark:hover:text-zinc-200"
+      >
+        <CalendarDays className="size-4" />
+      </button>
+      {/* the browser's own calendar; its value is converted to dd-mm-yyyy */}
+      <input
+        ref={picker}
+        type="date"
+        tabIndex={-1}
+        aria-hidden
+        value={iso}
+        onChange={(e) => {
+          const [y, mo, d] = e.target.value.split("-");
+          if (y && mo && d) onChange(`${d}-${mo}-${y}`);
+        }}
+        className="pointer-events-none absolute right-2 bottom-0 h-0 w-0 opacity-0"
+      />
+    </div>
   );
 }
 

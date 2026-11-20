@@ -720,6 +720,14 @@ export const GUIDE: Topic[] = [
         ],
       },
       {
+        id: "https",
+        title: "HTTPS or plain HTTP",
+        blocks: [
+          { p: "Talon uses HTTPS with its own certificate. When Cloudflare (for example a Cloudflare Tunnel) or another proxy already provides HTTPS, turn Talon's off: under **Settings → Networking → Web interface**, switch off **HTTPS** and confirm. Talon restarts and serves plain http:// on port 80; point the proxy at **http://<NAS IP address>:80**." },
+          { warn: "Without HTTPS, passwords cross your network unencrypted unless the proxy adds HTTPS. Turn **HTTPS** on again to return to https:// on port 443." },
+        ],
+      },
+      {
         id: "update",
         title: "Software updates",
         blocks: [

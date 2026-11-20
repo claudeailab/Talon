@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.38
+- HTTPS can be turned off (plain HTTP on port 80), for use behind Cloudflare
+- Calendar for the Entra ID secret expiry date; fewer hints
+- Disks page updates by itself after wiping a disk
+
 ## 1.0.37
 - Settings > Networking: switch between DHCP and a static IP
 - Network changes undo themselves if Talon is not reached within 3 minutes
