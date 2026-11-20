@@ -59,9 +59,26 @@ https://<nas-ip>/
 - **OneDrive:** back up to or from OneDrive, or two-way sync (beta)
 - **Notifications:** e-mail alerts for RAID, disks, tasks and updates
 
----
+## Screenshots
 
-![RAID wizard](docs/screenshots/raid-wizard.png)
+<table>
+  <tr>
+    <td width="50%" align="center"><a href="docs/screenshots/volumes.png"><img src="docs/screenshots/volumes.png" alt="Volumes on RAID or single disks"></a><br><sub>Volumes on RAID or single disks</sub></td>
+    <td width="50%" align="center"><a href="docs/screenshots/raid-wizard.png"><img src="docs/screenshots/raid-wizard.png" alt="RAID wizard with capacity and protection"></a><br><sub>RAID wizard with capacity and protection</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><a href="docs/screenshots/files.png"><img src="docs/screenshots/files.png" alt="Files: browse, upload and download"></a><br><sub>Files: browse, upload and download</sub></td>
+    <td width="50%" align="center"><a href="docs/screenshots/share-permissions.png"><img src="docs/screenshots/share-permissions.png" alt="Shared folder permissions"></a><br><sub>Shared folder permissions</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><a href="docs/screenshots/onedrive.png"><img src="docs/screenshots/onedrive.png" alt="OneDrive backup and sync"></a><br><sub>OneDrive backup and sync</sub></td>
+    <td width="50%" align="center"><a href="docs/screenshots/users.png"><img src="docs/screenshots/users.png" alt="Users and groups"></a><br><sub>Users and groups</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><a href="docs/screenshots/notifications.png"><img src="docs/screenshots/notifications.png" alt="E-mail notifications"></a><br><sub>E-mail notifications</sub></td>
+    <td width="50%" align="center"><a href="docs/screenshots/dashboard-dark.png"><img src="docs/screenshots/dashboard-dark.png" alt="Dark mode"></a><br><sub>Dark mode</sub></td>
+  </tr>
+</table>
 
 ## Updates
 

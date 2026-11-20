@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.28
+- README: screenshot gallery of the main pages
+
 ## 1.0.27
 - README describes what Talon is and does
 - Talon is now MIT licensed
