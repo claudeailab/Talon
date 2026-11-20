@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   type ButtonHTMLAttributes,
+  type HTMLAttributes,
   type InputHTMLAttributes,
   type ReactNode,
   type SelectHTMLAttributes,
@@ -84,8 +85,12 @@ export function IconButton({
 }
 
 /* ------------------------------------------------------------------ Card */
-export function Card({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cx("card", className)}>{children}</div>;
+export function Card({ className, children, ...rest }: HTMLAttributes<HTMLDivElement> & { children: ReactNode }) {
+  return (
+    <div className={cx("card", className)} {...rest}>
+      {children}
+    </div>
+  );
 }
 
 export function CardHeader({

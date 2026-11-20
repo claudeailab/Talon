@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.26
+- New Files page: browse your volumes, upload, download, rename, move and delete
+- "Browse files" button on every volume
+
 ## 1.0.25
 - OneDrive tasks can copy a single file as well as a folder
 - Folder picker: click to select, double-click a folder to open it

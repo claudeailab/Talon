@@ -10,6 +10,7 @@ from typing import Dict, List, Optional
 
 from . import raid, sharecfg
 from .cloudsync import CloudSync
+from .files import FileBrowser
 from .jobs import JobRunner
 from .notify import Notifier
 from .state import State
@@ -39,6 +40,7 @@ class Nas:
         self.notifier = Notifier(self.state, lambda: self.p.system_info().get("hostname", "nas"),
                                  demo)
         self.cloud = CloudSync(cfg, self.state, self, demo)
+        self.files = FileBrowser(self, demo)
         self.history: collections.deque = collections.deque(maxlen=90)
         self._last_sample: Optional[dict] = None
         self._stop = threading.Event()

@@ -7,6 +7,7 @@ import {
   Cloud,
   Database,
   FolderOpen,
+  FolderTree,
   HardDrive,
   LayoutDashboard,
   Layers,
@@ -34,6 +35,7 @@ import { JobDialog } from "./components/jobs";
 import { Reconnecting, UpdateOverlay, UpdatePill } from "./components/update";
 import Login from "./pages/Login";
 import DashboardPage from "./pages/Dashboard";
+import FilesPage from "./pages/Files";
 import NotificationsPage from "./pages/Notifications";
 import OneDrivePage from "./pages/OneDrive";
 import RaidPage from "./pages/Raid";
@@ -54,6 +56,7 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
     items: [
       { to: "/raid", label: "RAID", icon: Layers, page: RaidPage },
       { to: "/volumes", label: "Volumes", icon: Database, page: VolumesPage },
+      { to: "/files", label: "Files", icon: FolderTree, page: FilesPage },
       { to: "/disks", label: "Disks", icon: HardDrive, page: DisksPage },
       { to: "/onedrive", label: "OneDrive", icon: Cloud, page: OneDrivePage },
     ],

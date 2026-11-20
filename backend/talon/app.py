@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import contextlib
+import tempfile
+import urllib.parse
 import html as htmllib
 import json
 import os
@@ -9,8 +11,8 @@ import threading
 import time
 from typing import List, Optional
 
-from fastapi import Body, Depends, FastAPI, HTTPException, Request, Response
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
 from . import __version__, notify
@@ -389,6 +391,70 @@ def create_app(cfg, platform) -> FastAPI:
     def notifications_test(_u: str = Depends(current_user)):
         nas.notifier.test()
         return {"ok": True}
+
+    # ------------------------------------------------------------ files
+    @app.get("/api/files")
+    def files_list(volume: str, path: str = "", _u: str = Depends(current_user)):
+        return nas.files.list(volume, path)
+
+    @app.post("/api/files/folder")
+    def files_mkdir(body: dict = Body(...), user: str = Depends(current_user)):
+        rel = nas.files.mkdir(body.get("volume", ""), body.get("path", ""), body.get("name", ""))
+        nas.state.log_activity(user, f"Created folder {body.get('volume')}/{rel}")
+        return {"path": rel}
+
+    @app.post("/api/files/rename")
+    def files_rename(body: dict = Body(...), user: str = Depends(current_user)):
+        rel = nas.files.rename(body.get("volume", ""), body.get("path", ""), body.get("name", ""))
+        nas.state.log_activity(user, f"Renamed {body.get('volume')}/{body.get('path')} to {rel}")
+        return {"path": rel}
+
+    @app.post("/api/files/move")
+    def files_move(body: dict = Body(...), user: str = Depends(current_user)):
+        n = nas.files.move(body.get("volume", ""), list(body.get("items") or []),
+                           body.get("dest_volume") or body.get("volume", ""), body.get("dest", ""))
+        nas.state.log_activity(user, f"Moved {n} item(s) to {body.get('dest_volume') or body.get('volume')}/"
+                                     f"{body.get('dest', '')}")
+        return {"moved": n}
+
+    @app.post("/api/files/delete")
+    def files_delete(body: dict = Body(...), user: str = Depends(current_user)):
+        items = list(body.get("items") or [])
+        n = nas.files.delete(body.get("volume", ""), items)
+        nas.state.log_activity(user, f"Deleted {n} item(s) in {body.get('volume')}: "
+                                     + ", ".join(items[:5]) + (" …" if len(items) > 5 else ""),
+                               "warning")
+        return {"deleted": n}
+
+    @app.put("/api/files/upload")
+    async def files_upload(request: Request, volume: str, name: str, path: str = "",
+                           overwrite: bool = False, user: str = Depends(current_user)):
+        target = nas.files.upload_target(volume, path, name, overwrite)
+        fd, tmp = tempfile.mkstemp(prefix=".upload-", dir=os.path.dirname(target))
+        size = 0
+        try:
+            with os.fdopen(fd, "wb") as f:
+                async for chunk in request.stream():
+                    f.write(chunk)
+                    size += len(chunk)
+            os.replace(tmp, target)
+        except BaseException:
+            with contextlib.suppress(OSError):
+                os.unlink(tmp)
+            raise
+        nas.files._inherit(target)
+        nas.state.log_activity(user, f"Uploaded {volume}/{os.path.join(path, name)}")
+        return {"size": size}
+
+    @app.get("/api/files/download")
+    def files_download(volume: str, item: List[str] = Query(...), _u: str = Depends(current_user)):
+        name, path, stream = nas.files.download(volume, item)
+        disposition = "attachment; filename*=UTF-8''" + urllib.parse.quote(name)
+        if path:
+            return FileResponse(path, headers={"Content-Disposition": disposition},
+                                media_type="application/octet-stream")
+        return StreamingResponse(stream, media_type="application/zip",
+                                 headers={"Content-Disposition": disposition})
 
     # ------------------------------------------------------------ OneDrive
     @app.get("/api/onedrive")
