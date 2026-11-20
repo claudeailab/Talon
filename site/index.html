@@ -124,13 +124,18 @@
     document.body.style.overflow = "hidden";
     new Image().src = `screenshots/${SHOTS[(current + 1) % SHOTS.length][0]}.png`; // preload next
   }
+  // opened from a README link: closing returns to the README, like closing a modal
+  let fromGitHub = /^https:\/\/github\.com\//.test(document.referrer) && location.hash.length > 1;
   function close() {
+    if (fromGitHub && history.length > 1) { history.back(); return; }
+    fromGitHub = false;
     viewer.classList.remove("open");
     document.body.style.overflow = "";
     current = -1;
     if (location.hash) history.replaceState(null, "", location.pathname);
   }
-  const go = (d) => { location.hash = SHOTS[(current + d + SHOTS.length) % SHOTS.length][0]; };
+  // Previous / Next replace the address instead of adding history, so one Back (or Close) leaves the viewer
+  const go = (d) => { history.replaceState(null, "", "#" + SHOTS[(current + d + SHOTS.length) % SHOTS.length][0]); fromHash(); };
   function fromHash() {
     const i = SHOTS.findIndex(([id]) => id === location.hash.slice(1));
     i >= 0 ? show(i) : (current >= 0 && close());
