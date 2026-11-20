@@ -10,6 +10,7 @@ export function StatusBadge({ status }: { status: StorageStatus }) {
     healthy: ["Healthy", "green"],
     degraded: ["Degraded", "amber"],
     rebuilding: ["Rebuilding", "blue"],
+    building: ["Building", "blue"],
     reshaping: ["Expanding", "blue"],
     syncing: ["Syncing", "blue"],
     checking: ["Scrubbing", "violet"],
@@ -29,12 +30,20 @@ export function statusTone(status: StorageStatus): "danger" | "warning" | "info"
   return status === "failed" || status === "missing" ? "danger" : status === "degraded" || status === "unmounted" ? "warning" : "info";
 }
 
+const SYNC_LABEL: Record<string, string> = {
+  recover: "Rebuilding",
+  resync: "Syncing",
+  check: "Scrubbing",
+  repair: "Repairing",
+  reshape: "Expanding",
+};
+
 export function SyncProgress({ sync }: { sync: SyncInfo | null }) {
   if (!sync || sync.sync_action === "idle" || sync.sync_progress == null) return null;
   return (
     <div>
       <div className="mb-1.5 flex justify-between text-xs text-zinc-500">
-        <span className="capitalize">{sync.sync_action === "check" ? "Scrubbing" : sync.sync_action}</span>
+        <span>{sync.label ?? SYNC_LABEL[sync.sync_action] ?? sync.sync_action}</span>
         <span className="tabular">
           {sync.sync_progress.toFixed(1)}% · {(sync.sync_speed_kbs / 1000).toFixed(0)} MB/s
         </span>
@@ -54,7 +63,7 @@ export function Stat({ label, value }: { label: string; value: ReactNode }) {
 }
 
 function memberTone(state: string) {
-  return state === "active" ? "green" : state === "spare" ? "blue" : state === "rebuilding" ? "violet" : "red";
+  return state === "active" ? "green" : state === "spare" || state === "syncing" ? "blue" : state === "rebuilding" ? "violet" : "red";
 }
 
 export function MemberList({ members, onRemove }: { members: Member[]; onRemove?: (m: Member) => void }) {

@@ -72,6 +72,8 @@ class DemoPlatform:
         parts = [self.make_partition(d, True, log) for d in ("sda", "sdb", "sdc")]
         md = self.md_create("tank", "raid5", parts, [], log)
         self.arrays[md["dev"]]["sync_start"] = 0          # already in sync
+        for m in self.arrays[md["dev"]]["members"]:
+            m["state"] = "active"
         u = self.mkfs(md["dev"], "ext4", "tank", log)
         self.mount_persist(u, "ext4", "/srv/nas/tank", log)
         self.fs[u]["used"] = int(3.1 * TB)
@@ -227,10 +229,12 @@ class DemoPlatform:
             log(f"$ mdadm --create /dev/md/{name} --level={level} --raid-devices={len(parts)}")
             members = [{"part": p, "state": "active"} for p in parts] + \
                       [{"part": p, "state": "spare"} for p in spares]
+            if level == "raid5":           # like mdadm: build by recovering onto the last disk
+                members[len(parts) - 1]["state"] = "rebuilding"
             self.arrays[dev] = {"dev": dev, "uuid": _uuid(), "name": name,
                                 "level": level, "raid_disks": len(parts),
                                 "members": members, "sync_start": time.time(),
-                                "sync_kind": "resync" if level != "raid0" else None,
+                                "sync_kind": None if level == "raid0" else ("recover" if level == "raid5" else "resync"),
                                 "check": None}
             time.sleep(0.5)
             return {"dev": dev, "uuid": self.arrays[dev]["uuid"]}

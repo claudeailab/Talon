@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.39
+- A new RAID 5 shows "Building" instead of "Rebuilding" on its last disk
+
 ## 1.0.38
 - HTTPS can be turned off (plain HTTP on port 80), for use behind Cloudflare
 - Calendar for the Entra ID secret expiry date; fewer hints

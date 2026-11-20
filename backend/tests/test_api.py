@@ -202,3 +202,19 @@ def test_old_raid_disks_go_straight_into_a_new_raid(client):
     assert wait_job(client, r.json())["status"] == "success"
     disks = {d["name"]: d for d in client.get("/api/disks").json()}
     assert disks["sdh"]["array"] == "reuse" and disks["sdi"]["array"] == "reuse"
+
+
+def test_new_raid5_shows_building_not_rebuilding(client):
+    r = client.post("/api/raid", json={"name": "fresh", "level": "raid5", "disks": ["sdd", "sdh", "sdi"]})
+    assert wait_job(client, r.json())["status"] == "success"
+    a = next(x for x in client.get("/api/raid").json() if x["name"] == "fresh")
+    assert a["status"] == "building" and a["sync"]["label"] == "Building"
+    assert [m["state"] for m in a["members"]] == ["active", "active", "syncing"]
+    # once built it is an ordinary array: a later recover is a real rebuild
+    nas = client.app.state.nas
+    for arr in nas.p.arrays.values():
+        if arr["name"] == "fresh":
+            arr["sync_start"] = 1
+    a = next(x for x in client.get("/api/raid").json() if x["name"] == "fresh")
+    assert a["status"] == "healthy"
+    assert nas.state.get("arrays")["fresh"]["synced"] is True

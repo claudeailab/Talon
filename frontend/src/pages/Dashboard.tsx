@@ -208,7 +208,7 @@ export default function DashboardPage() {
                       {sync ? (
                         <Progress value={sync.sync_progress ?? 0} tone="blue" className="mt-1.5" />
                       ) : (
-                        <Chips items={active.map((m) => ({ key: m.disk, label: m.disk, bad: m.state !== "active", mono: true }))} />
+                        <Chips items={active.map((m) => ({ key: m.disk, label: m.disk, bad: m.state === "faulty", mono: true }))} />
                       )}
                     </Tile>
                   );

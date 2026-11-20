@@ -36,6 +36,7 @@ export type StorageStatus =
   | "healthy"
   | "degraded"
   | "rebuilding"
+  | "building"
   | "reshaping"
   | "syncing"
   | "checking"
@@ -47,6 +48,7 @@ export interface SyncInfo {
   sync_action: string;
   sync_progress: number | null;
   sync_speed_kbs: number;
+  label?: string;
 }
 
 export interface RaidArray {

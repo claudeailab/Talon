@@ -255,6 +255,21 @@ class Nas:
                                             "size": d.get("size", 0),
                                             "kind": d.get("kind", "hdd")})
                 item["status"], item["status_detail"] = self._array_status(a)
+                # mdadm builds a new RAID 5 by "recovering" onto its last disk (faster than
+                # a parity resync): that is the first build, not a replacement disk.
+                if r.get("synced") is False:
+                    if a["sync_action"] in ("recover", "resync"):
+                        prog = a.get("sync_progress")
+                        item["status"] = "building"
+                        item["status_detail"] = "Building the new array" + (
+                            f" ({prog:.1f}%)" if prog is not None else "")
+                        item["sync"]["label"] = "Building"
+                        for m in item["members"]:
+                            if m["state"] == "rebuilding":
+                                m["state"] = "syncing"
+                    elif a["sync_action"] == "idle" and not a["degraded"]:
+                        name = r["name"]
+                        self.state.update(lambda d: d["arrays"][name].__setitem__("synced", True))
             item["fault_tolerance"] = raid.fault_tolerance(
                 r["level"], len([m for m in item["members"] if m["state"] != "spare"]) or 1)
             out.append(item)
@@ -313,7 +328,8 @@ class Nas:
             sparts = [self.p.make_partition(n, True, log) for n in spares]
             log(f"-- creating {label} array")
             md = self.p.md_create(name, level, parts, sparts, log)
-            record = {"name": name, "level": level, "md_uuid": md["uuid"], "created": time.time()}
+            record = {"name": name, "level": level, "md_uuid": md["uuid"], "created": time.time(),
+                      "synced": level == "raid0"}       # False until the first build has finished
             self.state.update(lambda d: d["arrays"].__setitem__(name, record))
             self.p.save_mdadm_conf(log)
             log("RAID array created. Create a volume on it to store data.")
