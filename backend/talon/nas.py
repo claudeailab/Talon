@@ -132,7 +132,7 @@ class Nas:
             out.append({**d, "status": status, "status_detail": detail, "volume": volume,
                         "array": array, "selectable": status in ("available", "has_data"),
                         "health": self._health(smart),
-                        "temperature": smart.get("temperature"),
+                        "temperature": smart.get("temperature") or None,
                         "power_on_hours": smart.get("power_on_hours")})
         return out
 

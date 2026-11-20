@@ -21,7 +21,7 @@ import { Link } from "../lib/router";
 import type { Dashboard, Point } from "../lib/types";
 import { AreaChart, Ring } from "../components/charts";
 import { Badge, Card, CardHeader, PageLoader, Progress, StatusDot, usageTone } from "../components/ui";
-import { DiskIcon, HealthBadge } from "../components/disk";
+import { DiskIcon, DiskStatusBadge, HealthBadge } from "../components/disk";
 import { VolumeStatusBadge } from "./Volumes";
 
 function greeting() {
@@ -295,8 +295,9 @@ export default function DashboardPage() {
                   </div>
                   <div className="truncate text-xs text-zinc-500">{d.model}</div>
                   <div className="mt-1 flex items-center gap-2">
-                    <HealthBadge health={d.health} />
-                    {d.temperature != null && <span className="tabular text-xs text-zinc-500">{d.temperature}°C</span>}
+                    {/* without SMART (e.g. virtual disks) show what the disk is used for */}
+                    {d.health === "unknown" ? <DiskStatusBadge d={d} /> : <HealthBadge health={d.health} />}
+                    {d.temperature ? <span className="tabular text-xs text-zinc-500">{d.temperature}°C</span> : null}
                   </div>
                 </div>
               </div>

@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Download, Info, MonitorSmartphone, RefreshCw, Server, Sparkles } from "lucide-react";
+import { CheckCircle2, Download, Info, RefreshCw, Server, Sparkles } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, bytes } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Settings, SysInfo, UpdateInfo } from "../lib/types";
-import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Field, Input, PageHeader, PageLoader, Select, ToggleRow } from "../components/ui";
+import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Field, Input, PageHeader, PageLoader, Select, Switch } from "../components/ui";
 
 export default function SettingsPage() {
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.get<Settings>("/settings") });
@@ -24,62 +24,23 @@ export default function SettingsPage() {
 
   return (
     <>
-      <PageHeader title="Settings" description="System identity, file sharing defaults and software updates." />
+      <PageHeader title="Settings" description="Name, file sharing and software updates." />
       <div className="grid gap-5 xl:grid-cols-2">
         <SoftwareUpdate />
-        <Card>
-          <CardHeader icon={<Server className="size-4.5" />} title="General" subtitle="Name and time zone of this NAS" />
-          <div className="space-y-4 px-5 pb-5">
-            <Field label="Hostname" hint={`Reachable as ${form.hostname}.local on most networks`}>
-              <Input value={form.hostname} onChange={(e) => set("hostname", e.target.value)} />
-            </Field>
-            <Field label="Time zone">
-              <Select value={form.timezone} onChange={(e) => set("timezone", e.target.value)}>
-                {(tz.data ?? [form.timezone]).map((t) => (
-                  <option key={t}>{t}</option>
-                ))}
-              </Select>
-            </Field>
-            <div className="flex justify-end">
-              <Button variant="primary" loading={save.isPending} onClick={() => save.mutate({ hostname: form.hostname, timezone: form.timezone })}>
-                Save
-              </Button>
-            </div>
-          </div>
-        </Card>
-
-        <Card>
-          <CardHeader icon={<MonitorSmartphone className="size-4.5" />} title="SMB / Windows sharing" subtitle="Global Samba settings" />
-          <div className="space-y-4 px-5 pb-5">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Workgroup">
-                <Input value={form.workgroup} onChange={(e) => set("workgroup", e.target.value.toUpperCase())} maxLength={15} />
-              </Field>
-              <Field label="Minimum protocol" hint="SMB2_10 or newer is recommended">
-                <Select value={form.smb_min_protocol} onChange={(e) => set("smb_min_protocol", e.target.value)}>
-                  {form.smb_protocols.map((p) => (
-                    <option key={p}>{p}</option>
-                  ))}
-                </Select>
-              </Field>
-            </div>
-            <Field label="Server description">
-              <Input value={form.server_string} onChange={(e) => set("server_string", e.target.value)} maxLength={64} />
-            </Field>
-            <ToggleRow
-              title="macOS compatibility"
-              description="Apple SMB extensions (vfs_fruit) for faster Finder browsing and correct metadata."
-              checked={form.smb_macos_compat}
-              onChange={(v) => set("smb_macos_compat", v)}
-            />
-            <div className="flex justify-end">
+        <Card className="xl:col-span-2">
+          <CardHeader
+            icon={<Server className="size-4.5" />}
+            title="General & file sharing"
+            subtitle="Name, time zone and Windows/macOS sharing"
+            actions={
               <Button
                 variant="primary"
                 loading={save.isPending}
                 onClick={() =>
                   save.mutate({
+                    hostname: form.hostname,
+                    timezone: form.timezone,
                     workgroup: form.workgroup,
-                    server_string: form.server_string,
                     smb_min_protocol: form.smb_min_protocol,
                     smb_macos_compat: form.smb_macos_compat,
                   })
@@ -87,6 +48,37 @@ export default function SettingsPage() {
               >
                 Save
               </Button>
+            }
+          />
+          <div className="grid gap-x-8 gap-y-4 px-5 pb-5 md:grid-cols-2 [&>*]:min-w-0">
+            <Field label="Hostname" hint={`Reachable as ${form.hostname}.local on most networks`}>
+              <Input value={form.hostname} onChange={(e) => set("hostname", e.target.value)} />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2 [&>*]:min-w-0">
+              <Field label="Workgroup">
+                <Input value={form.workgroup} onChange={(e) => set("workgroup", e.target.value.toUpperCase())} maxLength={15} />
+              </Field>
+              <Field label="Minimum SMB protocol" hint="SMB2_10 or newer is recommended">
+                <Select value={form.smb_min_protocol} onChange={(e) => set("smb_min_protocol", e.target.value)}>
+                  {form.smb_protocols.map((p) => (
+                    <option key={p}>{p}</option>
+                  ))}
+                </Select>
+              </Field>
+            </div>
+            <Field label="Time zone">
+              <Select value={form.timezone} onChange={(e) => set("timezone", e.target.value)}>
+                {(tz.data ?? [form.timezone]).map((t) => (
+                  <option key={t}>{t}</option>
+                ))}
+              </Select>
+            </Field>
+            <div>
+              <div className="mb-1.5 text-[13px] font-medium">macOS compatibility</div>
+              <div className="flex h-10 items-center justify-between gap-4 rounded-xl bg-zinc-50 px-3.5 dark:bg-white/[0.03]">
+                <span className="truncate text-[13px] text-zinc-600 dark:text-zinc-400">Faster Finder browsing and correct metadata</span>
+                <Switch checked={form.smb_macos_compat} onChange={(v) => set("smb_macos_compat", v)} label="macOS compatibility" />
+              </div>
             </div>
           </div>
         </Card>

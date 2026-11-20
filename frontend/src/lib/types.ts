@@ -196,7 +196,7 @@ export interface Dashboard {
   info: SysInfo;
   history: Point[];
   volumes: Volume[];
-  disks: Pick<Disk, "name" | "model" | "size" | "kind" | "status" | "health" | "temperature" | "volume">[];
+  disks: Pick<Disk, "name" | "model" | "size" | "kind" | "status" | "health" | "temperature" | "volume" | "array">[];
   services: Service[];
   alerts: Alert[];
   shares: number;

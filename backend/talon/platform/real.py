@@ -196,7 +196,8 @@ class RealPlatform:
         return {
             "available": bool(d.get("smart_support", {}).get("available", bool(d.get("smart_status")))),
             "passed": status,
-            "temperature": d.get("temperature", {}).get("current"),
+            # virtual and some USB disks report 0 when they have no sensor
+            "temperature": (d.get("temperature", {}).get("current") or None),
             "power_on_hours": d.get("power_on_time", {}).get("hours"),
             "power_cycles": d.get("power_cycle_count"),
             "bad_sectors": realloc,

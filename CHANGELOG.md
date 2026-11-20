@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.18
+- Settings: one compact "General & file sharing" card; Server description removed
+- Disks without health data (e.g. virtual disks) show their use instead of "Unknown" and no 0°C
+
 ## 1.0.17
 - A new RAID is named after its level by default, e.g. raid5
 

@@ -22,7 +22,11 @@ export function HealthBadge({ health }: { health: Disk["health"] }) {
   if (health === "good") return <Badge tone="green" dot>Healthy</Badge>;
   if (health === "warning") return <Badge tone="amber" dot>Warning</Badge>;
   if (health === "failing") return <Badge tone="red" dot>Failing</Badge>;
-  return <Badge dot>Unknown</Badge>;
+  return (
+    <span title="This disk does not report health data (S.M.A.R.T.). Virtual disks never do.">
+      <Badge dot>No health data</Badge>
+    </span>
+  );
 }
 
 export function DiskStatusBadge({ d }: { d: Pick<Disk, "status" | "volume" | "array"> }) {
@@ -32,7 +36,7 @@ export function DiskStatusBadge({ d }: { d: Pick<Disk, "status" | "volume" | "ar
     case "has_data":
       return <Badge tone="amber">Has data</Badge>;
     case "volume":
-      return <Badge tone="violet">{d.volume}</Badge>;
+      return <Badge tone="violet">Volume {d.volume}</Badge>;
     case "raid":
       return <Badge tone="violet">RAID {d.array}</Badge>;
     case "system":
