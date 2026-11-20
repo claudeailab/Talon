@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.17
+- A new RAID is named after its level by default, e.g. raid5
+
 ## 1.0.16
 - New volumes are named volume1, volume2, … by default
 

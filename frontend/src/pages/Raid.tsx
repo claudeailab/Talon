@@ -294,10 +294,6 @@ function CreateRaidWizard({ disks, existing, onClose, onJob }: { disks: Disk[]; 
   const [sel, setSel] = useState<string[]>([]);
   const [spares, setSpares] = useState(0);
   const [level, setLevel] = useState<string | null>(null);
-  const defaultName = useMemo(() => {
-    for (let i = 1; ; i++) if (!existing.includes(`raid${i}`)) return `raid${i}`;
-  }, [existing]);
-  const [name, setName] = useState(defaultName);
   const [confirm, setConfirm] = useState("");
 
   const selectable = disks.filter((d) => d.selectable);
@@ -330,6 +326,18 @@ function CreateRaidWizard({ disks, existing, onClose, onJob }: { disks: Disk[]; 
   useEffect(() => {
     if (spares > maxSpares) setSpares(maxSpares);
   }, [maxSpares]); // eslint-disable-line
+
+  // suggested name = the chosen level (raid5), or raid5-2, raid5-3, ... if taken
+  const suggested = useMemo(() => {
+    const base = level ?? "raid";
+    if (!existing.includes(base)) return base;
+    for (let i = 2; ; i++) if (!existing.includes(`${base}-${i}`)) return `${base}-${i}`;
+  }, [level, existing]);
+  const [name, setName] = useState(suggested);
+  const [nameEdited, setNameEdited] = useState(false);
+  useEffect(() => {
+    if (!nameEdited) setName(suggested);
+  }, [suggested, nameEdited]);
 
   const nameErr = !NAME_RE.test(name) ? NAME_HINT : existing.includes(name) ? "A RAID with this name exists" : null;
   const create = useAction(() => api.post<Job>("/raid", { name, level, disks: dataDisks, spares: spareDisks }), {
@@ -447,7 +455,14 @@ function CreateRaidWizard({ disks, existing, onClose, onJob }: { disks: Disk[]; 
         <div className="grid gap-6 md:grid-cols-2">
           <div className="space-y-4">
             <Field label="RAID name" error={nameErr}>
-              <Input value={name} onChange={(e) => setName(e.target.value.toLowerCase())} maxLength={24} />
+              <Input
+                value={name}
+                onChange={(e) => {
+                  setNameEdited(true);
+                  setName(e.target.value.toLowerCase());
+                }}
+                maxLength={24}
+              />
             </Field>
             <Callout tone="danger" title="All data on these disks will be erased">
               <ul className="mt-1 list-disc pl-4">
