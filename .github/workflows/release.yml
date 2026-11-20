@@ -12,11 +12,14 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:             # one release run at a time; a second run sees the tag and skips
+  group: release
+  cancel-in-progress: false
 jobs:
   release:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { ref: main, fetch-depth: 0 }
       - name: Read version
         id: v
@@ -31,4 +34,10 @@ jobs:
         if: steps.v.outputs.exists != '1'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "v${{ steps.v.outputs.version }}" --target "$GITHUB_SHA" --title "Talon v${{ steps.v.outputs.version }}" --generate-notes
+          V: v${{ steps.v.outputs.version }}
+        run: |
+          if gh release view "$V" >/dev/null 2>&1; then
+            echo "$V is already released"
+          else
+            gh release create "$V" --target "$GITHUB_SHA" --title "Talon $V" --generate-notes
+          fi

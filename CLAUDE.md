@@ -16,7 +16,7 @@
 - If anything in `frontend/` changed: `cd frontend && npm run build` and commit `backend/talon/web/`
   (the installer ships the pre-built UI; CI fails if it is stale).
 - Raise `__version__` in `backend/talon/__init__.py` (see above); the Release workflow tags and
-  releases it on push to `main`.
+  releases it on push to `main` by itself. Do not also start it manually.
 
 ## Automation
 `.github/workflows/auto-merge.yml` merges any pushed non-main branch into `main` and deletes it,
