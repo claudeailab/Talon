@@ -92,8 +92,8 @@ export default function DocumentationPage() {
         <nav className="hidden lg:block">
           <Card className="sticky top-6 p-3">
             {GROUPS.map((g) => (
-              <div key={g} className="mb-3 last:mb-0">
-                <div className="mb-1 px-3 text-[11px] font-semibold tracking-wider text-zinc-400 uppercase dark:text-zinc-500">{g}</div>
+              <div key={g} className="border-t border-zinc-200 pt-3 pb-3 first:border-t-0 first:pt-0 last:pb-0 dark:border-white/10">
+                <div className="mb-1 px-3 text-[13px] font-bold text-zinc-900 dark:text-zinc-100">{g}</div>
                 {GUIDE.filter((t) => t.group === g).map((t) => (
                   <button
                     key={t.id}

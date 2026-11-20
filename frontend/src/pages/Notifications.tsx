@@ -6,9 +6,41 @@ import { cx, sameSet, sameValue } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import { navigate } from "../lib/router";
 import type { NotificationSettings } from "../lib/types";
-import { Badge, Button, Card, CardHeader, Empty, Field, Input, PageHeader, PageLoader, Switch } from "../components/ui";
+import { Badge, Button, Card, CardHeader, Empty, Field, Input, PageHeader, PageLoader, Switch, Tabs } from "../components/ui";
+
+type TabId = "email" | "thresholds";
 
 export default function NotificationsPage() {
+  const initial = new URLSearchParams(location.search).get("tab");
+  const [tab, setTab] = useState<TabId>(initial === "thresholds" ? "thresholds" : "email");
+  const change = (t: TabId) => {
+    setTab(t);
+    history.replaceState(null, "", t === "email" ? location.pathname : `${location.pathname}?tab=${t}`);
+  };
+  const header = (
+    <>
+      <PageHeader title="Notifications" description="Choose when the NAS warns you." />
+      <div className="mb-5">
+        <Tabs
+          value={tab}
+          onChange={change}
+          tabs={[
+            { value: "email", label: "E-mail" },
+            { value: "thresholds", label: "Alert thresholds" },
+          ]}
+        />
+      </div>
+    </>
+  );
+  return (
+    <>
+      {header}
+      {tab === "email" ? <EmailTab /> : <ThresholdsCard />}
+    </>
+  );
+}
+
+function EmailTab() {
   const q = useQuery({ queryKey: ["notifications"], queryFn: () => api.get<NotificationSettings>("/notifications") });
   const [recipients, setRecipients] = useState("");
   const [events, setEvents] = useState<Record<string, boolean>>({});
@@ -24,12 +56,10 @@ export default function NotificationsPage() {
   });
   const test = useAction(() => api.post("/notifications/test"), { success: "Test notification sent" });
   if (!q.data) return <PageLoader />;
-  const header = <PageHeader title="Notifications" description="Choose when the NAS warns you." />;
 
   if (!q.data.smtp)
     return (
       <>
-        {header}
         <Card>
           <Empty
             icon={<Mail className="size-6" />}
@@ -42,14 +72,12 @@ export default function NotificationsPage() {
             }
           />
         </Card>
-        <ThresholdsCard />
       </>
     );
 
   const changed = !sameSet(list, q.data.recipients) || !sameValue(events, q.data.events);
   return (
     <>
-      {header}
       <Card>
         <CardHeader
           icon={<BellRing className="size-4.5" />}
@@ -83,7 +111,6 @@ export default function NotificationsPage() {
           </div>
         </div>
       </Card>
-      <ThresholdsCard />
     </>
   );
 }
@@ -126,7 +153,7 @@ function ThresholdsCard() {
   let section = "";
 
   return (
-    <Card className="mt-5">
+    <Card>
       <CardHeader
         icon={<Thermometer className="size-4.5" />}
         title="Alert thresholds"

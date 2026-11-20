@@ -60,8 +60,8 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
     items: [
       { to: "/raid", label: "RAID", icon: Layers, page: RaidPage },
       { to: "/volumes", label: "Volumes", icon: Database, page: VolumesPage },
-      { to: "/files", label: "Files", icon: FolderTree, page: FilesPage },
       { to: "/disks", label: "Disks", icon: HardDrive, page: DisksPage },
+      { to: "/files", label: "Files", icon: FolderTree, page: FilesPage },
       { to: "/onedrive", label: "OneDrive", icon: Cloud, page: OneDrivePage },
     ],
   },
@@ -75,9 +75,9 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
   {
     section: "System",
     items: [
-      { to: "/services", label: "Services", icon: Server, page: ServicesPage },
-      { to: "/settings", label: "Settings", icon: SettingsIcon, page: SettingsPage },
       { to: "/activity", label: "Activity", icon: ActivityIcon, page: ActivityPage },
+      { to: "/settings", label: "Settings", icon: SettingsIcon, page: SettingsPage },
+      { to: "/services", label: "Services", icon: Server, page: ServicesPage },
       { to: "/scheduled", label: "Scheduled", icon: Clock, page: ScheduledPage },
       { to: "/notifications", label: "Notifications", icon: Mail, page: NotificationsPage },
       { to: "/documentation", label: "Documentation", icon: BookOpen, page: DocumentationPage },

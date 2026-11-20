@@ -67,9 +67,16 @@ export const GUIDE: Topic[] = [
         id: "signin",
         title: "Signing in",
         blocks: [
-          { p: "Open **https://<NAS address>/** in a browser, for example https://192.168.1.50/ or https://<hostname>.local/." },
-          { p: "Sign in with the Linux account you installed Talon with. Other users can sign in once they are marked as **Administrator** on the [Users & groups](/users) page." },
-          { p: "The first time, the browser warns that the connection is not private. This is expected: Talon uses its own certificate. Choose **Advanced** and continue to the site." },
+          { p: "Open the address the installer shows at the end in a browser, for example **https://192.168.1.50/** or **https://<hostname>.local/**." },
+          { p: "The installer shows how to sign in when it finishes:" },
+          {
+            list: [
+              "Installed as **root**: it creates the administrator **nasadmin** with a random password and shows both, for example `Administrator login: nasadmin / Xy7…`. Change this password in [Users & groups](/users) after signing in.",
+              "Installed from your own account (asked for your password to get root access): that account is the administrator; sign in with its user name and Linux password.",
+            ],
+          },
+          { p: "Other people can sign in once they are marked as **Administrator** on the [Users & groups](/users) page." },
+          { p: "The first time, the browser warns that the connection is not private. This is expected: Talon uses its own certificate. Choose **Advanced** and continue to the site. (With HTTPS turned off in [Settings → Networking](/settings?tab=network), the address starts with http:// and there is no warning.)" },
         ],
       },
       {
@@ -97,7 +104,7 @@ export const GUIDE: Topic[] = [
             list: [
               "**CPU, Memory, Network and Disk activity**: live values and the last few minutes as a chart.",
               "**Storage**: each volume with its free space, each RAID array with its health and disks, your shared folders and, when turned on, OneDrive.",
-              "**System**: model, operating system, uptime and network addresses.",
+              "**System**: model, operating system, kernel, processor, memory, uptime, network addresses, and the number of shared folders and users.",
               "**Disks**: every disk with its health and temperature.",
               "**Services**: which network services are running.",
             ],
@@ -160,13 +167,13 @@ export const GUIDE: Topic[] = [
           { p: "Open the **⋯** menu of an array for these actions:" },
           {
             list: [
-              "**Add disk**: add a disk as a **Hot spare** (stands by and automatically replaces a failing disk), to **Expand capacity**, or to **Add mirror** for RAID 1.",
-              "**Replace failed disk**: rebuild the missing data onto a new disk.",
-              "**Remove disk**: take a disk out of the array.",
-              "**Run data scrub**: read every block to find and repair hidden errors. Running one every month or two is good practice. **Stop data scrub** stops it.",
+              "**Add disk**: add a disk as a **Hot spare** (stands by and automatically replaces a failing disk), to **Expand capacity** (RAID 5 and RAID 6) or to **Add mirror** (RAID 1). RAID 0 and RAID 10 arrays cannot be extended, and RAID 0 has no hot spares.",
+              "**Replace failed disk**: shown instead of **Add disk** when the array is degraded; rebuilds the missing data onto a new disk.",
+              "**Run data scrub**: read every block to find and repair hidden errors. Running one every month or two is good practice. **Stop data scrub** stops it. Not available for RAID 0.",
               "**Delete RAID**: only possible after its volume is deleted.",
             ],
           },
+          { p: "To take a disk out of an array, point at it under **Member disks** and click its remove button. Talon refuses when the array would not survive it." },
           { p: "After **Expand capacity** finishes, use **Expand filesystem** on the [Volumes](/volumes) page so the volume can use the new space." },
         ],
       },
@@ -230,6 +237,42 @@ export const GUIDE: Topic[] = [
     ],
   },
   {
+    id: "disks",
+    title: "Disks and health",
+    group: "Storage",
+    summary: "Disk health (S.M.A.R.T.), temperature, self-tests and wiping.",
+    page: { to: "/disks", label: "Open Disks" },
+    sections: [
+      {
+        id: "health",
+        title: "Disk health",
+        blocks: [
+          { img: "disks", alt: "Disks page" },
+          { p: "Every disk shows its type (HDD, SSD, NVMe, USB), size, what it is used for, health and temperature. Choose **S.M.A.R.T. details** in a disk's **⋯** menu for its power-on time, bad sectors, wear and every attribute." },
+          { p: "Virtual disks and some USB enclosures do not report health; they show what they are used for instead." },
+        ],
+      },
+      {
+        id: "tests",
+        title: "Self-tests",
+        blocks: [
+          { p: "In **S.M.A.R.T. details**, click **Run short test** (a few minutes) or **Run extended test** (several hours). The result appears in the **Self-test log**." },
+        ],
+      },
+      {
+        id: "wipe",
+        title: "Wipe a disk",
+        blocks: [
+          { p: "**Wipe disk** in a disk's **⋯** menu removes old partitions and RAID information, so the disk can be used for a new RAID array or volume." },
+          { warn: "Everything on the disk is lost. Disks that belong to one of Talon's RAID arrays or volumes cannot be wiped." },
+          { p: "**Foreign RAID** means the disk belongs to a RAID array from another system. Wipe it, or select it directly when you create a RAID array or volume: Talon stops the old array first, then erases the disk. Its other disks then show **Has data** and can be used the same way. A foreign array that is mounted or in use is left alone." },
+          { tip: "USB disks work, but can disconnect under load. For RAID, use SATA or NVMe disks, or a powered USB hub." },
+        ],
+      },
+    ],
+  },
+
+  {
     id: "files",
     title: "Files",
     group: "Storage",
@@ -243,7 +286,7 @@ export const GUIDE: Topic[] = [
           { img: "files", alt: "Files page" },
           {
             list: [
-              "Pick a **Volume** at the top. Click once to select an item, double-click a folder to open it.",
+              "With more than one volume, pick it with the buttons at the top. Click once to select an item, double-click a folder to open it.",
               "Use the path at the top to go back up, and **Filter this folder** to find a name.",
               "Hidden items whose names start with a dot, like .recycle and .versions, are not shown.",
             ],
@@ -277,42 +320,6 @@ export const GUIDE: Topic[] = [
       },
     ],
   },
-  {
-    id: "disks",
-    title: "Disks and health",
-    group: "Storage",
-    summary: "Disk health (S.M.A.R.T.), temperature, self-tests and wiping.",
-    page: { to: "/disks", label: "Open Disks" },
-    sections: [
-      {
-        id: "health",
-        title: "Disk health",
-        blocks: [
-          { img: "disks", alt: "Disks page" },
-          { p: "Every disk shows its type (HDD, SSD, NVMe, USB), size, what it is used for, health and temperature. Click a disk for its S.M.A.R.T. details: power-on time, bad sectors, wear and every attribute." },
-          { p: "Virtual disks and some USB enclosures do not report health; they show what they are used for instead." },
-        ],
-      },
-      {
-        id: "tests",
-        title: "Self-tests",
-        blocks: [
-          { p: "Open a disk and start a **Short** (a few minutes) or **Extended** (several hours) self-test. The result appears in its **Self-test log**." },
-        ],
-      },
-      {
-        id: "wipe",
-        title: "Wipe a disk",
-        blocks: [
-          { p: "**Wipe disk** in a disk's **⋯** menu removes old partitions and RAID information, so the disk can be used for a new RAID array or volume." },
-          { warn: "Everything on the disk is lost. Disks that belong to one of Talon's RAID arrays or volumes cannot be wiped." },
-          { p: "**Foreign RAID** means the disk belongs to a RAID array from another system. Wipe it, or select it directly when you create a RAID array or volume: Talon stops the old array first, then erases the disk. Its other disks then show **Has data** and can be used the same way. A foreign array that is mounted or in use is left alone." },
-          { tip: "USB disks work, but can disconnect under load. For RAID, use SATA or NVMe disks, or a powered USB hub." },
-        ],
-      },
-    ],
-  },
-
   // ------------------------------------------------------------ Sharing
   {
     id: "shares",
@@ -330,7 +337,7 @@ export const GUIDE: Topic[] = [
             steps: [
               "On the [Shared folders](/shares) page, click **New share**.",
               "**General**: enter the **Name** that people see on the network, pick the **Volume** and optionally a **Description**. A folder with this name is created on the volume.",
-              "**Permissions**: give each user or group **No access**, **Read** or **Read/Write**. **Guests** means anyone on the network, without a password.",
+              "**Permissions**: give **All NAS users**, each group and each user **No access**, **Read** or **Read/Write**. **Guests** (anyone on the network, without a password) can get **Read** at most.",
               "**SMB**: for Windows, macOS, Linux, Android and iOS. On by default. Options below.",
               "**NFS**: for Linux, Kodi, VMware ESXi and Proxmox. Options below.",
               "Click **Create share**.",
@@ -453,7 +460,7 @@ export const GUIDE: Topic[] = [
             steps: [
               "On the [Users & groups](/users) page, click **Add user**.",
               "Enter a **User name**, optionally a **Full name**, and a **Password** twice. This password is also used to open shared folders.",
-              "Turn on **Administrator** only for people who should manage the NAS in this web interface.",
+              "Optionally add the user to **Groups**. Turn on **Administrator** only for people who should manage the NAS in this web interface.",
               "Click **Create user**, then give the user access on the [Shared folders](/shares) page.",
             ],
           },
@@ -634,7 +641,7 @@ export const GUIDE: Topic[] = [
         blocks: [
           {
             steps: [
-              "Open the [Notifications](/notifications) page.",
+              "Open the [Notifications](/notifications) page, tab **E-mail**.",
               "Enter one or more addresses under **Send to**, separated by commas.",
               "Under **Send an e-mail when**, choose the events: RAID degraded or failed, disk health warning, disk too hot, volume almost full, background task failed, OneDrive task failed, software update available, and failed sign-in attempt.",
               "Click **Save**, then **Send test** to send a test email.",
@@ -648,7 +655,7 @@ export const GUIDE: Topic[] = [
         id: "thresholds",
         title: "3. Alert thresholds",
         blocks: [
-          { p: "Under **Alert thresholds** on the [Notifications](/notifications) page you choose when Talon warns you. The limits apply to the dashboard, the bell and e-mails, also without SMTP." },
+          { p: "On the [Notifications](/notifications?tab=thresholds) page, the **Alert thresholds** tab sets when Talon warns you. The limits apply to the dashboard, the bell and e-mails, also without SMTP." },
           {
             list: [
               "**Disk temperature**: a limit for **Hard disks (HDD)**, **SATA SSDs** and **NVMe SSDs**, because SSDs run warmer. Each shows the current temperatures of those disks.",
@@ -657,6 +664,7 @@ export const GUIDE: Topic[] = [
               "**Bad sectors**: warn as soon as a disk reports reallocated or pending sectors.",
             ],
           },
+          { img: "notifications-thresholds", alt: "Alert thresholds" },
           { p: "Change the values and click **Save**. **Reset to defaults** restores 55 °C, 65 °C and 75 °C, 90% full, 90% worn, and bad sector warnings on." },
         ],
       },
@@ -665,29 +673,18 @@ export const GUIDE: Topic[] = [
 
   // ------------------------------------------------------------ System
   {
-    id: "services",
-    title: "Services",
+    id: "activity",
+    title: "Activity",
     group: "System",
-    summary: "The network services that make the NAS reachable.",
-    page: { to: "/services", label: "Open Services" },
+    summary: "A log of administrative actions and background tasks.",
+    page: { to: "/activity", label: "Open Activity" },
     sections: [
       {
-        id: "list",
-        title: "What each service does",
+        id: "log",
+        title: "Activity log and tasks",
         blocks: [
-          { img: "services", alt: "Services" },
-          {
-            list: [
-              "**SMB (Samba)**: shared folders for Windows, macOS, Linux, iPhone and Android.",
-              "**NetBIOS**: lets very old Windows versions find the NAS by name. Usually not needed.",
-              "**NFS**: shared folders for Linux and other Unix systems.",
-              "**WS-Discovery**: shows the NAS under Network in Windows File Explorer.",
-              "**Bonjour (mDNS)**: shows the NAS in macOS Finder and makes **<hostname>.local** work.",
-              "**SSH**: command-line access for advanced users.",
-              "**OneDrive**: backup and sync with Microsoft OneDrive. See [OneDrive](" + t("onedrive") + ").",
-            ],
-          },
-          { p: "Turn a service on or off with its switch; it then also starts, or no longer starts, at boot. **Restart** restarts a running service." },
+          { img: "activity", alt: "Activity" },
+          { p: "**Tasks** lists background jobs, such as creating a RAID array or installing an update, with their progress and result. The **Activity log** lists who changed what and when. Choose how many entries to show per page and use **Previous** and **Next**." },
         ],
       },
     ],
@@ -762,6 +759,34 @@ export const GUIDE: Topic[] = [
     ],
   },
   {
+    id: "services",
+    title: "Services",
+    group: "System",
+    summary: "The network services that make the NAS reachable.",
+    page: { to: "/services", label: "Open Services" },
+    sections: [
+      {
+        id: "list",
+        title: "What each service does",
+        blocks: [
+          { img: "services", alt: "Services" },
+          {
+            list: [
+              "**SMB (Samba)**: shared folders for Windows, macOS, Linux, iPhone and Android.",
+              "**NetBIOS**: lets very old Windows versions find the NAS by name. Usually not needed.",
+              "**NFS**: shared folders for Linux and other Unix systems.",
+              "**WS-Discovery**: shows the NAS under Network in Windows File Explorer.",
+              "**Bonjour (mDNS)**: shows the NAS in macOS Finder and makes **<hostname>.local** work.",
+              "**SSH**: command-line access for advanced users.",
+              "**OneDrive**: backup and sync with Microsoft OneDrive. See [OneDrive](" + t("onedrive") + ").",
+            ],
+          },
+          { p: "Turn a service on or off with its switch; it then also starts, or no longer starts, at boot. **Restart** restarts a running service." },
+        ],
+      },
+    ],
+  },
+  {
     id: "scheduled",
     title: "Scheduled tasks",
     group: "System",
@@ -821,23 +846,6 @@ export const GUIDE: Topic[] = [
     ],
   },
   {
-    id: "activity",
-    title: "Activity",
-    group: "System",
-    summary: "A log of administrative actions and background tasks.",
-    page: { to: "/activity", label: "Open Activity" },
-    sections: [
-      {
-        id: "log",
-        title: "Activity log and tasks",
-        blocks: [
-          { img: "activity", alt: "Activity" },
-          { p: "**Tasks** lists background jobs, such as creating a RAID array or installing an update, with their progress and result. The **Activity log** lists who changed what and when. Choose how many entries to show per page and use **Previous** and **Next**." },
-        ],
-      },
-    ],
-  },
-  {
     id: "troubleshooting",
     title: "Troubleshooting",
     group: "System",
@@ -851,7 +859,10 @@ export const GUIDE: Topic[] = [
       {
         id: "signin",
         title: "I cannot sign in",
-        blocks: [{ p: "Only administrators can sign in. Use the Linux account you installed Talon with, or ask an administrator to turn on **Administrator** for your account on the [Users & groups](/users) page." }],
+        blocks: [
+          { p: "Only administrators can sign in. Use the login the installer showed when it finished (see [Getting started](" + t("start") + ")), or ask an administrator to turn on **Administrator** for your account on the [Users & groups](/users) page." },
+          { p: "If the sign-in page says your browser did not keep the sign-in, delete this site's cookies (or use a private window) and sign in again." },
+        ],
       },
       {
         id: "notfound",

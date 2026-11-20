@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.43
+- Documentation reviewed and corrected, including how to sign in after installing
+- Menu order: RAID, Volumes, Disks, Files, OneDrive; Activity, Settings, Services
+- Notifications page has tabs: E-mail and Alert thresholds
+
 ## 1.0.42
 - Alert thresholds: disk temperature per disk type, volume full, SSD wear, bad sectors
 - Card buttons move below the title on narrow screens
