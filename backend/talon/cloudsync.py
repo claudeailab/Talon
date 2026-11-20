@@ -72,6 +72,7 @@ class CloudSync:
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._installing = False
+        self._demo_dirs: set = set()                 # folders created in demo mode
 
     # ------------------------------------------------------------ state helpers
     def _od(self) -> dict:
@@ -288,13 +289,36 @@ class CloudSync:
         if not target.startswith(root):
             raise UserError("Invalid folder")
         if self.demo:
-            return ["Documents", "Media", "Office", "Photos"] if target == root else []
+            made = sorted(n for p, n in self._demo_dirs if p == (volume, _clean_rel(path)))
+            return sorted({*(["Documents", "Media", "Office", "Photos"] if target == root else []),
+                           *made}, key=str.lower)
         try:
             return sorted((n for n in os.listdir(target)
                            if os.path.isdir(os.path.join(target, n)) and not n.startswith(".")),
                           key=str.lower)
         except OSError:
             return []
+
+    def make_local_folder(self, volume: str, path: str, name: str) -> str:
+        """Create a folder inside a volume; returns its path relative to the volume."""
+        name = str(name or "").strip()
+        if not name or name in (".", "..") or name.startswith(".") or "/" in name \
+                or "\\" in name or len(name) > 128 or not PATH_RE.match(name):
+            raise UserError("Enter a folder name without / (not starting with a dot)")
+        root = self._volume_root(volume)
+        rel = _clean_rel(f"{_clean_rel(path)}/{name}")
+        target = os.path.realpath(os.path.join(root, rel))
+        if not target.startswith(root + os.sep):
+            raise UserError("Invalid folder")
+        if self.demo:
+            if (volume, _clean_rel(path), name) in {(v, p, n) for (v, p), n in self._demo_dirs}:
+                raise UserError(f"{name} already exists")
+            self._demo_dirs.add(((volume, _clean_rel(path)), name))
+            return rel
+        if os.path.exists(target):
+            raise UserError(f"{name} already exists")
+        os.makedirs(target, mode=0o775)
+        return rel
 
     # ------------------------------------------------------------ tasks
     def _volume_root(self, volume: str) -> str:

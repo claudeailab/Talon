@@ -84,22 +84,69 @@ def _deliver(cfg: dict, action: Callable[[smtplib.SMTP], None]) -> None:
         raise UserError(f"Cannot connect to {cfg['host']}:{cfg['port']}: {e}") from None
 
 
-def smtp_check(cfg: dict, demo: bool = False) -> str:
-    """Test the server without sending mail: connect, encrypt, sign in, and
-    check that the sender address is accepted (MAIL FROM, then reset)."""
+def smtp_check(cfg: dict, demo: bool = False) -> List[dict]:
+    """Test the server step by step without sending mail. Returns the same
+    check list as the Entra ID test: connection, encryption, sign-in, sender."""
     if not (cfg.get("host") and cfg.get("sender")):
         raise UserError("Enter the SMTP server and the sender address")
+    sec = {"starttls": "STARTTLS", "ssl": "SSL/TLS", "none": "None (not encrypted)"}[cfg.get("security", "starttls")]
+    names = ["Connection", "Encryption", "Sign-in", "Sender address"]
     if demo:
-        return "SMTP works: connected and sender accepted (demo)"
+        details = [f"{cfg['host']}:{cfg['port']} (demo)", sec,
+                   f"Signed in as {cfg['username']}" if cfg.get("username") else "Not required",
+                   f"{cfg['sender']} accepted"]
+        return [{"name": n, "ok": True, "detail": d} for n, d in zip(names, details)]
+    checks: List[dict] = []
 
-    def probe(smtp: smtplib.SMTP) -> None:
-        code, msg = smtp.mail(cfg["sender"])
-        if code != 250:
-            raise UserError(f"The server refused the sender address: {msg.decode(errors='replace')}")
-        smtp.rset()
-    _deliver(cfg, probe)
-    return ("SMTP works: signed in and sender accepted" if cfg.get("username")
-            else "SMTP works: connected and sender accepted")
+    def ok(detail: str) -> None:
+        checks.append({"name": names[len(checks)], "ok": True, "detail": detail})
+
+    def fail(detail: str) -> List[dict]:
+        checks.append({"name": names[len(checks)], "ok": False, "detail": detail})
+        return checks
+
+    ctx = ssl.create_default_context()
+    try:
+        if cfg.get("security") == "ssl":
+            smtp = smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=20, context=ctx)
+        else:
+            smtp = smtplib.SMTP(cfg["host"], cfg["port"], timeout=20)
+    except ssl.SSLError as e:
+        ok(f"{cfg['host']}:{cfg['port']}")
+        return fail(f"SSL/TLS failed: {e.reason or e}")
+    except (socket.timeout, OSError, smtplib.SMTPException) as e:
+        return fail(f"Cannot connect to {cfg['host']}:{cfg['port']}: {e}")
+    with smtp:
+        try:
+            smtp.ehlo()
+            ok(f"{cfg['host']}:{cfg['port']}")
+            if cfg.get("security") == "starttls":
+                try:
+                    smtp.starttls(context=ctx)
+                    smtp.ehlo()
+                except smtplib.SMTPNotSupportedError:
+                    return fail("The server does not offer STARTTLS")
+                except ssl.SSLError as e:
+                    return fail(f"STARTTLS failed: {e.reason or e}")
+            ok(sec)
+            if cfg.get("username"):
+                try:
+                    smtp.login(cfg["username"], cfg.get("password", ""))
+                except smtplib.SMTPAuthenticationError:
+                    return fail("The server rejected the user name or password")
+                except smtplib.SMTPNotSupportedError:
+                    return fail("The server does not support sign-in on this connection")
+                ok(f"Signed in as {cfg['username']}")
+            else:
+                ok("Not required")
+            code, msg = smtp.mail(cfg["sender"])
+            if code != 250:
+                return fail(f"Refused: {msg.decode(errors='replace')}")
+            smtp.rset()
+            ok(f"{cfg['sender']} accepted")
+        except (smtplib.SMTPException, socket.timeout, OSError) as e:
+            return fail(f"SMTP error: {e}")
+    return checks
 
 
 def send_mail(cfg: dict, to: List[str], subject: str, body: str, demo: bool = False) -> None:

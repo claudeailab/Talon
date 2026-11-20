@@ -372,7 +372,7 @@ def create_app(cfg, platform) -> FastAPI:
     @app.post("/api/settings/smtp/test")
     def smtp_test(body: dict = Body(...), _u: str = Depends(current_user)):
         cfg_ = notify.smtp_validate(body.get("config") or {}, nas.state.get("smtp") or {})
-        return {"ok": True, "message": notify.smtp_check(cfg_, cfg.demo)}
+        return {"checks": notify.smtp_check(cfg_, cfg.demo)}
 
     @app.get("/api/notifications")
     def notifications_get(_u: str = Depends(current_user)):
@@ -427,6 +427,13 @@ def create_app(cfg, platform) -> FastAPI:
     @app.get("/api/onedrive/local-folders")
     def onedrive_local_folders(volume: str, path: str = "", _u: str = Depends(current_user)):
         return nas.cloud.local_folders(volume, path)
+
+    @app.post("/api/onedrive/local-folders")
+    def onedrive_local_folder_create(body: dict = Body(...), user: str = Depends(current_user)):
+        rel = nas.cloud.make_local_folder(body.get("volume", ""), body.get("path", ""),
+                                          body.get("name", ""))
+        nas.state.log_activity(user, f"Created folder {body.get('volume')}/{rel}")
+        return {"path": rel}
 
     @app.post("/api/onedrive/tasks")
     def onedrive_task_create(body: dict = Body(...), user: str = Depends(current_user)):

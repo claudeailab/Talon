@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Mail, Send } from "lucide-react";
+import { Mail, PlugZap } from "lucide-react";
+import { TestResult, type Check } from "../components/testresult";
 import { api } from "../lib/api";
 import { useAction } from "../lib/hooks";
 import type { SmtpConfig } from "../lib/types";
@@ -19,8 +20,9 @@ export default function SmtpTab() {
   const body = f && { ...f, port: Number(f.port) };
   const save = useAction(() => api.put<SmtpConfig>("/settings/smtp", body), { success: "SMTP settings saved", invalidate: ["smtp", "notifications"] });
   // checks connection, encryption, sign-in and sender without sending an e-mail
-  const test = useAction(() => api.post<{ message: string }>("/settings/smtp/test", { config: body }), {
-    success: (r) => r.message,
+  const [checks, setChecks] = useState<Check[] | null>(null);
+  const test = useAction(() => api.post<{ checks: Check[] }>("/settings/smtp/test", { config: body }), {
+    onSuccess: (r) => setChecks(r.checks),
   });
   if (!q.data || !f) return <PageLoader />;
   const d = q.data;
@@ -41,7 +43,7 @@ export default function SmtpTab() {
         subtitle="Used to send e-mail notifications"
         actions={
           <div className="flex gap-2">
-            <Button icon={<Send className="size-4" />} disabled={!f.host || !f.sender} loading={test.isPending} onClick={() => test.mutate()}>
+            <Button icon={<PlugZap className="size-4" />} disabled={!f.host || !f.sender} loading={test.isPending} onClick={() => test.mutate()}>
               Test
             </Button>
             <Button variant="primary" disabled={!changed} loading={save.isPending} onClick={() => save.mutate()}>
@@ -81,6 +83,7 @@ export default function SmtpTab() {
           <Input value={f.sender} onChange={(e) => set("sender", e.target.value.trim())} placeholder="nas@example.com" />
         </Field>
       </div>
+      {checks && <TestResult checks={checks} />}
     </Card>
   );
 }

@@ -8,6 +8,7 @@ import {
   FileText,
   Folder,
   FolderOpen,
+  FolderPlus,
   KeyRound,
   LogOut,
   MoreHorizontal,
@@ -838,6 +839,19 @@ function FolderPicker({
   });
   const parts = useMemo(() => path.split("/").filter(Boolean), [path]);
   const root = kind === "remote" ? "OneDrive" : vol;
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const mkdir = useAction(
+    () => api.post<{ path: string }>("/onedrive/local-folders", { volume: vol, path, name: newName.trim() }),
+    {
+      success: `Folder ${newName.trim()} created`,
+      onSuccess: (r) => {
+        setPath(r.path); // open the new folder
+        setCreating(false);
+        setNewName("");
+      },
+    },
+  );
   return (
     <Modal
       open
@@ -846,18 +860,23 @@ function FolderPicker({
         kind === "remote" ? "Choose a OneDrive folder" : "Choose a NAS folder"
       }
       footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            disabled={kind === "local" && !vol}
-            onClick={() => onPick(path, vol)}
-          >
-            Use this folder
-          </Button>
-        </>
+        <div className="flex w-full items-center justify-between gap-2">
+          <div>
+            {kind === "local" && (
+              <Button icon={<FolderPlus className="size-4" />} disabled={!vol || creating} onClick={() => setCreating(true)}>
+                New folder
+              </Button>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button variant="primary" disabled={kind === "local" && !vol} onClick={() => onPick(path, vol)}>
+              Use this folder
+            </Button>
+          </div>
+        </div>
       }
     >
       {kind === "local" && (
@@ -921,21 +940,25 @@ function FolderPicker({
           ))
         ) : (
           <div className="px-3.5 py-3 text-[13px] text-zinc-500">
-            {kind === "local"
-              ? "No subfolders. It is created if needed."
-              : "No subfolders."}
+            No subfolders.
           </div>
         )}
       </div>
-      {kind === "local" && (
-        <div className="mt-4">
-          <Field label="Or type a new folder name">
-            <Input
-              value={path}
-              onChange={(e) => setPath(e.target.value)}
-              placeholder="Photos"
-            />
-          </Field>
+      {creating && (
+        <div className="mt-3 flex gap-2">
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && newName.trim() && mkdir.mutate()}
+            placeholder="Folder name"
+            autoFocus
+          />
+          <Button variant="primary" disabled={!newName.trim()} loading={mkdir.isPending} onClick={() => mkdir.mutate()}>
+            Create
+          </Button>
+          <Button variant="ghost" onClick={() => setCreating(false)}>
+            Cancel
+          </Button>
         </div>
       )}
     </Modal>

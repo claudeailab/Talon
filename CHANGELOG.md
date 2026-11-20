@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.24
+- NAS folder picker: New folder button
+- SMTP test shows its result step by step in the card, like the Entra ID test
+
 ## 1.0.23
 - SMTP Test checks the server without sending an e-mail
 - Activity log: 10 entries per page with Previous and Next

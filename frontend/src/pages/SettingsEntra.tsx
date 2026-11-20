@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
-import { BookOpen, CheckCircle2, Copy, KeyRound, PlugZap, XCircle } from "lucide-react";
+import { BookOpen, Copy, KeyRound, PlugZap } from "lucide-react";
 import { api } from "../lib/api";
 import { useAction } from "../lib/hooks";
 import type { EntraCheck, EntraConfig } from "../lib/types";
+import { TestResult } from "../components/testresult";
 import { Badge, Button, Card, CardHeader, Field, Input, Modal, PageLoader, Select, useToast } from "../components/ui";
 
 const ACCOUNT_TYPES = [
@@ -113,22 +114,7 @@ export default function EntraTab() {
           </Field>
         )}
       </div>
-      {checks && (
-        <div className="border-t border-zinc-100 px-5 py-4 dark:border-white/5">
-          <div className="mb-2 text-xs font-semibold tracking-wide text-zinc-500 uppercase">Test result</div>
-          <ul className="space-y-1.5">
-            {checks.map((c) => (
-              <li key={c.name} className="flex items-center gap-2 text-[13px]">
-                {c.ok ? <CheckCircle2 className="size-4 shrink-0 text-emerald-500" /> : <XCircle className="size-4 shrink-0 text-rose-500" />}
-                <span className="shrink-0 font-medium">{c.name}</span>
-                <span className="truncate text-zinc-500" title={c.detail}>
-                  {c.detail}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {checks && <TestResult checks={checks} />}
       {guide && <SetupGuide onClose={() => setGuide(false)} />}
     </Card>
   );

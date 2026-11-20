@@ -36,7 +36,7 @@ def test_smtp_and_notifications(client):
     assert client.post("/api/settings/smtp/test",
                        json={"config": {"host": "smtp.example.com", "port": 587,
                                         "security": "starttls", "sender": "nas@example.com"}}
-                       ).json()["message"].startswith("SMTP works")
+                       ).json()["checks"][-1]["ok"]
     assert client.post("/api/notifications/test").status_code == 400      # no recipients yet
     r = client.put("/api/notifications", json={"recipients": "me@example.com, you@example.com",
                                                "events": {"raid": False}})
@@ -135,3 +135,16 @@ def test_daily_schedule_due():
     assert not cs._due(t, today_2am - 60)
     iv = {"schedule": {"kind": "interval", "minutes": 15}, "created": 1000, "last": None}
     assert not cs._due(iv, 1000 + 14 * 60) and cs._due(iv, 1000 + 15 * 60)
+
+
+def test_new_local_folder(client):
+    r = client.post("/api/onedrive/local-folders", json={"volume": "tank", "path": "", "name": "Backups"})
+    assert r.status_code == 200 and r.json()["path"] == "Backups"
+    assert "Backups" in client.get("/api/onedrive/local-folders?volume=tank").json()
+    sub = client.post("/api/onedrive/local-folders", json={"volume": "tank", "path": "Backups", "name": "Phone"})
+    assert sub.json()["path"] == "Backups/Phone"
+    for bad in ["", "..", ".hidden", "a/b"]:
+        assert client.post("/api/onedrive/local-folders",
+                           json={"volume": "tank", "path": "", "name": bad}).status_code == 400, bad
+    assert client.post("/api/onedrive/local-folders",
+                       json={"volume": "tank", "path": "", "name": "Backups"}).status_code == 400
