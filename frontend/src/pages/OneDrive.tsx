@@ -487,7 +487,10 @@ type Form = {
   delete: boolean;
   versions: boolean;
   max_delete: number;
+  source_file: boolean;
 };
+
+const parentOf = (p: string) => p.split("/").slice(0, -1).join("/");
 
 function toForm(t: CloudTask | null, volumes: Volume[]): Form {
   return {
@@ -506,6 +509,7 @@ function toForm(t: CloudTask | null, volumes: Volume[]): Form {
     delete: t?.delete ?? false,
     versions: t?.versions ?? true,
     max_delete: t?.max_delete ?? 50,
+    source_file: t?.source_file ?? false,
   };
 }
 
@@ -546,6 +550,7 @@ function TaskDialog({
     delete: f.delete,
     versions: f.versions,
     max_delete: f.max_delete,
+    source_file: f.source_file,
   };
   const save = useAction(
     () =>
@@ -561,6 +566,14 @@ function TaskDialog({
   if (!f || !vols.data) return null;
   const set = <K extends keyof Form>(k: K, v: Form[K]) =>
     setF({ ...f, [k]: v });
+  // which side is copied from; only that side may be a single file
+  const fileOn = f.source_file ? (f.direction === "pull" ? "remote" : "local") : null;
+  const setDirection = (d: CloudTask["direction"]) => {
+    if (!fileOn || (d === "pull" && fileOn === "remote") || (d === "push" && fileOn === "local"))
+      return set("direction", d);
+    // the chosen file is no longer on the source side: use its folder instead
+    setF({ ...f, direction: d, source_file: false, ...(fileOn === "remote" ? { remote: parentOf(f.remote) } : { folder: parentOf(f.folder) }) });
+  };
   const changed = !task || !sameValue(f, initial);
   const valid = !!f.name.trim() && !!f.volume;
   const arrow =
@@ -603,9 +616,11 @@ function TaskDialog({
               <button
                 key={k}
                 type="button"
-                onClick={() => set("direction", k)}
+                onClick={() => setDirection(k)}
+                disabled={k === "bisync" && f.source_file}
+                title={k === "bisync" && f.source_file ? "Two-way sync works with folders only" : undefined}
                 className={cx(
-                  "rounded-xl p-3 text-left ring-1 transition",
+                  "rounded-xl p-3 text-left ring-1 transition disabled:cursor-not-allowed disabled:opacity-45",
                   f.direction === k
                     ? "bg-brand-50/60 ring-2 ring-brand-500 dark:bg-brand-500/10"
                     : "ring-zinc-200 hover:ring-zinc-300 dark:ring-white/10",
@@ -628,17 +643,17 @@ function TaskDialog({
         </div>
 
         <div className="grid items-end gap-3 md:grid-cols-[1fr_auto_1fr] [&>*]:min-w-0">
-          <Field label="OneDrive folder">
+          <Field label={f.direction === "pull" ? "OneDrive folder or file" : "OneDrive folder"}>
             <PathButton
-              icon={<Cloud className="size-4 text-[#0364b8]" />}
+              icon={fileOn === "remote" ? <FileText className="size-4 text-[#0364b8]" /> : <Cloud className="size-4 text-[#0364b8]" />}
               text={odPath(f.remote)}
               onClick={() => setPick("remote")}
             />
           </Field>
           <div className="hidden pb-3 text-zinc-400 md:block">{arrow}</div>
-          <Field label="NAS folder">
+          <Field label={f.direction === "push" ? "NAS folder or file" : "NAS folder"}>
             <PathButton
-              icon={<Folder className="size-4 text-brand-500" />}
+              icon={fileOn === "local" ? <FileText className="size-4 text-brand-500" /> : <Folder className="size-4 text-brand-500" />}
               text={f.volume ? nasPath(f) : "Choose a volume"}
               onClick={() => setPick("local")}
             />
@@ -720,12 +735,16 @@ function TaskDialog({
           </div>
         ) : (
           <div className="grid gap-3 md:grid-cols-2">
-            <ToggleBox
-              title={`Delete files removed from ${f.direction === "pull" ? "OneDrive" : "the NAS"}`}
-              text="Off: nothing is ever deleted (safer)"
-              checked={f.delete}
-              onChange={(v) => set("delete", v)}
-            />
+            {f.source_file ? (
+              <ToggleBox title="Single file" text="Only this file is copied; nothing is deleted" />
+            ) : (
+              <ToggleBox
+                title={`Delete files removed from ${f.direction === "pull" ? "OneDrive" : "the NAS"}`}
+                text="Off: nothing is ever deleted (safer)"
+                checked={f.delete}
+                onChange={(v) => set("delete", v)}
+              />
+            )}
             <ToggleBox
               title="Keep old versions"
               text="Replaced files kept in .versions for 30 days"
@@ -738,18 +757,15 @@ function TaskDialog({
       {pick && (
         <FolderPicker
           kind={pick}
+          allowFiles={(pick === "remote" && f.direction === "pull") || (pick === "local" && f.direction === "push")}
           volumes={vols.data}
           volume={f.volume}
-          start={pick === "remote" ? f.remote : f.folder}
+          start={pick === "remote" ? (fileOn === "remote" ? parentOf(f.remote) : f.remote) : fileOn === "local" ? parentOf(f.folder) : f.folder}
           onClose={() => setPick(null)}
-          onPick={(p, vol) => {
-            if (pick === "remote")
-              setF({
-                ...f,
-                remote: p,
-                name: f.name || (p.split("/").pop() ?? ""),
-              });
-            else setF({ ...f, volume: vol ?? f.volume, folder: p });
+          onPick={(p, isFile, vol) => {
+            const name = f.name || (p.split("/").pop() ?? "");
+            if (pick === "remote") setF({ ...f, remote: p, name, source_file: f.direction === "pull" ? isFile : f.source_file });
+            else setF({ ...f, volume: vol ?? f.volume, folder: p, name: f.direction === "push" ? name : f.name, source_file: f.direction === "push" ? isFile : f.source_file });
             setPick(null);
           }}
         />
@@ -808,8 +824,11 @@ function ToggleBox({
 
 /* ====================================================================== folder picker */
 
+type Item = { name: string; folder: boolean; size: number };
+
 function FolderPicker({
   kind,
+  allowFiles,
   volumes,
   volume,
   start,
@@ -817,48 +836,50 @@ function FolderPicker({
   onPick,
 }: {
   kind: "remote" | "local";
+  allowFiles: boolean;
   volumes: Volume[];
   volume: string;
   start: string;
   onClose: () => void;
-  onPick: (path: string, volume?: string) => void;
+  onPick: (path: string, isFile: boolean, volume?: string) => void;
 }) {
   const [vol, setVol] = useState(volume);
   const [path, setPath] = useState(start);
+  const [selected, setSelected] = useState<Item | null>(null);
   const q = useQuery({
-    queryKey: ["folders", kind, vol, path],
+    queryKey: ["items", kind, vol, path],
     queryFn: () =>
       kind === "remote"
-        ? api.get<string[]>(
-            `/onedrive/folders?path=${encodeURIComponent(path)}`,
-          )
-        : api.get<string[]>(
-            `/onedrive/local-folders?volume=${encodeURIComponent(vol)}&path=${encodeURIComponent(path)}`,
-          ),
+        ? api.get<Item[]>(`/onedrive/folders?path=${encodeURIComponent(path)}`)
+        : api.get<Item[]>(`/onedrive/local-folders?volume=${encodeURIComponent(vol)}&path=${encodeURIComponent(path)}`),
     enabled: kind === "remote" || !!vol,
   });
+  const items = (q.data ?? []).filter((i) => i.folder || allowFiles);
   const parts = useMemo(() => path.split("/").filter(Boolean), [path]);
   const root = kind === "remote" ? "OneDrive" : vol;
+  const join = (name: string) => (path ? `${path}/${name}` : name);
+  const open = (p: string) => {
+    setPath(p);
+    setSelected(null);
+  };
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
-  const mkdir = useAction(
-    () => api.post<{ path: string }>("/onedrive/local-folders", { volume: vol, path, name: newName.trim() }),
-    {
-      success: `Folder ${newName.trim()} created`,
-      onSuccess: (r) => {
-        setPath(r.path); // open the new folder
-        setCreating(false);
-        setNewName("");
-      },
+  const mkdir = useAction(() => api.post<{ path: string }>("/onedrive/local-folders", { volume: vol, path, name: newName.trim() }), {
+    success: `Folder ${newName.trim()} created`,
+    onSuccess: (r) => {
+      open(r.path); // open the new folder
+      setCreating(false);
+      setNewName("");
     },
-  );
+  });
+  const confirm = () => (selected ? onPick(join(selected.name), !selected.folder, vol) : onPick(path, false, vol));
+
   return (
     <Modal
       open
       onClose={onClose}
-      title={
-        kind === "remote" ? "Choose a OneDrive folder" : "Choose a NAS folder"
-      }
+      title={kind === "remote" ? "Choose from OneDrive" : "Choose from the NAS"}
+      description="Click to select. Double-click a folder to open it."
       footer={
         <div className="flex w-full items-center justify-between gap-2">
           <div>
@@ -872,76 +893,87 @@ function FolderPicker({
             <Button variant="ghost" onClick={onClose}>
               Cancel
             </Button>
-            <Button variant="primary" disabled={kind === "local" && !vol} onClick={() => onPick(path, vol)}>
-              Use this folder
+            <Button variant="primary" disabled={kind === "local" && !vol} onClick={confirm}>
+              {selected ? "Select" : "Use this folder"}
             </Button>
           </div>
         </div>
       }
     >
       {kind === "local" && (
-        <Field label="Volume">
-          <Select
-            value={vol}
-            onChange={(e) => {
-              setVol(e.target.value);
-              setPath("");
-            }}
-          >
-            {volumes.map((v) => (
-              <option key={v.name} value={v.name}>
-                {v.name}
-              </option>
-            ))}
-          </Select>
-        </Field>
+        <div className="mb-4">
+          <Field label="Volume">
+            <Select
+              value={vol}
+              onChange={(e) => {
+                setVol(e.target.value);
+                open("");
+              }}
+            >
+              {volumes.map((v) => (
+                <option key={v.name} value={v.name}>
+                  {v.name}
+                </option>
+              ))}
+            </Select>
+          </Field>
+        </div>
       )}
-      <div
-        className={cx(
-          "flex flex-wrap items-center gap-1 text-[13px]",
-          kind === "local" && "mt-4",
-        )}
-      >
-        <button
-          className="font-medium text-brand-600 hover:underline dark:text-brand-400"
-          onClick={() => setPath("")}
-        >
+      <div className="flex flex-wrap items-center gap-1 text-[13px]">
+        <button className="font-medium text-brand-600 hover:underline dark:text-brand-400" onClick={() => open("")}>
           {root}
         </button>
         {parts.map((p, i) => (
           <span key={i} className="flex items-center gap-1">
             <ChevronRight className="size-3.5 text-zinc-400" />
-            <button
-              className="font-medium text-brand-600 hover:underline dark:text-brand-400"
-              onClick={() => setPath(parts.slice(0, i + 1).join("/"))}
-            >
+            <button className="font-medium text-brand-600 hover:underline dark:text-brand-400" onClick={() => open(parts.slice(0, i + 1).join("/"))}>
               {p}
             </button>
           </span>
         ))}
       </div>
-      <div className="mt-3 divide-y divide-zinc-100 rounded-xl ring-1 ring-zinc-200 dark:divide-white/5 dark:ring-white/10">
+      <div className="mt-3 divide-y divide-zinc-100 overflow-hidden rounded-xl ring-1 ring-zinc-200 select-none dark:divide-white/5 dark:ring-white/10">
         {q.isLoading ? (
           <div className="p-4">
             <PageLoader />
           </div>
-        ) : q.data?.length ? (
-          q.data.map((name) => (
-            <button
-              key={name}
-              type="button"
-              onClick={() => setPath(path ? `${path}/${name}` : name)}
-              className="flex w-full items-center gap-2.5 px-3.5 py-2.5 text-left text-sm hover:bg-zinc-50 dark:hover:bg-white/[0.03]"
-            >
-              <FolderOpen className="size-4 shrink-0 text-amber-500" />
-              <span className="truncate">{name}</span>
-              <ChevronRight className="ml-auto size-4 shrink-0 text-zinc-400" />
-            </button>
-          ))
+        ) : items.length ? (
+          items.map((it) => {
+            const on = selected?.name === it.name;
+            return (
+              <div
+                key={it.name}
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelected(on ? null : it)}
+                onDoubleClick={() => (it.folder ? open(join(it.name)) : onPick(join(it.name), true, vol))}
+                onKeyDown={(e) => e.key === "Enter" && (it.folder ? open(join(it.name)) : setSelected(it))}
+                className={cx(
+                  "flex h-11 w-full cursor-pointer items-center gap-2.5 px-3.5 text-left text-sm",
+                  on ? "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "hover:bg-zinc-50 dark:hover:bg-white/[0.03]",
+                )}
+              >
+                {it.folder ? <FolderOpen className="size-4 shrink-0 text-amber-500" /> : <FileText className="size-4 shrink-0 text-zinc-400" />}
+                <span className={cx("truncate", on && "font-medium")}>{it.name}</span>
+                {it.folder ? (
+                  <IconButton
+                    label={`Open ${it.name}`}
+                    className="ml-auto size-7"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      open(join(it.name));
+                    }}
+                  >
+                    <ChevronRight className="size-4" />
+                  </IconButton>
+                ) : (
+                  <span className="ml-auto shrink-0 text-xs text-zinc-500">{bytes(it.size)}</span>
+                )}
+              </div>
+            );
+          })
         ) : (
-          <div className="px-3.5 py-3 text-[13px] text-zinc-500">
-            No subfolders.
-          </div>
+          <div className="px-3.5 py-3 text-[13px] text-zinc-500">{allowFiles ? "This folder is empty." : "No subfolders."}</div>
         )}
       </div>
       {creating && (

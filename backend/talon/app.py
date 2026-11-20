@@ -422,7 +422,7 @@ def create_app(cfg, platform) -> FastAPI:
 
     @app.get("/api/onedrive/folders")
     def onedrive_folders(path: str = "", _u: str = Depends(current_user)):
-        return nas.cloud.folders(path)
+        return nas.cloud.items(path)
 
     @app.get("/api/onedrive/local-folders")
     def onedrive_local_folders(volume: str, path: str = "", _u: str = Depends(current_user)):

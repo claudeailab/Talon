@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.25
+- OneDrive tasks can copy a single file as well as a folder
+- Folder picker: click to select, double-click a folder to open it
+
 ## 1.0.24
 - NAS folder picker: New folder button
 - SMTP test shows its result step by step in the card, like the Entra ID test

@@ -73,7 +73,7 @@ def test_onedrive_flow(client):
     st = client.get("/api/onedrive").json()
     assert st["connected"] and st["account"]["email"]
 
-    assert "Pictures" in client.get("/api/onedrive/folders").json()
+    assert "Pictures" in [i["name"] for i in client.get("/api/onedrive/folders").json()]
     assert client.get("/api/onedrive/folders?path=../etc").status_code == 400
 
     bad = client.post("/api/onedrive/tasks", json={"name": "x", "direction": "sideways",
@@ -140,7 +140,7 @@ def test_daily_schedule_due():
 def test_new_local_folder(client):
     r = client.post("/api/onedrive/local-folders", json={"volume": "tank", "path": "", "name": "Backups"})
     assert r.status_code == 200 and r.json()["path"] == "Backups"
-    assert "Backups" in client.get("/api/onedrive/local-folders?volume=tank").json()
+    assert "Backups" in [i["name"] for i in client.get("/api/onedrive/local-folders?volume=tank").json()]
     sub = client.post("/api/onedrive/local-folders", json={"volume": "tank", "path": "Backups", "name": "Phone"})
     assert sub.json()["path"] == "Backups/Phone"
     for bad in ["", "..", ".hidden", "a/b"]:
@@ -148,3 +148,27 @@ def test_new_local_folder(client):
                            json={"volume": "tank", "path": "", "name": bad}).status_code == 400, bad
     assert client.post("/api/onedrive/local-folders",
                        json={"volume": "tank", "path": "", "name": "Backups"}).status_code == 400
+
+
+def test_single_file_tasks(client, tmp_path):
+    from types import SimpleNamespace
+    from talon.cloudsync import CloudSync
+    client.put("/api/settings/entra", json={"tenant": "common", "client_id": GUID, "client_secret": "s"})
+    items = client.get("/api/onedrive/folders?path=Documents").json()
+    assert {"name": "Invoices", "folder": True, "size": 0} in items
+    assert any(i["name"] == "Passport scan.jpg" and not i["folder"] for i in items)
+    local = client.get("/api/onedrive/local-folders?volume=tank").json()
+    assert local[0]["folder"] and any(not i["folder"] for i in local)
+    base = {"name": "Passport", "remote": "Documents/Passport scan.jpg", "volume": "tank",
+            "folder": "Important", "schedule": {"kind": "manual"}}
+    assert client.post("/api/onedrive/tasks", json={**base, "direction": "bisync",
+                                                    "source_file": True}).status_code == 400
+    t = client.post("/api/onedrive/tasks", json={**base, "direction": "pull", "source_file": True,
+                                                 "delete": True}).json()
+    assert t["source_file"] is True and t["delete"] is False
+    client.delete(f"/api/onedrive/tasks/{t['id']}")
+    cs = CloudSync(SimpleNamespace(state_file=str(tmp_path / "s.json")), None, None, demo=True)
+    cmd = cs.command({"id": "x", "remote": "Documents/Passport scan.jpg", "bwlimit": "",
+                      "delete": False, "versions": False, "max_delete": 50, "direction": "pull",
+                      "source_file": True}, "c.conf", "/srv/nas/tank/Important", False)
+    assert cmd[-3:] == ["copy", "onedrive:Documents/Passport scan.jpg", "/srv/nas/tank/Important"]

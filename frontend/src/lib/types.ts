@@ -292,6 +292,7 @@ export interface CloudTask {
   delete: boolean;
   versions: boolean;
   max_delete: number;
+  source_file?: boolean;
   created: number;
   next_run: number | null;
   last: { started: number; finished: number; status: "success" | "error" | "cancelled"; files: number; bytes: number; error: string | null } | null;

@@ -274,14 +274,19 @@ class CloudSync:
         self._update(lambda od: od.__setitem__("account", info))
         return info
 
-    def folders(self, path: str) -> list:
+    def items(self, path: str) -> list:
+        """OneDrive folders and files at ``path`` (folders first)."""
         path = _clean_rel(path)
         if self.demo:
-            tree = {"": ["Documents", "Pictures", "Music", "Work", "NAS backup"],
+            dirs = {"": ["Documents", "Music", "NAS backup", "Pictures", "Work"],
                     "Pictures": ["2024", "2025", "2026", "Screenshots"],
                     "Documents": ["Invoices", "Taxes"], "Work": ["Projects", "Reports"]}
-            return tree.get(path, [])
-        return entra.list_folders(self.access_token(), path)
+            files = {"Documents": [("Car insurance.pdf", 220_000), ("Lease agreement.pdf", 640_000),
+                                   ("Passport scan.jpg", 1_100_000)],
+                     "Pictures": [("Profile.png", 380_000)], "": [("Notes.txt", 2_000)]}
+            return [{"name": n, "folder": True, "size": 0} for n in dirs.get(path, [])] + \
+                [{"name": n, "folder": False, "size": s} for n, s in files.get(path, [])]
+        return entra.list_items(self.access_token(), path)
 
     def local_folders(self, volume: str, path: str) -> list:
         root = self._volume_root(volume)
@@ -289,15 +294,25 @@ class CloudSync:
         if not target.startswith(root):
             raise UserError("Invalid folder")
         if self.demo:
-            made = sorted(n for p, n in self._demo_dirs if p == (volume, _clean_rel(path)))
-            return sorted({*(["Documents", "Media", "Office", "Photos"] if target == root else []),
+            made = {n for p, n in self._demo_dirs if p == (volume, _clean_rel(path))}
+            dirs = sorted({*(["Documents", "Media", "Office", "Photos"] if target == root else []),
                            *made}, key=str.lower)
+            files = [("Budget 2026.xlsx", 48_000), ("Readme.txt", 1_200)] if target == root else []
+            return [{"name": n, "folder": True, "size": 0} for n in dirs] + \
+                [{"name": n, "folder": False, "size": s} for n, s in files]
+        out = []
         try:
-            return sorted((n for n in os.listdir(target)
-                           if os.path.isdir(os.path.join(target, n)) and not n.startswith(".")),
-                          key=str.lower)
+            for n in os.listdir(target):
+                if n.startswith("."):
+                    continue
+                full = os.path.join(target, n)
+                if os.path.isdir(full):
+                    out.append({"name": n, "folder": True, "size": 0})
+                elif os.path.isfile(full):
+                    out.append({"name": n, "folder": False, "size": os.path.getsize(full)})
         except OSError:
             return []
+        return sorted(out, key=lambda i: (not i["folder"], i["name"].lower()))
 
     def make_local_folder(self, volume: str, path: str, name: str) -> str:
         """Create a folder inside a volume; returns its path relative to the volume."""
@@ -364,9 +379,15 @@ class CloudSync:
             raise UserError("Invalid delete limit") from None
         if not 1 <= max_delete <= 100:
             raise UserError("Delete limit must be 1-100%")
+        # the source may be a single file: OneDrive for "pull", the NAS for "push"
+        source_file = bool(data.get("source_file"))
+        if source_file and direction == "bisync":
+            raise UserError("Two-way sync works with folders only")
+        if source_file and not (remote if direction == "pull" else folder):
+            raise UserError("Choose a file")
         return {"name": name, "direction": direction, "remote": remote, "volume": volume,
-                "folder": folder, "schedule": sched, "bwlimit": bw,
-                "delete": bool(data.get("delete")) and direction != "bisync",
+                "folder": folder, "schedule": sched, "bwlimit": bw, "source_file": source_file,
+                "delete": bool(data.get("delete")) and direction != "bisync" and not source_file,
                 "versions": bool(data.get("versions")) and direction != "bisync",
                 "max_delete": max_delete}
 
@@ -389,7 +410,8 @@ class CloudSync:
             raise UserError("Stop the task before editing it")
         new = {**old, **self._validate(data)}
         if (new["remote"], new["volume"], new["folder"], new["direction"]) != \
-                (old["remote"], old["volume"], old["folder"], old["direction"]):
+                (old["remote"], old["volume"], old["folder"], old["direction"]) or \
+                new.get("source_file") != old.get("source_file"):
             new["bisync_ready"] = False
         self._update(lambda od: od["tasks"].__setitem__(tid, new))
         self.state.log_activity(user, f"Updated OneDrive task {new['name']}")
@@ -566,7 +588,11 @@ class CloudSync:
             if self.demo:
                 status, error = self._simulate(r)
             else:
-                os.makedirs(local, exist_ok=True)
+                if t.get("source_file") and t["direction"] == "push":
+                    if not os.path.isfile(local):
+                        raise UserError(f"File not found: {t['volume']}/{t['folder']}")
+                else:
+                    os.makedirs(local, exist_ok=True)
                 self.access_token()                       # refresh before writing the config
                 conf = self._rclone_conf(tid)
                 first = t["direction"] == "bisync" and not t.get("bisync_ready")

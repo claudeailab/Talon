@@ -202,9 +202,12 @@ def account_info(token: str) -> dict:
             "used": quota.get("used") or 0, "total": quota.get("total") or 0}
 
 
-def list_folders(token: str, path: str) -> list:
+def list_items(token: str, path: str) -> list:
+    """Folders first, then files: [{name, folder, size}]."""
     path = path.strip("/")
     url = "/me/drive/root/children" if not path else \
         f"/me/drive/root:/{urllib.parse.quote(path)}:/children"
-    data = graph(token, url + "?$select=name,folder&$top=999")
-    return sorted((i["name"] for i in data.get("value", []) if "folder" in i), key=str.lower)
+    data = graph(token, url + "?$select=name,folder,file,size&$top=999")
+    items = [{"name": i["name"], "folder": "folder" in i, "size": i.get("size") or 0}
+             for i in data.get("value", []) if "folder" in i or "file" in i]
+    return sorted(items, key=lambda i: (not i["folder"], i["name"].lower()))
