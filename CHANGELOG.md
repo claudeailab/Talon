@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.32
+- One workflow run per change; releases only after the tests pass
+
 ## 1.0.31
 - README dashboard image opens the screenshot viewer
 

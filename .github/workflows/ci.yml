@@ -1,10 +1,47 @@
+# One run per commit on main: test, then release, then publish the website.
+# - release: publishes a GitHub Release when __version__ in backend/talon/__init__.py
+#   is new. Installed Talon systems offer it in Settings → Update. Notes come from
+#   CHANGELOG.md (.github/scripts/release_notes.py); editing CHANGELOG.md also
+#   updates the notes of releases already published.
+# - pages: publishes site/ (screenshot gallery) to https://claudeailab.github.io/Talon/
+#   when the site, screenshots or logo changed.
+# Nothing is released or published unless the tests pass.
 name: CI
-on: [push, pull_request]
+on:
+  push:
+    branches: [main]
+  workflow_run:            # merges done by auto-merge.yml use GITHUB_TOKEN, which
+    workflows: [Auto-merge to main]   # does not trigger push workflows by itself
+    types: [completed]
+  workflow_dispatch:
+concurrency:             # one run at a time; a later run sees an existing tag and skips it
+  group: ci
+  cancel-in-progress: false
+permissions:
+  contents: read
 jobs:
   test:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+      site: ${{ steps.site.outputs.changed }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event_name == 'push' && github.sha || 'main' }}
+          fetch-depth: 0
+      - id: sha
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Did the website change?
+        id: site
+        env:
+          BEFORE: ${{ github.event_name == 'push' && github.event.before || '' }}
+        run: |
+          if [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null \
+             || git diff --name-only "$BEFORE" HEAD | grep -qE '^(site/|docs/screenshots/|docs/logo\.svg$|\.github/workflows/ci\.yml$)'; then
+            echo "changed=1" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-python@v7
         with: { python-version: "3.12" }
       - uses: actions/setup-node@v7
@@ -15,3 +52,65 @@ jobs:
       - run: cd frontend && npm ci && npm run build
       - name: Committed web build is up to date
         run: git diff --stat --exit-code -- backend/talon/web || (echo "Run 'npm run build' in frontend/ and commit" && exit 1)
+
+  release:
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: "${{ needs.test.outputs.sha }}", fetch-depth: 0 }
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ needs.test.outputs.sha }}
+        run: |
+          v=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' backend/talon/__init__.py)
+          if gh release view "v$v" --repo "$REPO" >/dev/null 2>&1; then
+            echo "v$v is already released"
+          else
+            python3 .github/scripts/release_notes.py "$v" "$REPO" > "$RUNNER_TEMP/notes.md"
+            gh release create "v$v" --repo "$REPO" --target "$SHA" --title "Talon v$v" \
+              --notes-file "$RUNNER_TEMP/notes.md"
+          fi
+      - name: Sync release notes from CHANGELOG.md
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          git fetch -q --force --tags origin
+          for v in $(sed -n 's/^## \([0-9][0-9.]*\)[[:space:]]*$/\1/p' CHANGELOG.md); do
+            gh release view "v$v" --repo "$REPO" >/dev/null 2>&1 || continue
+            python3 .github/scripts/release_notes.py "$v" "$REPO" > "$RUNNER_TEMP/notes.md"
+            if [ "$(gh release view "v$v" --repo "$REPO" --json body --jq .body)" != "$(cat "$RUNNER_TEMP/notes.md")" ]; then
+              gh release edit "v$v" --repo "$REPO" --notes-file "$RUNNER_TEMP/notes.md"
+              echo "v$v: notes updated"
+            fi
+          done
+
+  pages:
+    needs: test
+    if: needs.test.outputs.site == '1'
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7
+        with: { ref: "${{ needs.test.outputs.sha }}" }
+      - uses: actions/configure-pages@v6
+      - name: Build site
+        run: |
+          mkdir -p _site/screenshots
+          cp site/index.html docs/logo.svg _site/
+          cp docs/screenshots/*.png _site/screenshots/
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+      - id: deployment
+        uses: actions/deploy-pages@v5
