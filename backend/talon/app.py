@@ -122,9 +122,6 @@ def create_app(cfg, platform) -> FastAPI:
     # reusing the name would silently drop the new session.
     COOKIE_HTTP = COOKIE + "_http"
 
-    def session_token(request: Request):
-        return request.cookies.get(COOKIE) or request.cookies.get(COOKIE_HTTP)
-
     def current_user(request: Request) -> str:
         user = sessions.get(request.cookies.get(COOKIE)) or sessions.get(request.cookies.get(COOKIE_HTTP))
         if not user:

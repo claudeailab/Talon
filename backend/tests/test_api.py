@@ -218,3 +218,22 @@ def test_new_raid5_shows_building_not_rebuilding(client):
     a = next(x for x in client.get("/api/raid").json() if x["name"] == "fresh")
     assert a["status"] == "healthy"
     assert nas.state.get("arrays")["fresh"]["synced"] is True
+
+
+def test_http_session_uses_its_own_cookie(client, monkeypatch):
+    """Over plain HTTP the session cookie has another name, so a Secure cookie left
+    from HTTPS (which an http:// page may not replace) cannot block signing in."""
+    cfg = client.app.state.nas.cfg
+    monkeypatch.setattr(cfg, "demo", False)
+    from fastapi.testclient import TestClient
+    http = TestClient(client.app, base_url="http://nas")
+    http.cookies.set("talon_session", "stale-token-from-https")
+    r = http.post("/api/auth/login", json={"username": "admin", "password": "talon"},
+                  headers={"X-Requested-With": "talon"})
+    assert r.status_code == 200
+    assert "talon_session_http=" in r.headers["set-cookie"] and "Secure" not in r.headers["set-cookie"]
+    assert http.get("/api/auth/me").status_code == 200
+    https = TestClient(client.app, base_url="https://nas")
+    r = https.post("/api/auth/login", json={"username": "admin", "password": "talon"},
+                   headers={"X-Requested-With": "talon"})
+    assert r.headers["set-cookie"].startswith("talon_session=") and "Secure" in r.headers["set-cookie"]

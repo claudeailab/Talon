@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.41
+- Fixed: signing in after turning HTTPS off
+
 ## 1.0.40
 - Support renamed to Documentation
 - Shorter sign-in page
