@@ -120,6 +120,7 @@ jobs:
     if: needs.test.outputs.site == '1'
     runs-on: ubuntu-24.04
     permissions:
+      actions: read
       pages: write
       id-token: write
     environment:
@@ -137,5 +138,19 @@ jobs:
       - uses: actions/upload-pages-artifact@v5
         with:
           path: _site
+      # deploy-pages looks the upload up immediately and fails when GitHub has not
+      # listed it yet ("No artifacts named github-pages"): wait until it is listed
+      - name: Wait until the upload is listed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          for _ in $(seq 1 30); do
+            n=$(gh api "repos/$REPO/actions/runs/$RUN/artifacts" --jq '[.artifacts[] | select(.name == "github-pages")] | length')
+            [ "$n" -gt 0 ] && exit 0
+            sleep 2
+          done
+          echo "::warning::The upload is still not listed; trying to publish anyway"
       - id: deployment
         uses: actions/deploy-pages@v5

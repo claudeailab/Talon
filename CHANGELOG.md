@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.47
+- Website publishing no longer fails when GitHub lists the upload late
+
 ## 1.0.46
 - "Email" written as one word everywhere
 - Files: the location name is no longer repeated next to its menu
