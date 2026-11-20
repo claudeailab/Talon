@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.31
+- README dashboard image opens the screenshot viewer
+
 ## 1.0.30
 - Screenshot viewer closes back to the README, like a modal
 
