@@ -172,3 +172,15 @@ def test_single_file_tasks(client, tmp_path):
                       "delete": False, "versions": False, "max_delete": 50, "direction": "pull",
                       "source_file": True}, "c.conf", "/srv/nas/tank/Important", False)
     assert cmd[-3:] == ["copy", "onedrive:Documents/Passport scan.jpg", "/srv/nas/tank/Important"]
+
+
+def test_rclone_log_lines_keep_time_level_file_and_message():
+    from talon.cloudsync import CloudSync
+    r = {"log": []}
+    CloudSync._parse('{"level":"info","msg":"Copied (new)","object":"Pictures/a b.jpg",'
+                     '"time":"2026-11-20T02:00:03.123+02:00"}', r)
+    CloudSync._parse('{"level":"error","msg":"Failed to copy: quota exceeded","time":"2026-11-20T02:00:04+02:00"}', r)
+    CloudSync._parse("plain text from rclone", r)
+    assert r["log"] == ["02:00:03\tINFO\tPictures/a b.jpg\tCopied (new)",
+                        "02:00:04\tERROR\t\tFailed to copy: quota exceeded",
+                        "plain text from rclone"]

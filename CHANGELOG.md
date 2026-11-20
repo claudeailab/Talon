@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.50
+- iPhone: no more zooming in on fields, which made pages pan sideways
+- OneDrive task logs readable on phones: time, file and message per line
+
 ## 1.0.49
 - Settings on phones: icon tiles instead of a dropdown
 

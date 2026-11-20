@@ -749,9 +749,11 @@ class CloudSync:
                      bytes=st.get("bytes", 0), total_bytes=st.get("totalBytes", 0),
                      speed=st.get("speed", 0))
             return
-        msg = d.get("msg", "")
-        obj = d.get("object", "")
-        r["log"].append(f"{d.get('level', 'info').upper()}: {obj + ': ' if obj else ''}{msg}".strip())
+        # "time<TAB>LEVEL<TAB>file<TAB>message": the web interface shows each part
+        # on its own (time, highlighted level, wrapped path), so it reads on a phone
+        when = str(d.get("time", ""))[11:19]
+        r["log"].append("\t".join((when, str(d.get("level", "info")).upper(),
+                                    str(d.get("object", "")), str(d.get("msg", "")).strip())))
 
     def _prune_versions(self, t: dict, conf: str, local: str) -> None:
         if t["direction"] == "pull":
@@ -776,5 +778,9 @@ class CloudSync:
                 return "cancelled", "Stopped"
             time.sleep(0.5)
             r.update(files=total * i // 20, bytes=size * i // 20, speed=size / 10)
-            r["log"].append(f"INFO: Copied {total * i // 20} of {total} files (demo)")
+            when = time.strftime("%H:%M:%S")
+            r["log"].append(f"{when}\tINFO\tPictures/2026/Holiday in Paphos/IMG_{4000 + i}.HEIC\tCopied (new)")
+            if i == 12:
+                r["log"].append(f"{when}\tNOTICE\tPictures/2026/Screenshot 2026-11-20 at 14.02.11.png"
+                                "\tSkipped: the file is in use (demo)")
         return "success", None

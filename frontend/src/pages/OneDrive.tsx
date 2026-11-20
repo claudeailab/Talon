@@ -1021,9 +1021,52 @@ function LogDialog({
           {task.last.error}
         </Callout>
       )}
-      <pre className="max-h-96 overflow-auto rounded-xl bg-zinc-950 p-4 font-mono text-[12px] leading-relaxed text-zinc-300">
-        {q.data?.length ? q.data.join("\n") : "No log yet."}
-      </pre>
+      {q.data?.length ? (
+        <ul className="max-h-[60vh] divide-y divide-zinc-100 overflow-y-auto rounded-xl ring-1 ring-zinc-200 dark:divide-white/5 dark:ring-white/10">
+          {q.data.map((line, i) => (
+            <LogLine key={i} line={line} />
+          ))}
+        </ul>
+      ) : (
+        <div className="py-8 text-center text-sm text-zinc-500">No log yet.</div>
+      )}
     </Modal>
+  );
+}
+
+/** One log entry: "time<TAB>LEVEL<TAB>file<TAB>message", or any older plain line. */
+function LogLine({ line }: { line: string }) {
+  const parts = line.split("\t");
+  if (parts.length !== 4)
+    return <li className="px-3 py-2 font-mono text-[12px] text-zinc-600 [overflow-wrap:anywhere] dark:text-zinc-300">{line}</li>;
+  const [when, level, file, msg] = parts;
+  const tone = level === "ERROR" ? "red" : level === "NOTICE" || level === "WARNING" ? "amber" : null;
+  return (
+    <li className="px-3 py-2">
+      <div className="flex items-baseline gap-2 text-[13px]">
+        {when && <span className="tabular shrink-0 text-xs text-zinc-400">{when}</span>}
+        {tone && (
+          <Badge tone={tone} className="shrink-0">
+            {level === "ERROR" ? "Error" : "Warning"}
+          </Badge>
+        )}
+        <span className={cx("min-w-0 font-medium break-words", tone === "red" && "text-rose-600 dark:text-rose-400")}>{msg}</span>
+      </div>
+      {file && (
+        <div className="mt-0.5 text-[12px] text-zinc-500 [overflow-wrap:anywhere] dark:text-zinc-400">
+          {/* allow line breaks after each "/" so long paths wrap between folders */}
+          {file.split("/").map((seg, j, all) => (
+            <span key={j}>
+              {seg}
+              {j < all.length - 1 && (
+                <>
+                  /<wbr />
+                </>
+              )}
+            </span>
+          ))}
+        </div>
+      )}
+    </li>
   );
 }

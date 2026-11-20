@@ -329,7 +329,7 @@ function TaskDialog({ task, copy, runAs, onClose }: { task: ScheduledTask | null
               </Badge>
               <span className="text-zinc-500">{took(test.seconds)}</span>
             </div>
-            <pre className="max-h-28 overflow-auto rounded-xl bg-zinc-950 px-4 py-3 font-mono text-[12px] leading-5 whitespace-pre-wrap text-zinc-300">
+            <pre className="max-h-28 overflow-auto rounded-xl bg-zinc-950 px-4 py-3 font-mono text-[12px] leading-5 whitespace-pre-wrap text-zinc-300 [overflow-wrap:anywhere]">
               {test.output || "No output"}
             </pre>
           </div>
@@ -451,7 +451,7 @@ function OutputDialog({ task, onClose }: { task: ScheduledTask; onClose: () => v
                 {run.exit_code !== null && <span>Exit code {run.exit_code}</span>}
                 <span>{run.trigger === "manual" ? "Started by hand" : "Started by schedule"}</span>
               </div>
-              <pre className="h-80 overflow-auto rounded-xl bg-zinc-950 px-4 py-3 font-mono text-[12px] leading-5 whitespace-pre-wrap text-zinc-300">
+              <pre className="h-80 overflow-auto rounded-xl bg-zinc-950 px-4 py-3 font-mono text-[12px] leading-5 whitespace-pre-wrap text-zinc-300 [overflow-wrap:anywhere]">
                 {run.output || "No output"}
               </pre>
             </div>
