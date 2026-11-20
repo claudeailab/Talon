@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.27
+- README describes what Talon is and does
+- Talon is now MIT licensed
+
 ## 1.0.26
 - New Files page: browse your volumes, upload, download, rename, move and delete
 - "Browse files" button on every volume

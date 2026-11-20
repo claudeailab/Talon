@@ -5,6 +5,10 @@
 
 ---
 
+**Talon is self-hosted NAS software for Debian, Ubuntu and Raspberry Pi OS.** It turns an ordinary PC, mini-PC or Raspberry Pi into a home NAS and file server that you manage entirely from your web browser.
+
+Talon sets up Linux software RAID (mdadm), creates ext4 or XFS volumes, and shares folders with Windows, macOS and Linux over SMB (Samba) and NFS, including macOS Time Machine backups. It manages users and permissions, checks disk health with S.M.A.R.T., backs up or syncs folders with Microsoft OneDrive, and emails you when a disk or RAID array needs attention. One command installs it, and updates install from the web interface.
+
 ![Dashboard](docs/screenshots/dashboard.png)
 
 ## Install
@@ -70,3 +74,7 @@ Updates are detected automatically and installed from the web interface.
 ```
 
 Add `--purge` to also remove the settings. Your data is never touched.
+
+## License
+
+[MIT](LICENSE)
