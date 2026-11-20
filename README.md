@@ -5,9 +5,9 @@
 
 ---
 
-**Talon is self-hosted NAS software for Debian, Ubuntu and Raspberry Pi OS.** It turns an ordinary PC, mini-PC or Raspberry Pi into a home NAS and file server that you manage entirely from your web browser.
+**Talon is self-hosted NAS software for Debian, Ubuntu and Raspberry Pi OS.** It turns a PC, mini-PC or Raspberry Pi into a home NAS that you manage from your browser.
 
-Talon sets up Linux software RAID (mdadm), creates ext4 or XFS volumes, and shares folders with Windows, macOS and Linux over SMB (Samba) and NFS, including macOS Time Machine backups. It manages users and permissions, checks disk health with S.M.A.R.T., backs up or syncs folders with Microsoft OneDrive, and emails you when a disk or RAID array needs attention. One command installs it, and updates install from the web interface.
+RAID, shared folders, users, OneDrive backup and alerts. One command installs it; updates install from the web interface.
 
 [![Dashboard](docs/screenshots/dashboard.png)](https://claudeailab.github.io/Talon/#dashboard)
 
@@ -48,19 +48,19 @@ https://<nas-ip>/
 
 </div>
 
-- **RAID:** hot spares, expand, replace or remove disks, data scrub
-- **Volumes:** ext4 or XFS, on a RAID array or a single disk
-- **Files:** browse, upload, download, rename, move and delete files on volumes, USB disks and OneDrive
-- **Disks:** S.M.A.R.T. health, temperature, self-tests, secure wipe
-- **Shared folders:** SMB and NFS with per-user and per-group permissions
-- **Users & groups:** NAS accounts with Samba passwords kept in sync
-- **Discovery:** appears in Windows Network and macOS Finder
 - **Dashboard:** live system stats, storage health and alerts
-- **OneDrive:** back up to or from OneDrive, or two-way sync (beta)
-- **Networking:** DHCP or a static IP, undone automatically if the NAS becomes unreachable
-- **Scheduled:** run commands and scripts on a schedule, with output history
-- **Notifications:** e-mail alerts for RAID, disks, tasks and updates
-- **Documentation:** built-in searchable guide with steps and screenshots
+- **RAID:** hot spares, expansion, disk replacement and data scrub
+- **Volumes:** ext4 or XFS on a RAID array or a single disk
+- **Disks:** S.M.A.R.T. health, temperatures, self-tests and wipe
+- **Files:** browse volumes, USB disks and OneDrive in the browser
+- **Shared folders:** SMB, NFS and Time Machine with per-user permissions
+- **Users & groups:** accounts for shared folders and the web interface
+- **Discovery:** appears in Windows Network and macOS Finder
+- **OneDrive:** back up to or from OneDrive, or two-way sync
+- **Networking:** DHCP or static IP, HTTPS on or off
+- **Scheduled:** run scripts on a schedule
+- **Notifications:** e-mail alerts with adjustable thresholds
+- **Documentation:** built-in searchable guide
 
 ## Screenshots
 
@@ -69,10 +69,10 @@ Click a screenshot to open the [gallery](https://claudeailab.github.io/Talon/).
 <table>
   <tr>
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#volumes"><img src="docs/screenshots/volumes.png" alt="Volumes on RAID or single disks"></a><br><sub>Volumes on RAID or single disks</sub></td>
-    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#raid-wizard"><img src="docs/screenshots/raid-wizard.png" alt="RAID wizard with capacity and protection"></a><br><sub>RAID wizard with capacity and protection</sub></td>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#raid-wizard"><img src="docs/screenshots/raid-wizard.png" alt="RAID wizard"></a><br><sub>RAID wizard</sub></td>
   </tr>
   <tr>
-    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#files"><img src="docs/screenshots/files.png" alt="Files: browse, upload and download"></a><br><sub>Files: browse, upload and download</sub></td>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#files"><img src="docs/screenshots/files.png" alt="Files on volumes, USB disks and OneDrive"></a><br><sub>Files on volumes, USB disks and OneDrive</sub></td>
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#share-permissions"><img src="docs/screenshots/share-permissions.png" alt="Shared folder permissions"></a><br><sub>Shared folder permissions</sub></td>
   </tr>
   <tr>
@@ -80,7 +80,11 @@ Click a screenshot to open the [gallery](https://claudeailab.github.io/Talon/).
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#users"><img src="docs/screenshots/users.png" alt="Users and groups"></a><br><sub>Users and groups</sub></td>
   </tr>
   <tr>
-    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#notifications"><img src="docs/screenshots/notifications.png" alt="E-mail notifications"></a><br><sub>E-mail notifications</sub></td>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#scheduled"><img src="docs/screenshots/scheduled.png" alt="Scheduled scripts"></a><br><sub>Scheduled scripts</sub></td>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#notifications"><img src="docs/screenshots/notifications.png" alt="Alert thresholds"></a><br><sub>Alert thresholds</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#documentation"><img src="docs/screenshots/documentation.png" alt="Built-in documentation"></a><br><sub>Built-in documentation</sub></td>
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#dashboard-dark"><img src="docs/screenshots/dashboard-dark.png" alt="Dark mode"></a><br><sub>Dark mode</sub></td>
   </tr>
 </table>

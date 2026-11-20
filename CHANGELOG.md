@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.45
+- New screenshots and a shorter description on GitHub and the website
+
 ## 1.0.44
 - Files: browse USB and other disks (with Eject) and OneDrive, not only volumes
 

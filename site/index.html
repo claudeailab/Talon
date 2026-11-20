@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Talon: self-hosted NAS software for Debian, Ubuntu and Raspberry Pi</title>
-<meta name="description" content="Talon turns an ordinary PC, mini-PC or Raspberry Pi into a home NAS and file server: software RAID, SMB and NFS shares, Time Machine, OneDrive backup and a modern web interface.">
+<meta name="description" content="Talon turns a PC, mini-PC or Raspberry Pi into a home NAS that you manage from your browser: RAID, shared folders, users, OneDrive backup and alerts.">
 <link rel="canonical" href="https://claudeailab.github.io/Talon/">
 <meta property="og:title" content="Talon: self-hosted NAS software">
 <meta property="og:description" content="Turn any Debian or Ubuntu computer into a NAS, with a modern web interface, software RAID, shared folders and users.">
@@ -63,8 +63,8 @@
   </header>
 
   <div class="intro">
-    <p><strong>Talon is self-hosted NAS software for Debian, Ubuntu and Raspberry Pi OS.</strong> It turns an ordinary PC, mini-PC or Raspberry Pi into a home NAS and file server that you manage entirely from your web browser.</p>
-    <p>Talon sets up Linux software RAID (mdadm), creates ext4 or XFS volumes, and shares folders with Windows, macOS and Linux over SMB (Samba) and NFS, including macOS Time Machine backups. It manages users and permissions, checks disk health with S.M.A.R.T., backs up or syncs folders with Microsoft OneDrive, and emails you when a disk or RAID array needs attention. One command installs it, and updates install from the web interface.</p>
+    <p><strong>Talon is self-hosted NAS software for Debian, Ubuntu and Raspberry Pi OS.</strong> It turns a PC, mini-PC or Raspberry Pi into a home NAS that you manage from your browser.</p>
+    <p>RAID, shared folders, users, OneDrive backup and alerts. One command installs it; updates install from the web interface.</p>
   </div>
   <div class="actions">
     <a class="btn primary" href="https://github.com/claudeailab/Talon">View on GitHub</a>
@@ -95,12 +95,14 @@
   const SHOTS = [
     ["dashboard", "Dashboard"],
     ["volumes", "Volumes on RAID or single disks"],
-    ["raid-wizard", "RAID wizard with capacity and protection"],
-    ["files", "Files: browse, upload and download"],
+    ["raid-wizard", "RAID wizard"],
+    ["files", "Files on volumes, USB disks and OneDrive"],
     ["share-permissions", "Shared folder permissions"],
     ["onedrive", "OneDrive backup and sync"],
     ["users", "Users and groups"],
-    ["notifications", "E-mail notifications"],
+    ["scheduled", "Scheduled scripts"],
+    ["notifications", "Alert thresholds"],
+    ["documentation", "Built-in documentation"],
     ["dashboard-dark", "Dark mode"],
   ];
   const $ = (id) => document.getElementById(id);
