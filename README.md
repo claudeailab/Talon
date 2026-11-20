@@ -58,6 +58,7 @@ https://<nas-ip>/
 - **Dashboard:** live system stats, storage health and alerts
 - **OneDrive:** back up to or from OneDrive, or two-way sync (beta)
 - **Notifications:** e-mail alerts for RAID, disks, tasks and updates
+- **Support:** built-in searchable guide with steps and screenshots
 
 ## Screenshots
 

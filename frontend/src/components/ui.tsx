@@ -12,6 +12,7 @@ import {
   type InputHTMLAttributes,
   type ReactNode,
   type SelectHTMLAttributes,
+  type Ref,
 } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, Info, Loader2, X, XCircle } from "lucide-react";
@@ -225,7 +226,7 @@ export function Field({
 const inputCls =
   "block w-full rounded-xl border-0 bg-white px-3.5 py-2.5 text-sm text-zinc-900 shadow-xs ring-1 ring-inset ring-zinc-200 placeholder:text-zinc-400 transition focus:ring-2 focus:ring-brand-500 focus:outline-none disabled:opacity-60 dark:bg-white/[0.04] dark:text-white dark:ring-white/10 dark:placeholder:text-zinc-500 dark:focus:ring-brand-400";
 
-export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement>) {
+export function Input({ className, ...rest }: InputHTMLAttributes<HTMLInputElement> & { ref?: Ref<HTMLInputElement> }) {
   return <input className={cx(inputCls, className)} {...rest} />;
 }
 

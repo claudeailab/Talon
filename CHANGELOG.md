@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.34
+- Support page: a searchable guide to every feature, with steps and screenshots
+
 ## 1.0.33
 - Dashboard Storage card also shows RAID arrays, shared folders and OneDrive
 
