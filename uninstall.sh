@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # Remove the Talon web interface.
 #
-#   sudo /opt/talon/uninstall.sh          # keep configuration and shares
-#   sudo /opt/talon/uninstall.sh --purge  # also remove config, stop sharing
+#   /opt/talon/uninstall.sh          # keep configuration and shares
+#   /opt/talon/uninstall.sh --purge  # also remove config, stop sharing
 #
 # Volumes, RAID arrays, data, /etc/fstab entries and user accounts are NEVER
 # touched: your disks keep working and stay mounted at /srv/nas/*.
 set -euo pipefail
-[ "$(id -u)" -eq 0 ] || { echo "run as root" >&2; exit 1; }
+if [ "$(id -u)" -ne 0 ]; then   # ask for a password: sudo if installed, else su
+  echo "Removing Talon needs root access."
+  command -v sudo >/dev/null 2>&1 && exec sudo bash "$0" "$@"
+  exec su root -c "bash $(printf '%q ' "$0" "$@")"
+fi
 PURGE=0; [ "${1:-}" = "--purge" ] && PURGE=1
 
 if [ -d /run/systemd/system ]; then

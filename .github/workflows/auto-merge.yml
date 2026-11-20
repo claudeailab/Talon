@@ -1,6 +1,7 @@
 # Owner's rule: every change lands on main and no other branches are kept.
 # Any push to a branch other than main is merged into main here, then the
-# branch is deleted.
+# branch is deleted. Tags (and their releases) that are not part of main's
+# history, e.g. left over from a history rewrite, are deleted as well.
 #
 # GitHub never lets a repository's *default* branch be deleted, and the
 # built-in GITHUB_TOKEN cannot change the default. If the repository secret
@@ -65,5 +66,24 @@ jobs:
             else
               git push origin --delete "$b"
               echo "$b: deleted"
+            fi
+          done
+
+      - name: Delete tags and releases that are not on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          git fetch -q --force --tags origin
+          git fetch -q origin main
+          for t in $(git tag); do
+            if ! git merge-base --is-ancestor "$t^{commit}" FETCH_HEAD; then
+              if gh release view "$t" --repo "$REPO" >/dev/null 2>&1; then
+                gh release delete "$t" --repo "$REPO" --yes
+                echo "$t: release deleted"
+              fi
+              git push origin ":refs/tags/$t"
+              echo "$t: tag deleted (not on main)"
             fi
           done

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Talon installer
 #
-#   curl -fsSL https://raw.githubusercontent.com/claudeailab/Talon/main/install.sh | sudo bash
+#   curl -fsSL https://raw.githubusercontent.com/claudeailab/Talon/main/install.sh | bash
 #
 # Supported: Debian 12/13, Ubuntu 22.04/24.04/26.04, Raspberry Pi OS 12/13 (64-bit)
 # on amd64 and arm64.  Re-running the installer upgrades an existing installation
 # and keeps its configuration.
 #
 # The web UI runs on https://<nas-ip>/ (port 443). The Linux user who runs the
-# installer with sudo becomes the administrator.
+# installer becomes the administrator (root access is requested when needed).
 #
 #   TALON_FORCE=1          skip the OS/architecture check
 set -Eeuo pipefail
@@ -31,8 +31,27 @@ trap 'die "installation failed at line $LINENO"' ERR
 
 has_systemd() { [ -d /run/systemd/system ]; }
 
+# ---------------------------------------------------------------- root
+# Not root: ask for a password in this terminal (sudo if installed, else su)
+# and run the installer again as root.
+if [ "$(id -u)" -ne 0 ]; then
+  { : </dev/tty; } 2>/dev/null || die "root access is needed: run the installer in a terminal"
+  self="${BASH_SOURCE[0]:-}"
+  if [ -z "$self" ] || [ ! -f "$self" ]; then   # piped from curl: fetch a copy
+    self="$(mktemp /tmp/talon-install.XXXXXX)"
+    curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/install.sh" -o "$self" \
+      || die "download failed"
+    chmod 644 "$self"
+  fi
+  if command -v sudo >/dev/null 2>&1; then
+    echo "Talon needs root access. Enter your password if asked."
+    exec sudo bash "$self" </dev/tty
+  fi
+  echo "Talon needs root access. Enter the root password."
+  exec su root -c "SUDO_USER=$(id -un) bash '$self'" </dev/tty
+fi
+
 # ---------------------------------------------------------------- checks
-[ "$(id -u)" -eq 0 ] || die "run as root, e.g.: curl -fsSL <url> | sudo bash"
 [ -r /etc/os-release ] || die "/etc/os-release not found"
 . /etc/os-release
 ARCH="$(dpkg --print-architecture 2>/dev/null || uname -m)"

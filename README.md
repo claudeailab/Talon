@@ -3,17 +3,21 @@
   <img src="docs/banner-light.svg" width="760" alt="Talon: Turn any Debian or Ubuntu computer into a NAS, with a modern web interface, software RAID, shared folders and users.">
 </picture>
 
+---
+
 ![Dashboard](docs/screenshots/dashboard.png)
 
 ## Install
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/claudeailab/Talon/main/install.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/claudeailab/Talon/main/install.sh | bash
 ```
 
 ## Access
 
-`https://<nas-ip>/`
+```text
+https://<nas-ip>/
+```
 
 ## Support
 
@@ -47,6 +51,8 @@ curl -fsSL https://raw.githubusercontent.com/claudeailab/Talon/main/install.sh |
 - **Discovery:** appears in Windows Network and macOS Finder
 - **Dashboard:** live system stats, storage health and alerts
 
+---
+
 ![RAID wizard](docs/screenshots/raid-wizard.png)
 
 ## Updates
@@ -56,7 +62,7 @@ Updates are detected automatically and installed from the web interface.
 ## Uninstall
 
 ```bash
-sudo /opt/talon/uninstall.sh
+/opt/talon/uninstall.sh
 ```
 
 Add `--purge` to also remove the settings. Your data is never touched.
