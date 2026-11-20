@@ -27,9 +27,49 @@ step() { echo "${c_blue}==>${c_off} $*"; }
 ok()   { echo "${c_green}  ✓${c_off} $*"; }
 warn() { echo "${c_yellow}  !${c_off} $*"; }
 die()  { echo "${c_red}ERROR:${c_off} $*" >&2; exit 1; }
-trap 'die "installation failed at line $LINENO"' ERR
+trap 'clear_line; die "installation failed at line $LINENO (details: /var/log/talon-install.log)"' ERR
 
 has_systemd() { [ -d /run/systemd/system ]; }
+
+# ---------------------------------------------------------------- progress
+# Long steps write their output to $LOG and show live progress in a terminal.
+LOG=/var/log/talon-install.log
+TTY=0; [ -t 1 ] && TTY=1
+clear_line() { [ "$TTY" = 1 ] && printf '\r\033[K' || true; }
+bar() {   # bar <percent> <text>
+  [ "$TTY" = 1 ] || return 0
+  local p="${1%%.*}" w=30 n
+  case "$p" in ''|*[!0-9]*) p=0 ;; esac
+  [ "$p" -gt 100 ] && p=100
+  n=$((p * w / 100))
+  printf '\r\033[K    [%s%s] %3d%%  %.45s' \
+    "$(printf '%*s' "$n" '' | tr ' ' '#')" "$(printf '%*s' $((w - n)) '' | tr ' ' '.')" "$p" "$2"
+}
+apt_run() {   # apt_run <apt-get arguments...>: apt-get with a progress bar
+  apt-get -q -o APT::Status-Fd=3 -o Dpkg::Use-Pty=0 "$@" 3>&1 1>>"$LOG" 2>&1 |
+    while IFS=: read -r kind _ pct text; do
+      case "$kind" in
+        dlstatus) bar "$pct" "downloading: $text" ;;
+        pmstatus) bar "$pct" "$text" ;;
+      esac
+    done
+  local rc=${PIPESTATUS[0]}
+  clear_line
+  return "$rc"
+}
+spin() {   # spin <text> <command...>: run a command with a spinner and timer
+  local text="$1" chars='|/-\' i=0 start=$SECONDS pid rc=0
+  shift
+  "$@" >>"$LOG" 2>&1 &
+  pid=$!
+  while kill -0 "$pid" 2>/dev/null; do
+    [ "$TTY" = 1 ] && printf '\r\033[K    %s %s (%ds)' "${chars:i++%4:1}" "$text" $((SECONDS - start))
+    sleep 0.2
+  done
+  wait "$pid" || rc=$?
+  clear_line
+  return "$rc"
+}
 
 # ---------------------------------------------------------------- root
 # Not root: ask for a password in this terminal (sudo if installed, else su)
@@ -76,6 +116,7 @@ echo
 # ---------------------------------------------------------------- packages
 step "Checking system packages"
 export DEBIAN_FRONTEND=noninteractive
+: >"$LOG"
 PKGS=(python3 python3-venv ca-certificates curl openssl tar iproute2 udev util-linux
       mdadm parted smartmontools e2fsprogs xfsprogs acl
       samba samba-common-bin nfs-kernel-server avahi-daemon)
@@ -86,19 +127,19 @@ MISSING=()
 for p in "${PKGS[@]}"; do is_installed "$p" || MISSING+=("$p"); done
 APT_UPDATED=0
 if [ "${#MISSING[@]}" -gt 0 ]; then
-  echo "    installing: ${MISSING[*]} (this can take a few minutes)"
-  apt-get update -q >/dev/null; APT_UPDATED=1
-  apt-get install -y -q --no-install-recommends "${MISSING[@]}" >/dev/null
+  echo "    installing: ${MISSING[*]}"
+  spin "updating package lists" apt-get update -q; APT_UPDATED=1
+  apt_run install -y --no-install-recommends "${MISSING[@]}"
 fi
 ok "system packages present"
 # Windows network discovery: wsdd (Debian 12+/Ubuntu 22.04+), wsdd2 as fallback
 if is_installed wsdd || is_installed wsdd2; then
   ok "WS-Discovery present (Windows network discovery)"
 else
-  [ "$APT_UPDATED" = 1 ] || apt-get update -q >/dev/null
-  if apt-get install -y -q --no-install-recommends wsdd >/dev/null 2>&1; then
+  [ "$APT_UPDATED" = 1 ] || spin "updating package lists" apt-get update -q
+  if apt_run install -y --no-install-recommends wsdd; then
     ok "wsdd installed (Windows network discovery)"
-  elif apt-get install -y -q --no-install-recommends wsdd2 >/dev/null 2>&1; then
+  elif apt_run install -y --no-install-recommends wsdd2; then
     ok "wsdd2 installed (Windows network discovery)"
   else
     warn "wsdd not available - the NAS will not appear automatically in Windows Network"
@@ -135,11 +176,12 @@ cp "$SRC/uninstall.sh" "$PREFIX/uninstall.sh" 2>/dev/null && chmod 755 "$PREFIX/
 
 if [ ! -x "$PREFIX/venv/bin/python" ] || ! "$PREFIX/venv/bin/python" -c 'import sys' 2>/dev/null; then
   rm -rf "$PREFIX/venv"
-  python3 -m venv "$PREFIX/venv"
+  spin "creating Python environment" python3 -m venv "$PREFIX/venv"
 fi
-"$PREFIX/venv/bin/python" -m pip install -q --disable-pip-version-check --no-cache-dir --upgrade pip >/dev/null
-"$PREFIX/venv/bin/python" -m pip install -q --disable-pip-version-check --no-cache-dir --upgrade \
-  -r "$PREFIX/app/requirements.txt" >/dev/null
+spin "updating pip" "$PREFIX/venv/bin/python" -m pip install -q --disable-pip-version-check \
+  --no-cache-dir --upgrade pip
+spin "installing Python packages" "$PREFIX/venv/bin/python" -m pip install -q \
+  --disable-pip-version-check --no-cache-dir --upgrade -r "$PREFIX/app/requirements.txt"
 ok "Python environment ready ($("$PREFIX/venv/bin/python" -c 'import fastapi,sys;print(f"Python {sys.version.split()[0]}, FastAPI {fastapi.__version__}")'))"
 
 cat > /usr/local/sbin/talon <<EOF
