@@ -14,7 +14,7 @@ import {
   Loader2,
   LogOut,
   Clock,
-  LifeBuoy,
+  BookOpen,
   Mail,
   Menu as MenuIcon,
   Moon,
@@ -48,7 +48,7 @@ import UsersPage from "./pages/Users";
 import ServicesPage from "./pages/Services";
 import SettingsPage from "./pages/Settings";
 import ActivityPage from "./pages/Activity";
-import SupportPage from "./pages/Support";
+import DocumentationPage from "./pages/Documentation";
 import ScheduledPage from "./pages/Scheduled";
 
 type Me = { user: string; version: string; demo: boolean };
@@ -80,7 +80,7 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
       { to: "/activity", label: "Activity", icon: ActivityIcon, page: ActivityPage },
       { to: "/scheduled", label: "Scheduled", icon: Clock, page: ScheduledPage },
       { to: "/notifications", label: "Notifications", icon: Mail, page: NotificationsPage },
-      { to: "/support", label: "Support", icon: LifeBuoy, page: SupportPage },
+      { to: "/documentation", label: "Documentation", icon: BookOpen, page: DocumentationPage },
     ],
   },
 ];
@@ -146,6 +146,7 @@ function Shell({ me }: { me: Me }) {
   useEffect(() => setMobileNav(false), [path]);
   useEffect(() => {
     if (path === "/storage") navigate("/volumes"); // old address
+    if (path === "/support") navigate("/documentation" + location.search); // old address
   }, [path]);
 
   const all = NAV.flatMap((s) => s.items);

@@ -1,7 +1,7 @@
-/* The user guide shown on the Support page.
+/* The user guide shown on the Documentation page.
  *
  * Text supports **bold** (names of buttons, fields and pages), `code` and [links](/path)
- * to pages in Talon or to other topics (/support?topic=<id>). Screenshots live in
+ * to pages in Talon or to other topics (/documentation?topic=<id>). Screenshots live in
  * frontend/public/guide/<name>.webp. Keep wording identical to the interface. */
 
 export type Block =
@@ -28,7 +28,7 @@ export interface Topic {
   sections: Section[];
 }
 
-const t = (x: string) => `/support?topic=${x}`;
+const t = (x: string) => `/documentation?topic=${x}`;
 
 export const GUIDE: Topic[] = [
   // ------------------------------------------------------------ Basics

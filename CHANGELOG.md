@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.40
+- Support renamed to Documentation
+- Shorter sign-in page
+
 ## 1.0.39
 - A new RAID 5 shows "Building" instead of "Rebuilding" on its last disk
 

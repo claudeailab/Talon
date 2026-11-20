@@ -60,7 +60,7 @@ https://<nas-ip>/
 - **Networking:** DHCP or a static IP, undone automatically if the NAS becomes unreachable
 - **Scheduled:** run commands and scripts on a schedule, with output history
 - **Notifications:** e-mail alerts for RAID, disks, tasks and updates
-- **Support:** built-in searchable guide with steps and screenshots
+- **Documentation:** built-in searchable guide with steps and screenshots
 
 ## Screenshots
 

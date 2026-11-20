@@ -12,7 +12,7 @@ function topicFromUrl(): string {
   return GUIDE.some((t) => t.id === id) ? id! : GUIDE[0].id;
 }
 
-export default function SupportPage() {
+export default function DocumentationPage() {
   const [topicId, setTopicId] = useState(topicFromUrl);
   const [query, setQuery] = useState("");
   const [section, setSection] = useState<string | null>(null);
@@ -34,7 +34,7 @@ export default function SupportPage() {
   }, [section, topicId]);
 
   const open = (id: string, sec?: string) => {
-    if (id !== topicId) history.pushState(null, "", `/support?topic=${id}`);
+    if (id !== topicId) history.pushState(null, "", `/documentation?topic=${id}`);
     setTopicId(id);
     setQuery("");
     if (sec) setSection(sec);
@@ -60,7 +60,7 @@ export default function SupportPage() {
 
   return (
     <>
-      <PageHeader title="Support" description="How Talon works and how to set up each feature." />
+      <PageHeader title="Documentation" description="How Talon works and how to set up each feature." />
 
       <div className="relative mb-5">
         <Search className="pointer-events-none absolute top-1/2 left-3.5 size-4 -translate-y-1/2 text-zinc-400" />
@@ -283,7 +283,7 @@ function Inline({ text, onTopic }: { text: string; onTopic: (id: string) => void
       out.push(<b key={m.index} className="font-semibold text-zinc-900 dark:text-zinc-100">{m[1]}</b>);
     } else {
       const href = m[3];
-      const topic = href.match(/^\/support\?topic=([\w-]+)/)?.[1];
+      const topic = href.match(/^\/documentation\?topic=([\w-]+)/)?.[1];
       const cls = "font-medium text-brand-600 hover:underline dark:text-brand-400";
       out.push(
         topic ? (

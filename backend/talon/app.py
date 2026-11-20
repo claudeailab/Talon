@@ -117,8 +117,16 @@ def create_app(cfg, platform) -> FastAPI:
             resp.headers["Cache-Control"] = "no-store"
         return resp
 
+    # Over plain HTTP the session uses another cookie name: a browser does not let
+    # an http:// page replace a Secure cookie of the same name left from HTTPS, so
+    # reusing the name would silently drop the new session.
+    COOKIE_HTTP = COOKIE + "_http"
+
+    def session_token(request: Request):
+        return request.cookies.get(COOKIE) or request.cookies.get(COOKIE_HTTP)
+
     def current_user(request: Request) -> str:
-        user = sessions.get(request.cookies.get(COOKIE))
+        user = sessions.get(request.cookies.get(COOKIE)) or sessions.get(request.cookies.get(COOKIE_HTTP))
         if not user:
             raise HTTPException(401, "Not logged in")
         return user
@@ -146,15 +154,17 @@ def create_app(cfg, platform) -> FastAPI:
         # Secure cookies only travel over HTTPS: the browser's view counts, so a
         # proxy such as Cloudflare that serves HTTPS in front of plain HTTP keeps them.
         https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
-        response.set_cookie(COOKIE, token, httponly=True, samesite="strict",
-                            secure=https and not cfg.demo, max_age=cfg.session_hours * 3600, path="/")
+        secure = https and not cfg.demo
+        response.set_cookie(COOKIE if secure else COOKIE_HTTP, token, httponly=True, samesite="strict",
+                            secure=secure, max_age=cfg.session_hours * 3600, path="/")
         nas.state.log_activity(user, f"Signed in from {ip}")
         return {"user": user}
 
     @app.post("/api/auth/logout")
     def logout(request: Request, response: Response):
-        sessions.drop(request.cookies.get(COOKIE))
-        response.delete_cookie(COOKIE, path="/")
+        for name in (COOKIE, COOKIE_HTTP):
+            sessions.drop(request.cookies.get(name))
+            response.delete_cookie(name, path="/")
         return {"ok": True}
 
     @app.get("/api/auth/me")

@@ -15,6 +15,13 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
     setError(null);
     try {
       await api.post("/auth/login", { username, password });
+      // make sure the browser kept the session cookie before leaving this page
+      const ok = await fetch("/api/auth/me", { credentials: "same-origin" }).then((r) => r.ok, () => false);
+      if (!ok) {
+        setError("Your browser did not keep the sign-in. Clear this site's cookies and try again.");
+        setBusy(false);
+        return;
+      }
       onLogin();
     } catch (err) {
       setError((err as Error).message);
@@ -75,7 +82,6 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
             Sign in {!busy && <ArrowRight className="size-4" />}
           </Button>
         </form>
-        <p className="mt-6 text-center text-xs text-zinc-500">Use the Linux account you installed Talon with.</p>
       </div>
     </div>
   );
