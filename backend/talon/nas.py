@@ -181,15 +181,60 @@ class Nas:
                         "power_on_hours": smart.get("power_on_hours")})
         return out
 
+    # ---------------------------------------------------------------- alert thresholds
+    THRESHOLDS = {"temp_hdd": 55, "temp_ssd": 65, "temp_nvme": 75,
+                  "volume_full": 90, "ssd_wear": 90, "bad_sectors": True}
+    LIMITS = {"temp_hdd": (30, 90), "temp_ssd": (30, 90), "temp_nvme": (30, 95),
+              "volume_full": (50, 99), "ssd_wear": (50, 100)}
+
+    def thresholds(self) -> dict:
+        saved = self.state.get("thresholds") or {}
+        return {k: saved.get(k, v) for k, v in self.THRESHOLDS.items()}
+
+    def thresholds_info(self) -> dict:
+        """Thresholds, defaults and the current temperature of each disk by type."""
+        now: Dict[str, list] = {"hdd": [], "ssd": [], "nvme": []}
+        for d in self.disks():
+            if d.get("temperature"):
+                now[self._temp_kind(d)].append({"name": d["name"], "temperature": d["temperature"]})
+        return {"values": self.thresholds(), "defaults": dict(self.THRESHOLDS), "now": now}
+
+    def save_thresholds(self, data: dict, user: str) -> dict:
+        clean = {}
+        for k, default in self.THRESHOLDS.items():
+            v = data.get(k, default)
+            if isinstance(default, bool):
+                clean[k] = bool(v)
+                continue
+            try:
+                v = int(v)
+            except (TypeError, ValueError):
+                raise UserError("Enter whole numbers") from None
+            lo, hi = self.LIMITS[k]
+            if not lo <= v <= hi:
+                raise UserError(f"Enter a value between {lo} and {hi}")
+            clean[k] = v
+        self.state.update(lambda d: d.__setitem__("thresholds", clean))
+        self.state.log_activity(user, "Changed the alert thresholds")
+        return self.thresholds_info()
+
     @staticmethod
-    def _health(smart: dict) -> str:
+    def _temp_kind(d: dict) -> str:
+        if d.get("kind") == "nvme":
+            return "nvme"
+        if d.get("kind") == "hdd" or (d.get("kind") == "usb" and d.get("rotational")):
+            return "hdd"
+        return "ssd"
+
+    def _health(self, smart: dict) -> str:
         if not smart or smart.get("passed") is None:
             return "unknown"
         if smart.get("passed") is False:
             return "failing"
-        if smart.get("bad_sectors"):
+        t = self.thresholds()
+        if t["bad_sectors"] and smart.get("bad_sectors"):
             return "warning"
-        if (smart.get("percentage_used") or 0) >= 90:
+        if (smart.get("percentage_used") or 0) >= t["ssd_wear"]:
             return "warning"
         return "good"
 
@@ -849,6 +894,7 @@ class Nas:
                disks: Optional[List[dict]] = None) -> List[dict]:
         volumes = volumes if volumes is not None else self.volumes()
         disks = disks if disks is not None else self.disks()
+        limits = self.thresholds()
         out = []
         for a in self.raid_arrays():
             if a["status"] in ("degraded", "failed", "missing"):
@@ -860,7 +906,7 @@ class Nas:
                 out.append({"level": "critical" if v["status"] == "missing" else "warning",
                             "title": f"Volume {v['name']} is {v['status']}",
                             "detail": v["status_detail"], "link": "/volumes"})
-            if v["size"] and v["used"] / v["size"] > 0.9:
+            if v["size"] and v["used"] / v["size"] * 100 >= limits["volume_full"]:
                 out.append({"level": "warning", "title": f"Volume {v['name']} is almost full",
                             "detail": f"{v['used'] / v['size'] * 100:.0f}% used",
                             "link": "/volumes"})
@@ -872,7 +918,7 @@ class Nas:
             elif d["health"] == "warning":
                 out.append({"level": "warning", "title": f"Disk {d['name']} shows wear",
                             "detail": f"{d['model']} - check SMART details", "link": "/disks"})
-            if d.get("temperature") and d["temperature"] >= 55:
+            if d.get("temperature") and d["temperature"] >= limits[f"temp_{self._temp_kind(d)}"]:
                 out.append({"level": "warning", "title": f"Disk {d['name']} is hot",
                             "detail": f"{d['temperature']} °C", "link": "/disks"})
         exp = self.cloud.secret_expiry()

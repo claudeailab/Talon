@@ -644,6 +644,22 @@ export const GUIDE: Topic[] = [
           { p: "Each alert is sent once, and again only if it clears and comes back." },
         ],
       },
+      {
+        id: "thresholds",
+        title: "3. Alert thresholds",
+        blocks: [
+          { p: "Under **Alert thresholds** on the [Notifications](/notifications) page you choose when Talon warns you. The limits apply to the dashboard, the bell and e-mails, also without SMTP." },
+          {
+            list: [
+              "**Disk temperature**: a limit for **Hard disks (HDD)**, **SATA SSDs** and **NVMe SSDs**, because SSDs run warmer. Each shows the current temperatures of those disks.",
+              "**Volume almost full**: how full a volume may get, in percent.",
+              "**SSD wear**: how much of an SSD's rated write endurance may be used.",
+              "**Bad sectors**: warn as soon as a disk reports reallocated or pending sectors.",
+            ],
+          },
+          { p: "Change the values and click **Save**. **Reset to defaults** restores 55 °C, 65 °C and 75 °C, 90% full, 90% worn, and bad sector warnings on." },
+        ],
+      },
     ],
   },
 

@@ -387,6 +387,14 @@ def create_app(cfg, platform) -> FastAPI:
         cfg_ = notify.smtp_validate(body.get("config") or {}, nas.state.get("smtp") or {})
         return {"checks": notify.smtp_check(cfg_, cfg.demo)}
 
+    @app.get("/api/thresholds")
+    def thresholds_get(_u: str = Depends(current_user)):
+        return nas.thresholds_info()
+
+    @app.put("/api/thresholds")
+    def thresholds_put(body: dict = Body(...), user: str = Depends(current_user)):
+        return nas.save_thresholds(body, user)
+
     @app.get("/api/notifications")
     def notifications_get(_u: str = Depends(current_user)):
         return {**nas.notifier.settings(),

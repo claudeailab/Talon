@@ -237,3 +237,23 @@ def test_http_session_uses_its_own_cookie(client, monkeypatch):
     r = https.post("/api/auth/login", json={"username": "admin", "password": "talon"},
                    headers={"X-Requested-With": "talon"})
     assert r.headers["set-cookie"].startswith("talon_session=") and "Secure" in r.headers["set-cookie"]
+
+
+def test_alert_thresholds(client):
+    nas = client.app.state.nas
+    info = client.get("/api/thresholds").json()
+    assert info["values"] == {"temp_hdd": 55, "temp_ssd": 65, "temp_nvme": 75,
+                              "volume_full": 90, "ssd_wear": 90, "bad_sectors": True}
+    assert info["now"]["hdd"] and info["now"]["nvme"]          # demo disks report temperatures
+    # an HDD at 40 °C: no alert at 55, an alert once the limit is 35
+    sda = next(d for d in nas.disks() if d["name"] == "sda")
+    assert not any(a["title"] == "Disk sda is hot" for a in nas.alerts())
+    r = client.put("/api/thresholds", json={**info["values"], "temp_hdd": 30})
+    assert r.status_code == 200 and r.json()["values"]["temp_hdd"] == 30
+    if sda["temperature"] and sda["temperature"] >= 30:
+        assert any(a["title"] == "Disk sda is hot" for a in nas.alerts())
+    # volume almost full follows its threshold too (demo tank is about 40% used)
+    client.put("/api/thresholds", json={**info["values"], "volume_full": 50})
+    assert not any("tank is almost full" in a["title"] for a in nas.alerts())
+    for bad in ({"temp_hdd": 10}, {"volume_full": 100}, {"ssd_wear": "x"}):
+        assert client.put("/api/thresholds", json={**info["values"], **bad}).status_code == 400

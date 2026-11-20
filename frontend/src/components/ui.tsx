@@ -120,8 +120,9 @@ export function CardHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-3">
-      <div className="flex min-w-0 items-center gap-3">
+    <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3 px-5 pt-5 pb-3">
+      {/* on narrow screens the actions move below the title instead of squeezing it */}
+      <div className="flex min-w-[14rem] flex-1 items-center gap-3">
         {icon && (
           <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600 dark:bg-white/5 dark:text-zinc-300">
             {icon}

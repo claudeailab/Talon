@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.42
+- Alert thresholds: disk temperature per disk type, volume full, SSD wear, bad sectors
+- Card buttons move below the title on narrow screens
+
 ## 1.0.41
 - Fixed: signing in after turning HTTPS off
 
