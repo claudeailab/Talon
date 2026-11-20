@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Download, Info, RefreshCw, Server, Sparkles } from "lucide-react";
+import { CheckCircle2, Download, Info, KeyRound, Mail, Network, RefreshCw, Server, SlidersHorizontal, Sparkles } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, bytes, date } from "../lib/format";
 import { useAction } from "../lib/hooks";
@@ -11,13 +11,13 @@ import NetworkTab from "./SettingsNetwork";
 import SmtpTab from "./SettingsSmtp";
 
 type TabId = "general" | "network" | "entra" | "smtp" | "update" | "about";
-const TABS: { value: TabId; label: string }[] = [
-  { value: "general", label: "General" },
-  { value: "network", label: "Networking" },
-  { value: "entra", label: "EntraID" },
-  { value: "smtp", label: "SMTP" },
-  { value: "update", label: "Update" },
-  { value: "about", label: "About" },
+const TABS: { value: TabId; label: string; icon: React.ReactNode }[] = [
+  { value: "general", label: "General", icon: <SlidersHorizontal /> },
+  { value: "network", label: "Networking", icon: <Network /> },
+  { value: "entra", label: "EntraID", icon: <KeyRound /> },
+  { value: "smtp", label: "SMTP", icon: <Mail /> },
+  { value: "update", label: "Update", icon: <Download /> },
+  { value: "about", label: "About", icon: <Info /> },
 ];
 
 export default function SettingsPage() {

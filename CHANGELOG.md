@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.49
+- Settings on phones: icon tiles instead of a dropdown
+
 ## 1.0.48
 - Renamed: Thresholds tab and EntraID tab
 - Clearer description of the RAID data scrub

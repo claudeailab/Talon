@@ -514,13 +514,36 @@ export function Tabs<T extends string>({
 }: {
   value: T;
   onChange: (v: T) => void;
-  tabs: { value: T; label: ReactNode }[];
+  tabs: { value: T; label: ReactNode; icon?: ReactNode }[];
 }) {
-  // many tabs do not fit on a phone: show a dropdown there instead
+  // on a phone, tabs with icons become a grid of tiles; many tabs without
+  // icons become a dropdown, because they do not fit in one row
+  const tiles = tabs.every((t) => t.icon);
   const dropdown =
-    tabs.length > 5 && tabs.every((t) => typeof t.label === "string");
+    !tiles && tabs.length > 5 && tabs.every((t) => typeof t.label === "string");
   return (
     <>
+      {tiles && (
+        <div className="grid grid-cols-4 gap-2 sm:hidden">
+          {tabs.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => onChange(t.value)}
+              aria-pressed={value === t.value}
+              className={cx(
+                "flex min-w-0 flex-col items-center gap-1.5 rounded-xl px-1 py-3 text-[12px] font-medium ring-1 transition ring-inset [&>svg]:size-5",
+                value === t.value
+                  ? "bg-brand-600 text-white ring-brand-600 dark:bg-brand-500 dark:ring-brand-500"
+                  : "bg-white text-zinc-600 ring-zinc-200 hover:bg-zinc-50 dark:bg-white/[0.04] dark:text-zinc-300 dark:ring-white/10",
+              )}
+            >
+              {t.icon}
+              <span className="max-w-full truncate">{t.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
       {dropdown && (
         <Select
           value={value}
@@ -537,7 +560,7 @@ export function Tabs<T extends string>({
       )}
       <div
         className={cx(
-          dropdown && "hidden sm:flex",
+          (dropdown || tiles) && "hidden sm:flex",
           "flex gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-zinc-200)] [scrollbar-width:none] dark:shadow-[inset_0_-1px_0_rgb(255_255_255/0.1)] [&::-webkit-scrollbar]:hidden",
         )}
       >
