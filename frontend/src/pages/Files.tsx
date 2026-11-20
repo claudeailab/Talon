@@ -1,7 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
+  ArrowUpFromLine,
+  ChevronDown,
   ChevronRight,
+  Cloud,
+  Database,
+  HardDrive,
   Download,
   File,
   FileArchive,
@@ -19,16 +24,22 @@ import {
   Search,
   Trash2,
   Upload,
+  Usb,
   X,
 } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, bytes, cx, dateTime } from "../lib/format";
 import { useAction } from "../lib/hooks";
-import type { Volume } from "../lib/types";
-import { Button, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Segmented, Select } from "../components/ui";
+import { Button, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Select } from "../components/ui";
 
 type Item = { name: string; folder: boolean; size: number; modified: number; count: number | null };
 type Listing = { volume: string; path: string; items: Item[] };
+type Loc = { id: string; kind: "volume" | "usb" | "disk" | "onedrive"; name: string; detail: string; mounted: boolean; ejectable: boolean };
+
+function LocIcon({ kind, className }: { kind: Loc["kind"]; className?: string }) {
+  const C = kind === "onedrive" ? Cloud : kind === "usb" ? Usb : kind === "disk" ? HardDrive : Database;
+  return <C className={className} />;
+}
 type Upload = { id: number; name: string; size: number; sent: number; status: "waiting" | "uploading" | "done" | "error"; error?: string };
 
 const join = (a: string, b: string) => (a ? `${a}/${b}` : b);
@@ -47,7 +58,7 @@ function FileIcon({ item }: { item: Item }) {
 
 export default function FilesPage() {
   const qc = useQueryClient();
-  const vols = useQuery({ queryKey: ["volumes"], queryFn: () => api.get<Volume[]>("/volumes") });
+  const locs = useQuery({ queryKey: ["file-locations"], queryFn: () => api.get<Loc[]>("/files/locations"), refetchInterval: 15000 });
   const params = new URLSearchParams(location.search);
   const [volume, setVolume] = useState(params.get("volume") ?? "");
   const [path, setPath] = useState(params.get("path") ?? "");
@@ -59,10 +70,15 @@ export default function FilesPage() {
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const mounted = (vols.data ?? []).filter((v) => v.mounted);
+  const places = locs.data ?? [];
+  const here = places.find((l) => l.id === volume);
   useEffect(() => {
-    if (!volume && mounted.length) setVolume(mounted[0].name);
-  }, [mounted.length]); // eslint-disable-line
+    // start in the first location, or leave one that disappeared (ejected, disconnected)
+    if (places.length && (!volume || !places.some((l) => l.id === volume))) {
+      setVolume(places[0].id);
+      setPath("");
+    }
+  }, [places.map((l) => l.id).join()]); // eslint-disable-line
   useEffect(() => {
     if (!volume) return;
     const q = new URLSearchParams({ volume, ...(path ? { path } : {}) });
@@ -74,6 +90,10 @@ export default function FilesPage() {
     queryFn: () => api.get<Listing>(`/files?volume=${encodeURIComponent(volume)}&path=${encodeURIComponent(path)}`),
     enabled: !!volume,
   });
+  // opening a disk mounts it: refresh the locations so Eject appears
+  useEffect(() => {
+    if (list.data && here && !here.mounted) qc.invalidateQueries({ queryKey: ["file-locations"] });
+  }, [list.data]); // eslint-disable-line
   const items = useMemo(() => (list.data?.items ?? []).filter((i) => i.name.toLowerCase().includes(filter.toLowerCase())), [list.data, filter]);
   const refresh = () => qc.invalidateQueries({ queryKey: ["files", volume] });
 
@@ -152,11 +172,21 @@ export default function FilesPage() {
     if (e.dataTransfer.files.length) uploadFiles(e.dataTransfer.files);
   };
 
-  if (!vols.data) return <PageLoader />;
+  const eject = useAction(() => api.post("/files/eject", { volume }), {
+    success: () => `${here?.name ?? "Disk"} can be unplugged now`,
+    invalidate: ["file-locations", "disks"],
+    // leave the disk, or the next listing would mount it again
+    onSuccess: () => {
+      const next = places.find((l) => l.kind === "volume") ?? places.find((l) => l.id !== volume);
+      if (next) openVolume(next.id);
+    },
+  });
+
+  if (!locs.data) return <PageLoader />;
   const header = (
     <PageHeader
       title="Files"
-      description="Browse, upload and download files on your volumes."
+      description="Browse, upload and download files on your volumes, disks and OneDrive."
       actions={
         volume ? (
           <>
@@ -171,12 +201,12 @@ export default function FilesPage() {
       }
     />
   );
-  if (!mounted.length)
+  if (!places.length)
     return (
       <>
         {header}
         <Card>
-          <Empty icon={<FolderTree className="size-6" />} title="No volumes yet" text="Create a volume to store files." />
+          <Empty icon={<FolderTree className="size-6" />} title="No storage yet" text="Create a volume, plug in a disk or connect OneDrive." />
         </Card>
       </>
     );
@@ -239,10 +269,15 @@ export default function FilesPage() {
           </div>
         ) : (
           <div className="flex min-h-15 flex-wrap items-center gap-3 border-b border-zinc-100 px-5 py-2.5 dark:border-white/5">
-            {mounted.length > 1 && <Segmented value={volume} onChange={openVolume} options={mounted.map((v) => ({ value: v.name, label: v.name }))} />}
+            <LocationPicker locs={places} value={volume} onChange={openVolume} />
+            {here?.ejectable && (
+              <Button size="sm" icon={<ArrowUpFromLine className="size-3.5" />} loading={eject.isPending} onClick={() => eject.mutate()}>
+                Eject
+              </Button>
+            )}
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1 text-[13px]">
               <button className="font-medium text-brand-600 hover:underline dark:text-brand-400" onClick={() => open("")}>
-                {volume}
+                {here?.name ?? volume}
               </button>
               {parts.map((p, i) => (
                 <span key={i} className="flex items-center gap-1">
@@ -372,7 +407,7 @@ export default function FilesPage() {
       )}
       {dialog === "move" && (
         <MoveDialog
-          volumes={mounted}
+          volumes={places.filter((l) => (l.kind === "onedrive") === (here?.kind === "onedrive"))}
           volume={volume}
           start={path}
           items={target}
@@ -393,7 +428,7 @@ export default function FilesPage() {
         confirmText="Delete"
         message="Folders are deleted with everything inside them. This cannot be undone."
       />
-      {uploads.length > 0 && <UploadPanel uploads={uploads} where={`${volume}${path ? "/" + path : ""}`} onClose={() => setUploads((u) => u.filter((x) => x.status === "uploading" || x.status === "waiting"))} />}
+      {uploads.length > 0 && <UploadPanel uploads={uploads} where={`${here?.name ?? volume}${path ? "/" + path : ""}`} onClose={() => setUploads((u) => u.filter((x) => x.status === "uploading" || x.status === "waiting"))} />}
     </>
   );
 }
@@ -448,7 +483,7 @@ function NameDialog({
   );
 }
 
-function MoveDialog({ volumes, volume, start, items, onClose, onDone }: { volumes: Volume[]; volume: string; start: string; items: string[]; onClose: () => void; onDone: () => void }) {
+function MoveDialog({ volumes, volume, start, items, onClose, onDone }: { volumes: Loc[]; volume: string; start: string; items: string[]; onClose: () => void; onDone: () => void }) {
   const [vol, setVol] = useState(volume);
   const [path, setPath] = useState(start);
   const [picked, setPicked] = useState<string | null>(null); // a selected subfolder
@@ -490,7 +525,7 @@ function MoveDialog({ volumes, volume, start, items, onClose, onDone }: { volume
     >
       {volumes.length > 1 && (
         <div className="mb-4">
-          <Field label="Volume">
+          <Field label="Location">
             <Select
               value={vol}
               onChange={(e) => {
@@ -499,7 +534,9 @@ function MoveDialog({ volumes, volume, start, items, onClose, onDone }: { volume
               }}
             >
               {volumes.map((v) => (
-                <option key={v.name}>{v.name}</option>
+                <option key={v.id} value={v.id}>
+                  {v.name}
+                </option>
               ))}
             </Select>
           </Field>
@@ -507,7 +544,7 @@ function MoveDialog({ volumes, volume, start, items, onClose, onDone }: { volume
       )}
       <div className="flex flex-wrap items-center gap-1 text-[13px]">
         <button className="font-medium text-brand-600 hover:underline dark:text-brand-400" onClick={() => openDir("")}>
-          {vol}
+          {volumes.find((v) => v.id === vol)?.name ?? vol}
         </button>
         {parts.map((p, i) => (
           <span key={i} className="flex items-center gap-1">
@@ -585,5 +622,43 @@ function UploadPanel({ uploads, where, onClose }: { uploads: Upload[]; where: st
         ))}
       </ul>
     </div>
+  );
+}
+
+/** The current location; the menu lists volumes, other disks and OneDrive. */
+function LocationPicker({ locs, value, onChange }: { locs: Loc[]; value: string; onChange: (id: string) => void }) {
+  const cur = locs.find((l) => l.id === value);
+  const groups: [string, Loc[]][] = [
+    ["Volumes", locs.filter((l) => l.kind === "volume")],
+    ["Other disks", locs.filter((l) => l.kind === "usb" || l.kind === "disk")],
+    ["Cloud", locs.filter((l) => l.kind === "onedrive")],
+  ];
+  return (
+    <Menu
+      align="left"
+      trigger={
+        <button className="flex h-9 items-center gap-2 rounded-xl bg-zinc-100 px-3 text-[13px] font-semibold whitespace-nowrap hover:bg-zinc-200/70 dark:bg-white/5 dark:hover:bg-white/10">
+          {cur && <LocIcon kind={cur.kind} className="size-4 text-zinc-500" />}
+          {cur?.name ?? "Choose"}
+          <ChevronDown className="size-3.5 text-zinc-400" />
+        </button>
+      }
+    >
+      {groups
+        .filter(([, list]) => list.length)
+        .map(([title, list], gi) => (
+          <div key={title} className={cx(gi > 0 && "mt-1 border-t border-zinc-100 pt-1 dark:border-white/5")}>
+            <div className="px-2.5 pt-1.5 pb-1 text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">{title}</div>
+            {list.map((l) => (
+              <MenuItem key={l.id} icon={<LocIcon kind={l.kind} />} onClick={() => onChange(l.id)}>
+                <span className={cx("flex min-w-56 items-center justify-between gap-6", l.id === value && "text-brand-700 dark:text-brand-300")}>
+                  <span className="truncate">{l.name}</span>
+                  <span className="text-xs font-normal whitespace-nowrap text-zinc-400">{l.detail}</span>
+                </span>
+              </MenuItem>
+            ))}
+          </div>
+        ))}
+    </Menu>
   );
 }

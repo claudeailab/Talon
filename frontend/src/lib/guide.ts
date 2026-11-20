@@ -276,7 +276,7 @@ export const GUIDE: Topic[] = [
     id: "files",
     title: "Files",
     group: "Storage",
-    summary: "Browse, upload and download files in the browser.",
+    summary: "Browse, upload and download files on volumes, other disks and OneDrive.",
     page: { to: "/files", label: "Open Files" },
     sections: [
       {
@@ -286,11 +286,29 @@ export const GUIDE: Topic[] = [
           { img: "files", alt: "Files page" },
           {
             list: [
-              "With more than one volume, pick it with the buttons at the top. Click once to select an item, double-click a folder to open it.",
+              "Choose where to browse with the button at the top left: your **Volumes**, **Other disks** (USB disks and other disks with a filesystem that are not part of a volume or RAID) and **OneDrive** when it is connected.",
+              "Click once to select an item, double-click a folder to open it.",
               "Use the path at the top to go back up, and **Filter this folder** to find a name.",
               "Hidden items whose names start with a dot, like .recycle and .versions, are not shown.",
             ],
           },
+        ],
+      },
+      {
+        id: "disks",
+        title: "USB and other disks",
+        blocks: [
+          { p: "A disk with FAT32, exFAT, NTFS, ext4, XFS or Btrfs is opened the first time you choose it. Files on FAT32, exFAT and NTFS disks belong to the NAS users group." },
+          { p: "Before unplugging it, click **Eject**. Talon writes any remaining data and closes the disk. A disk that was opened outside Talon has no Eject button." },
+          { tip: "While a disk is open it cannot be used for a new RAID array or volume. Eject it first." },
+        ],
+      },
+      {
+        id: "onedrive",
+        title: "OneDrive",
+        blocks: [
+          { p: "With [OneDrive](" + t("onedrive") + ") connected, **OneDrive** appears under **Cloud**. You can browse, upload, download, create folders, rename, move within OneDrive and delete. Deleted items go to the OneDrive recycle bin." },
+          { p: "Moving files between OneDrive and the NAS is not possible on this page: download and upload them, or create a OneDrive task." },
         ],
       },
       {
@@ -315,7 +333,8 @@ export const GUIDE: Topic[] = [
               "Select items to **Rename**, **Move** (choose the destination, then **Move here**) or **Delete** them.",
             ],
           },
-          { warn: "Delete on this page is permanent. Folders are deleted with everything inside them." },
+          { p: "**Move** works between your volumes and other disks; on OneDrive it moves within OneDrive." },
+          { warn: "Delete on volumes and disks is permanent. Folders are deleted with everything inside them." },
         ],
       },
     ],

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.44
+- Files: browse USB and other disks (with Eject) and OneDrive, not only volumes
+
 ## 1.0.43
 - Documentation reviewed and corrected, including how to sign in after installing
 - Menu order: RAID, Volumes, Disks, Files, OneDrive; Activity, Settings, Services

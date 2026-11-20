@@ -419,6 +419,48 @@ class RealPlatform:
                 break
         return info
 
+    MEDIA_ROOT = "/media/talon"
+
+    def mount_external(self, dev: str, fstype: str, log: Logger) -> str:
+        """Mount a disk Talon does not manage under /media/talon/<dev> (until ejected
+        or the next restart). FAT, exFAT and NTFS have no owners: files belong to
+        root and the NAS users group, so shared-folder users can work with them."""
+        if not re.match(r"^[a-z0-9]+$", dev):
+            raise UserError("Invalid device")
+        mp = os.path.join(self.MEDIA_ROOT, dev)
+        os.makedirs(mp, exist_ok=True)
+        try:
+            gid = grp.getgrnam(self.cfg.users_group).gr_gid
+        except KeyError:
+            gid = 0
+        owners = f"uid=0,gid={gid},dmask=0002,fmask=0113"
+        attempts = {"vfat": [("vfat", owners + ",utf8")], "exfat": [("exfat", owners)],
+                    "ntfs": [("ntfs3", owners), ("ntfs-3g", owners)], "ntfs3": [("ntfs3", owners)]}
+        tries = attempts.get(fstype, [(fstype, "defaults")])
+        last = None
+        for fs, opts in tries:
+            cp = run(["mount", "-t", fs, "-o", opts, _dev(dev), mp], check=False, log=log, timeout=60)
+            if cp.returncode == 0:
+                return mp
+            last = (cp.stderr or cp.stdout or "").strip()
+        try:
+            os.rmdir(mp)
+        except OSError:
+            pass
+        raise UserError(f"Could not open {dev}: {last or 'mount failed'}")
+
+    def unmount_external(self, mountpoint: str, log: Logger) -> None:
+        if not mountpoint.startswith(self.MEDIA_ROOT + "/"):
+            raise UserError("Not mounted by Talon")
+        run(["sync"], check=False, log=log, timeout=120)
+        cp = run(["umount", mountpoint], check=False, log=log, timeout=60)
+        if cp.returncode != 0:
+            raise UserError("The disk is in use; close any open files and try again")
+        try:
+            os.rmdir(mountpoint)
+        except OSError:
+            pass
+
     def mount_persist(self, uuid: str, fs: str, mountpoint: str, log: Logger) -> None:
         os.makedirs(mountpoint, exist_ok=True)
         lines = [ln for ln in read_file(FSTAB).splitlines() if f"UUID={uuid} " not in ln]

@@ -1,7 +1,10 @@
-"""Web file browser for volumes: list, upload, download, new folder, rename,
-move and delete. Every path is resolved inside a volume's mount point and
-symlinks may not lead out of it. In demo mode a sandbox under the state
-directory stands in for the volumes."""
+"""Web file browser: list, upload, download, new folder, rename, move and delete.
+
+Locations are the volumes, other disks with a filesystem (USB or internal; they
+are mounted under /media/talon when first opened and can be ejected), and the
+connected OneDrive (through Microsoft Graph, see odfiles.py). Every local path is
+resolved inside its location's mount point and symlinks may not lead out of it.
+In demo mode a sandbox under the state directory stands in for all of them."""
 from __future__ import annotations
 
 import os
@@ -14,6 +17,10 @@ from typing import Iterator, List, Optional, Tuple
 from .util import UserError
 
 HIDDEN = (".",)          # dot-files (.recycle, .versions, ...) are not shown
+ONEDRIVE = "cloud:onedrive"
+EXTERNAL = "ext:"
+SUPPORTED_FS = ("vfat", "exfat", "ntfs", "ntfs3", "ext2", "ext3", "ext4", "xfs", "btrfs")
+FS_LABEL = {"vfat": "FAT32", "exfat": "exFAT", "ntfs": "NTFS", "ntfs3": "NTFS"}
 CHUNK = 1024 * 1024
 
 
@@ -42,6 +49,67 @@ class FileBrowser:
                                        "demo-files")
         self._seeded = False
         self._lock = threading.Lock()
+        self._demo_mounted: set = set()
+
+    # ------------------------------------------------------------ locations
+    def externals(self) -> List[dict]:
+        """Partitions (or whole disks) with a filesystem that Talon does not use."""
+        out = []
+        for d in self.nas.disks():
+            if d["status"] not in ("has_data", "mounted"):
+                continue
+            parts = d.get("partitions") or []
+            cands = [(p["name"], p.get("fstype"), p.get("size") or 0, p.get("label"), p.get("mountpoints") or [])
+                     for p in parts]
+            if not parts and d.get("fstypes"):
+                cands = [(d["name"], d["fstypes"][0], d["size"], None, d.get("mounts") or [])]
+            for name, fs, size, label, mps in cands:
+                if fs not in SUPPORTED_FS:
+                    continue
+                if any(m in ("/", "/boot", "/boot/efi", "/boot/firmware") or m.startswith("/srv/nas")
+                       for m in mps):
+                    continue
+                mounted = bool(mps) or (self.demo and name in self._demo_mounted)
+                out.append({"id": EXTERNAL + name, "kind": "usb" if d["kind"] == "usb" else "disk",
+                            "name": label or d["model"], "dev": name, "fstype": fs, "size": size,
+                            "detail": f"{name} · {FS_LABEL.get(fs, fs)}", "mounted": mounted,
+                            "mountpoint": mps[0] if mps else None,
+                            "ejectable": mounted and (not mps or mps[0].startswith("/media/talon/"))})
+        return out
+
+    def locations(self) -> List[dict]:
+        out = [{"id": v["name"], "kind": "volume", "name": v["name"], "detail": "Volume",
+                "mounted": v["mounted"] or self.demo, "ejectable": False}
+               for v in self.nas.volumes()]
+        out += [{k: e[k] for k in ("id", "kind", "name", "detail", "mounted", "ejectable")}
+                for e in self.externals()]
+        st = self.nas.cloud.status()
+        if st["enabled"] and st["connected"]:
+            out.append({"id": ONEDRIVE, "kind": "onedrive", "name": "OneDrive",
+                        "detail": (st.get("account") or {}).get("email") or "Microsoft OneDrive",
+                        "mounted": True, "ejectable": False})
+        return out
+
+    def is_remote(self, loc: str) -> bool:
+        return loc == ONEDRIVE and not self.demo
+
+    def _od(self):
+        from .odfiles import OneDriveFiles
+        st = self.nas.cloud.status()
+        if not (st["enabled"] and st["connected"]):
+            raise UserError("OneDrive is not connected")
+        return OneDriveFiles(self.nas.cloud.access_token)
+
+    def eject(self, loc: str) -> None:
+        ext = next((e for e in self.externals() if e["id"] == loc), None)
+        if not ext:
+            raise UserError("Not found")
+        if self.demo:
+            self._demo_mounted.discard(ext["dev"])
+            return
+        if not ext["ejectable"]:
+            raise UserError("This disk was mounted outside Talon")
+        self.nas.p.unmount_external(ext["mountpoint"], lambda m: None)
 
     # ------------------------------------------------------------ paths
     def volumes(self) -> List[dict]:
@@ -49,6 +117,23 @@ class FileBrowser:
                 for v in self.nas.volumes()]
 
     def _root(self, volume: str) -> str:
+        if volume == ONEDRIVE:
+            if not self.demo:
+                raise UserError("Not a local location")
+            root = os.path.join(self._demo_root, "@onedrive")
+            self._seed()
+            return os.path.realpath(root)
+        if volume.startswith(EXTERNAL):
+            ext = next((e for e in self.externals() if e["id"] == volume), None)
+            if not ext:
+                raise UserError("This disk is no longer available")
+            if self.demo:
+                self._demo_mounted.add(ext["dev"])
+                self._seed()
+                return os.path.realpath(os.path.join(self._demo_root, "@" + ext["dev"]))
+            if ext["mountpoint"]:
+                return os.path.realpath(ext["mountpoint"])
+            return os.path.realpath(self.nas.p.mount_external(ext["dev"], ext["fstype"], lambda m: None))
         vols = {v["name"]: v for v in self.nas.volumes()}
         v = vols.get(volume)
         if not v:
@@ -101,6 +186,16 @@ class FileBrowser:
                 "tank/Documents/Lease agreement.pdf": 640_000,
                 "tank/Office/Projects/Plan.docx": 52_000,
                 "backup/TimeMachine/Readme.txt": 1_200,
+                "@sdg1/Holiday 2025/Video 01.mp4": 48_000_000,
+                "@sdg1/Holiday 2025/Video 02.mp4": 61_000_000,
+                "@sdg1/Camera import/IMG_0412.jpg": 3_300_000,
+                "@sdg1/Notes.txt": 3_000,
+                "@onedrive/Documents/Car insurance.pdf": 220_000,
+                "@onedrive/Documents/Lease agreement.pdf": 640_000,
+                "@onedrive/Pictures/2026/Birthday.jpg": 2_900_000,
+                "@onedrive/Pictures/Profile.png": 380_000,
+                "@onedrive/Work/Projects/Plan.docx": 52_000,
+                "@onedrive/Notes.txt": 2_000,
             }
             for rel, size in samples.items():
                 p = os.path.join(self._demo_root, rel)
@@ -112,6 +207,8 @@ class FileBrowser:
 
     # ------------------------------------------------------------ listing
     def list(self, volume: str, path: str) -> dict:
+        if self.is_remote(volume):
+            return {"volume": volume, "path": _rel(path), "items": self._od().list(_rel(path))}
         target, root = self.resolve(volume, path)
         if not os.path.isdir(target):
             raise UserError("Not a folder")
@@ -141,6 +238,9 @@ class FileBrowser:
 
     # ------------------------------------------------------------ changes
     def mkdir(self, volume: str, path: str, name: str) -> str:
+        if self.is_remote(volume):
+            self._od().mkdir(_rel(path), _name(name))
+            return _rel(f"{_rel(path)}/{name}")
         parent, _ = self.resolve(volume, path)
         target = os.path.join(parent, _name(name))
         if os.path.lexists(target):
@@ -150,6 +250,12 @@ class FileBrowser:
         return _rel(f"{_rel(path)}/{name}")
 
     def rename(self, volume: str, path: str, name: str) -> str:
+        if self.is_remote(volume):
+            rel = _rel(path)
+            if not rel:
+                raise UserError("OneDrive itself cannot be renamed")
+            self._od().rename(rel, _name(name))
+            return _rel(f"{os.path.dirname(rel)}/{name}")
         src, root = self.resolve(volume, path)
         if src == root:
             raise UserError("The volume itself cannot be renamed")
@@ -160,6 +266,17 @@ class FileBrowser:
         return os.path.relpath(dst, root)
 
     def move(self, volume: str, items: List[str], dest_volume: str, dest: str) -> int:
+        if (volume == ONEDRIVE) != (dest_volume == ONEDRIVE):
+            raise UserError("Files cannot be moved between OneDrive and the NAS here; "
+                            "download and upload them, or use a OneDrive task")
+        if self.is_remote(volume):
+            od, dest = self._od(), _rel(dest)
+            for rel in items:
+                rel = _rel(rel)
+                if dest == rel or dest.startswith(rel + "/"):
+                    raise UserError(f"Cannot move {os.path.basename(rel)} into itself")
+                od.move(rel, dest)
+            return len(items)
         dst_dir, _ = self.resolve(dest_volume, dest)
         if not os.path.isdir(dst_dir):
             raise UserError("The destination is not a folder")
@@ -178,6 +295,11 @@ class FileBrowser:
         return moved
 
     def delete(self, volume: str, items: List[str]) -> int:
+        if self.is_remote(volume):
+            od = self._od()
+            for rel in items:
+                od.delete(_rel(rel))
+            return len(items)
         n = 0
         for rel in items:
             target, root = self.resolve(volume, rel)
@@ -191,6 +313,9 @@ class FileBrowser:
         return n
 
     # ------------------------------------------------------------ upload / download
+    def upload_remote(self, path: str, name: str, src: str, overwrite: bool) -> None:
+        self._od().upload(_rel(path), _name(name), src, overwrite)
+
     def upload_target(self, volume: str, path: str, name: str, overwrite: bool) -> str:
         parent, _ = self.resolve(volume, path)
         if not os.path.isdir(parent):
@@ -201,6 +326,17 @@ class FileBrowser:
         if os.path.exists(target) and not overwrite:
             raise UserError(f"{name} already exists")
         return target
+
+    def download_remote(self, items: List[str]) -> Tuple[str, Optional[str], Optional[Iterator[bytes]]]:
+        """(name, redirect URL for a single file, or a zip stream) from OneDrive."""
+        od = self._od()
+        rels = [_rel(i) for i in items]
+        if len(rels) == 1 and "file" in od.info(rels[0]):
+            return os.path.basename(rels[0]), od.download_url(rels[0]), None
+        parents = {os.path.dirname(r) for r in rels}
+        name = os.path.basename(rels[0]) if len(rels) == 1 else (
+            os.path.basename(parents.pop()) if len(parents) == 1 and list(parents)[0] else "OneDrive")
+        return f"{name or 'OneDrive'}.zip", None, od.zip_stream(rels)
 
     def download(self, volume: str, items: List[str]) -> Tuple[str, Optional[str], Optional[Iterator[bytes]]]:
         """(download name, file path for a single file, or a zip stream)."""

@@ -64,3 +64,91 @@ def test_paths_cannot_leave_the_volume(client):
     assert "escape" not in ls(client)
     assert client.get("/api/files", params={"volume": "tank", "path": "escape"}).status_code == 400
     assert client.get("/api/files", params={"volume": "nope"}).status_code == 400
+
+
+def test_locations_external_disk_and_onedrive(client):
+    locs = {l["id"]: l for l in client.get("/api/files/locations").json()}
+    assert locs["tank"]["kind"] == "volume" and locs["backup"]["kind"] == "volume"
+    usb = locs["ext:sdg1"]
+    assert usb["kind"] == "usb" and usb["detail"] == "sdg1 · exFAT" and not usb["mounted"]
+    assert "cloud:onedrive" not in locs                         # OneDrive is not connected yet
+
+    files = ls(client, volume="ext:sdg1")                        # opening it mounts it
+    assert files["Holiday 2025"]["folder"] and "Notes.txt" in files
+    assert client.put("/api/files/upload", params={"volume": "ext:sdg1", "name": "new.txt"},
+                      content=b"hi").status_code == 200
+    # moving between a volume and the USB disk works (both are local)
+    assert client.post("/api/files/move", json={"volume": "ext:sdg1", "items": ["new.txt"],
+                                                "dest_volume": "tank", "dest": "Documents"}).status_code == 200
+    assert "new.txt" in ls(client, "Documents")
+    assert {l["id"]: l for l in client.get("/api/files/locations").json()}["ext:sdg1"]["mounted"]
+    assert client.post("/api/files/eject", json={"volume": "ext:sdg1"}).status_code == 200
+    assert not {l["id"]: l for l in client.get("/api/files/locations").json()}["ext:sdg1"]["mounted"]
+
+    # connect OneDrive (demo): it appears as a location
+    client.put("/api/settings/entra", json={"tenant": "common", "client_id": "11111111-2222-3333-4444-555555555555",
+                                            "client_secret": "s"})
+    client.post("/api/services/onedrive/enable")
+    url = client.post("/api/onedrive/connect", json={"origin": "https://nas"}).json()["url"]
+    client.get(url.replace("https://nas", ""))
+    locs = {l["id"]: l for l in client.get("/api/files/locations").json()}
+    assert locs["cloud:onedrive"]["name"] == "OneDrive"
+    assert "Documents" in ls(client, volume="cloud:onedrive")
+    r = client.post("/api/files/move", json={"volume": "cloud:onedrive", "items": ["Notes.txt"],
+                                             "dest_volume": "tank", "dest": ""})
+    assert r.status_code == 400 and "OneDrive" in r.json()["detail"]
+
+
+# ---------------------------------------------------------------- OneDrive over Microsoft Graph (faked)
+def test_onedrive_files_requests(tmp_path):
+    from talon.odfiles import OneDriveFiles, PIECE
+    calls = []
+
+    class Fake(OneDriveFiles):
+        def _call(self, method, url, body=None, data=None, headers=None, auth=True, timeout=60):
+            calls.append((method, url, body, len(data) if data else 0, dict(headers or {}), auth))
+            if url.startswith("/me/drive/root/children?"):
+                return 200, {"value": [{"name": "b.txt", "file": {}, "size": 5, "lastModifiedDateTime": "2026-11-20T10:00:00Z"},
+                                       {"name": "A", "folder": {"childCount": 2}}],
+                             "@odata.nextLink": "https://graph.microsoft.com/v1.0/next"}
+            if url.endswith("/next"):
+                return 200, {"value": [{"name": "c", "folder": {"childCount": 0}}]}
+            if "createUploadSession" in url:
+                return 200, {"uploadUrl": "https://upload.example/session"}
+            if url == "https://upload.example/session":
+                return 202, {}
+            if url.endswith("?$select=id"):
+                return 404, {"error": {"code": "itemNotFound"}}
+            if "?$select=id,name,folder,file,size" in url:
+                return 200, {"id": "DEST", "folder": {}}
+            if method == "DELETE":
+                return 204, {}
+            return 200, {}
+
+    od = Fake(lambda: "token")
+    items = od.list("")
+    assert [i["name"] for i in items] == ["A", "c", "b.txt"] and items[0]["count"] == 2
+    od.mkdir("Work", "New")
+    assert calls[-1][:3] == ("POST", "/me/drive/root:/Work:/children",
+                             {"name": "New", "folder": {}, "@microsoft.graph.conflictBehavior": "fail"})
+    od.rename("Work/a b.txt", "c.txt")
+    assert calls[-1][:3] == ("PATCH", "/me/drive/root:/Work/a%20b.txt:", {"name": "c.txt"})
+    od.move("Work/c.txt", "Archive")
+    assert calls[-1][2]["parentReference"] == {"id": "DEST"}
+    od.delete("Work/c.txt")
+    assert calls[-1][:2] == ("DELETE", "/me/drive/root:/Work/c.txt:")
+
+    small = tmp_path / "small.bin"
+    small.write_bytes(b"x" * 1000)
+    od.upload("Work", "small.bin", str(small), overwrite=False)
+    assert calls[-1][:2] == ("PUT", "/me/drive/root:/Work/small.bin:/content") and calls[-1][5]
+
+    big = tmp_path / "big.bin"
+    big.write_bytes(b"y" * (PIECE + 1000))
+    calls.clear()
+    od.upload("Work", "big.bin", str(big), overwrite=True)
+    pieces = [c for c in calls if c[1] == "https://upload.example/session"]
+    assert [c[4]["Content-Range"] for c in pieces] == [f"bytes 0-{PIECE - 1}/{PIECE + 1000}",
+                                                      f"bytes {PIECE}-{PIECE + 999}/{PIECE + 1000}"]
+    assert all(not c[5] for c in pieces)                       # no Authorization on the upload URL
+    assert PIECE % (320 * 1024) == 0

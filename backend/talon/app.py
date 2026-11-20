@@ -12,7 +12,8 @@ import time
 from typing import List, Optional
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request, Response
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
+from starlette.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 from . import webconfig, __version__, notify
@@ -412,6 +413,16 @@ def create_app(cfg, platform) -> FastAPI:
         return {"ok": True}
 
     # ------------------------------------------------------------ files
+    @app.get("/api/files/locations")
+    def files_locations(_u: str = Depends(current_user)):
+        return nas.files.locations()
+
+    @app.post("/api/files/eject")
+    def files_eject(body: dict = Body(...), user: str = Depends(current_user)):
+        nas.files.eject(body.get("volume", ""))
+        nas.state.log_activity(user, f"Ejected {body.get('volume', '').removeprefix('ext:')}")
+        return {"ok": True}
+
     @app.get("/api/files")
     def files_list(volume: str, path: str = "", _u: str = Depends(current_user)):
         return nas.files.list(volume, path)
@@ -448,6 +459,19 @@ def create_app(cfg, platform) -> FastAPI:
     @app.put("/api/files/upload")
     async def files_upload(request: Request, volume: str, name: str, path: str = "",
                            overwrite: bool = False, user: str = Depends(current_user)):
+        if nas.files.is_remote(volume):
+            # OneDrive: receive into a temporary file, then send it on
+            fd, tmp = tempfile.mkstemp(prefix=".upload-", dir=os.path.dirname(os.path.abspath(cfg.state_file)))
+            try:
+                with os.fdopen(fd, "wb") as f:
+                    async for chunk in request.stream():
+                        f.write(chunk)
+                await run_in_threadpool(nas.files.upload_remote, path, name, tmp, overwrite)
+            finally:
+                with contextlib.suppress(OSError):
+                    os.unlink(tmp)
+            nas.state.log_activity(user, f"Uploaded {name} to OneDrive/{path}".rstrip("/"))
+            return {"ok": True}
         target = nas.files.upload_target(volume, path, name, overwrite)
         fd, tmp = tempfile.mkstemp(prefix=".upload-", dir=os.path.dirname(target))
         size = 0
@@ -467,6 +491,12 @@ def create_app(cfg, platform) -> FastAPI:
 
     @app.get("/api/files/download")
     def files_download(volume: str, item: List[str] = Query(...), _u: str = Depends(current_user)):
+        if nas.files.is_remote(volume):
+            name, url, stream = nas.files.download_remote(item)
+            if url:                                  # a single file: OneDrive serves it directly
+                return RedirectResponse(url, status_code=302)
+            return StreamingResponse(stream, media_type="application/zip", headers={
+                "Content-Disposition": "attachment; filename*=UTF-8''" + urllib.parse.quote(name)})
         name, path, stream = nas.files.download(volume, item)
         disposition = "attachment; filename*=UTF-8''" + urllib.parse.quote(name)
         if path:

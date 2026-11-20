@@ -50,7 +50,7 @@ https://<nas-ip>/
 
 - **RAID:** hot spares, expand, replace or remove disks, data scrub
 - **Volumes:** ext4 or XFS, on a RAID array or a single disk
-- **Files:** browse, upload, download, rename, move and delete files in the browser
+- **Files:** browse, upload, download, rename, move and delete files on volumes, USB disks and OneDrive
 - **Disks:** S.M.A.R.T. health, temperature, self-tests, secure wipe
 - **Shared folders:** SMB and NFS with per-user and per-group permissions
 - **Users & groups:** NAS accounts with Samba passwords kept in sync
