@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Info, ListChecks, Loader2, XCircle } from "lucide-react";
 import { api } from "../lib/api";
-import { ago, dateTime } from "../lib/format";
+import { ago, cx, dateTime } from "../lib/format";
 import type { Activity, Job } from "../lib/types";
 import { JobDialog } from "../components/jobs";
 import { Button, Card, CardHeader, Empty, PageHeader, PageLoader, Select } from "../components/ui";
@@ -13,6 +13,7 @@ const PER_PAGE = [10, 25, 50, 100];
 export default function ActivityPage() {
   const [perPage, setPerPage] = useState(10);
   const [page, setPage] = useState(0);
+  const [open, setOpen] = useState<string | null>(null); // the entry shown in full
   const act = useQuery({
     queryKey: ["activity", page, perPage],
     queryFn: () => api.get<Page>(`/activity?offset=${page * perPage}&limit=${perPage}`),
@@ -27,13 +28,18 @@ export default function ActivityPage() {
       <PageHeader title="Activity" description="Administrative actions and background tasks." />
       <div className="grid gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2">
-          <CardHeader title="Activity log" subtitle={`${act.data.total} events`} />
+          <CardHeader title="Activity log" subtitle={`${act.data.total} event${act.data.total === 1 ? "" : "s"}`} />
           {act.data.total === 0 ? (
             <Empty icon={<Info className="size-6" />} title="Nothing yet" />
           ) : (
             <ul className="divide-y divide-zinc-100 px-5 pb-2 dark:divide-white/5">
               {act.data.items.map((a, i) => (
-                <li key={i} className="flex items-start gap-3 py-3">
+                <li
+                  key={i}
+                  className="flex cursor-pointer items-start gap-3 py-3"
+                  onClick={() => setOpen((o) => (o === a.ts + a.message ? null : a.ts + a.message))}
+                  aria-expanded={open === a.ts + a.message}
+                >
                   {a.level === "error" ? (
                     <XCircle className="mt-0.5 size-4 shrink-0 text-rose-500" />
                   ) : a.level === "warning" ? (
@@ -42,7 +48,11 @@ export default function ActivityPage() {
                     <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="truncate text-[13px]" title={a.message}>
+                    {/* one line; tap (or click) to read the whole message */}
+                    <div
+                      className={cx("text-[13px]", open === a.ts + a.message ? "break-words whitespace-normal" : "truncate")}
+                      title={a.message}
+                    >
                       {a.message}
                     </div>
                     <div className="text-xs text-zinc-500">

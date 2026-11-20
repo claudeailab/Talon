@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.52
+- Activity: tap an entry to read the whole message
+- Failed OneDrive tasks report rclone's actual error
+
 ## 1.0.51
 - Scheduled and OneDrive task lists readable on phones
 

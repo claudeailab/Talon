@@ -184,3 +184,13 @@ def test_rclone_log_lines_keep_time_level_file_and_message():
     assert r["log"] == ["02:00:03\tINFO\tPictures/a b.jpg\tCopied (new)",
                         "02:00:04\tERROR\t\tFailed to copy: quota exceeded",
                         "plain text from rclone"]
+
+
+def test_rclone_error_detection():
+    from talon.cloudsync import CloudSync, RCLONE_EXIT
+    assert CloudSync._is_error('{"level":"critical","msg":"Failed to create file system"}')
+    assert CloudSync._is_error('{"level":"error","msg":"x"}')
+    assert not CloudSync._is_error('{"level":"info","msg":"Copied"}')
+    assert CloudSync._is_error("Error: unknown flag: --foo")
+    assert CloudSync._message('{"level":"error","object":"a/b.jpg","msg":"Failed to copy: quota"}') == "a/b.jpg: Failed to copy: quota"
+    assert RCLONE_EXIT[2] == "rclone: syntax or usage error"

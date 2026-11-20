@@ -29,6 +29,20 @@ from typing import Dict, Optional
 from . import entra
 from .util import UserError, write_atomic
 
+# rclone's exit codes (https://rclone.org/docs/#exit-code), used when it printed no error
+RCLONE_EXIT = {
+    1: "rclone: error not otherwise categorised",
+    2: "rclone: syntax or usage error",
+    3: "rclone: folder not found",
+    4: "rclone: file not found",
+    5: "rclone: temporary error; it may work next time",
+    6: "rclone: some files could not be copied",
+    7: "rclone: fatal error; retrying will not help",
+    8: "rclone: transfer limit reached",
+    9: "rclone: no files were transferred",
+    10: "rclone: time limit reached",
+}
+
 REMIND_DAYS = (7, 14, 30, 60, 90)
 REMIND_DEFAULT = 30
 
@@ -690,7 +704,7 @@ class CloudSync:
                 last_err = ""
                 for line in proc.stdout:
                     self._parse(line, r)
-                    if '"level":"error"' in line or "ERROR" in line:
+                    if self._is_error(line):
                         last_err = line
                 rc = proc.wait()
                 self._read_back_token(conf)
@@ -698,7 +712,7 @@ class CloudSync:
                     status, error = "cancelled", "Stopped"
                 elif rc != 0:
                     status = "error"
-                    error = self._message(last_err) or f"rclone exited with code {rc}"
+                    error = self._message(last_err) or RCLONE_EXIT.get(rc, f"rclone exited with code {rc}")
                 elif first:
                     self._update(lambda od: od["tasks"].get(tid, {}).__setitem__("bisync_ready", True))
                 if status == "success" and t["versions"]:
@@ -730,9 +744,21 @@ class CloudSync:
     @staticmethod
     def _message(line: str) -> str:
         try:
-            return json.loads(line).get("msg", "")[:300]
+            d = json.loads(line)
         except ValueError:
             return line.strip()[:300]
+        obj = d.get("object", "")
+        return (f"{obj}: " if obj else "") + str(d.get("msg", "")).strip()[:300]
+
+    @staticmethod
+    def _is_error(line: str) -> bool:
+        """rclone's JSON log lines at level error/critical, or a plain-text error
+        (e.g. a usage error printed before logging starts)."""
+        try:
+            d = json.loads(line)
+        except ValueError:
+            return "error" in line.lower() or "fatal" in line.lower()
+        return str(d.get("level", "")).lower() in ("error", "critical", "fatal")
 
     @staticmethod
     def _parse(line: str, r: dict) -> None:
