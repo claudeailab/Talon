@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.13
+- Menus no longer get cut off or add scrollbars inside tables
+- Disks, Users and Settings pages fit on phone screens without sideways scrolling
+
 ## 1.0.12
 - Release pages now list what changed in each version
 

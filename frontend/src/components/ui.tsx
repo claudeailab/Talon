@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
   type ButtonHTMLAttributes,
@@ -339,7 +340,7 @@ export function Tabs<T extends string>({
           type="button"
           onClick={() => onChange(t.value)}
           className={cx(
-            "flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition",
+            "flex items-center gap-2 border-b-2 px-2.5 py-2.5 text-sm font-medium whitespace-nowrap transition sm:px-3",
             value === t.value
               ? "border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300"
               : "border-transparent text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200",
@@ -578,10 +579,44 @@ export function Menu({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number; maxHeight?: number } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // The menu is rendered in a portal with fixed positioning, so scrolling or
+  // clipping containers (tables, cards) can never cut it off or grow scrollbars.
+  useLayoutEffect(() => {
+    if (!open) return setPos(null);
+    const place = () => {
+      const t = ref.current?.getBoundingClientRect();
+      const m = menuRef.current;
+      if (!t || !m) return;
+      const gap = 6, edge = 8, vw = window.innerWidth, vh = window.innerHeight;
+      const w = m.offsetWidth, h = m.scrollHeight;
+      let left = align === "right" ? t.right - w : t.left;
+      left = Math.max(edge, Math.min(left, vw - w - edge));
+      const below = vh - t.bottom - gap - edge, above = t.top - gap - edge;
+      const up = placement === "top" ? !(h > above && below > above) : h > below && above > below;
+      const room = up ? above : below;
+      const top = up ? t.top - gap - Math.min(h, room) : t.bottom + gap;
+      setPos({ top, left, maxHeight: h > room ? room : undefined });
+    };
+    place();
+    const close = (e: Event) => !menuRef.current?.contains(e.target as Node) && setOpen(false);
+    window.addEventListener("resize", place);
+    window.addEventListener("scroll", close, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("scroll", close, true);
+    };
+  }, [open, align, placement]);
+
   useEffect(() => {
     if (!open) return;
-    const h = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const h = (e: MouseEvent) => {
+      const n = e.target as Node;
+      if (!ref.current?.contains(n) && !menuRef.current?.contains(n)) setOpen(false);
+    };
     const k = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
     document.addEventListener("mousedown", h);
     document.addEventListener("keydown", k);
@@ -590,21 +625,25 @@ export function Menu({
       document.removeEventListener("keydown", k);
     };
   }, [open]);
+
   return (
     <div className={cx("relative", className)} ref={ref}>
-      <div onClick={() => setOpen((o) => !o)}>{trigger}</div>
-      {open && (
-        <div
-          onClick={() => setOpen(false)}
-          className={cx(
-            "absolute z-40 min-w-52 animate-pop rounded-xl bg-white p-1.5 shadow-xl ring-1 ring-zinc-900/10 dark:bg-zinc-800 dark:ring-white/10",
-            align === "right" ? "right-0" : "left-0",
-            placement === "top" ? "bottom-full mb-1.5" : "mt-1.5",
-          )}
-        >
-          {children}
-        </div>
-      )}
+      <div data-menu-trigger onClick={() => setOpen((o) => !o)}>{trigger}</div>
+      {open &&
+        createPortal(
+          <div
+            ref={menuRef}
+            onClick={() => setOpen(false)}
+            style={{ top: pos?.top ?? 0, left: pos?.left ?? 0, maxHeight: pos?.maxHeight, visibility: pos ? "visible" : "hidden" }}
+            className={cx(
+              "fixed z-50 min-w-52 animate-pop rounded-xl bg-white p-1.5 shadow-xl ring-1 ring-zinc-900/10 dark:bg-zinc-800 dark:ring-white/10",
+              pos?.maxHeight !== undefined && "overflow-y-auto",
+            )}
+          >
+            {children}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

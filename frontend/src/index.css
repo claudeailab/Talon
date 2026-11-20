@@ -33,5 +33,5 @@
 
 @utility tabular { font-variant-numeric: tabular-nums; }
 @utility card {
-  @apply rounded-2xl border border-zinc-200/80 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:border-white/[0.07] dark:bg-zinc-900/70;
+  @apply min-w-0 rounded-2xl border border-zinc-200/80 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:border-white/[0.07] dark:bg-zinc-900/70;
 }

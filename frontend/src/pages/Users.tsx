@@ -75,7 +75,7 @@ export default function UsersPage() {
               <thead>
                 <tr className="border-b border-zinc-100 text-left text-xs font-medium text-zinc-500 dark:border-white/5">
                   <th className="px-5 py-3">User</th>
-                  <th className="px-3 py-3">Role</th>
+                  <th className="hidden px-3 py-3 sm:table-cell">Role</th>
                   <th className="hidden px-3 py-3 md:table-cell">Groups</th>
                   <th className="px-3 py-3">Status</th>
                   <th className="w-12 px-3 py-3" />
@@ -96,14 +96,15 @@ export default function UsersPage() {
                           {u.name[0]}
                         </div>
                         <div>
-                          <div className="font-medium">
+                          <div className="flex items-center gap-1 font-medium">
                             {u.name} {u.name === me.data?.user && <span className="text-xs text-zinc-400">(you)</span>}
+                            {u.admin && <ShieldCheck className="size-3.5 text-brand-500 sm:hidden" aria-label="Administrator" />}
                           </div>
                           <div className="text-xs text-zinc-500">{u.full_name}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="hidden px-3 py-3 sm:table-cell">
                       {u.admin ? (
                         <Badge tone="violet">
                           <ShieldCheck className="size-3" /> Administrator

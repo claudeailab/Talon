@@ -48,10 +48,10 @@ export default function DisksPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-zinc-100 text-left text-xs font-medium text-zinc-500 dark:border-white/5">
-                  <th className="px-5 py-3">Disk</th>
-                  <th className="px-3 py-3">Capacity</th>
+                  <th className="px-4 py-3 sm:px-5">Disk</th>
+                  <th className="hidden px-3 py-3 sm:table-cell">Capacity</th>
                   <th className="hidden px-3 py-3 md:table-cell">Type</th>
-                  <th className="px-3 py-3">Health</th>
+                  <th className="hidden px-3 py-3 sm:table-cell">Health</th>
                   <th className="hidden px-3 py-3 sm:table-cell">Temp</th>
                   <th className="px-3 py-3">Usage</th>
                   <th className="w-12 px-3 py-3" />
@@ -60,23 +60,29 @@ export default function DisksPage() {
               <tbody className="divide-y divide-zinc-100 dark:divide-white/5">
                 {data.map((d) => (
                   <tr key={d.name} className="transition hover:bg-zinc-50/70 dark:hover:bg-white/[0.02]">
-                    <td className="px-5 py-3.5">
+                    <td className="px-4 py-3.5 sm:px-5">
                       <div className="flex items-center gap-3">
-                        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-500 dark:bg-white/5 dark:text-zinc-400">
+                        <div className="hidden size-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-500 sm:flex dark:bg-white/5 dark:text-zinc-400">
                           <DiskIcon kind={d.kind} />
                         </div>
                         <div className="min-w-0">
-                          <div className="font-mono text-[13px] font-semibold">{d.name}</div>
-                          <div className="max-w-[16rem] truncate text-xs text-zinc-500">{d.model}</div>
-                          {d.serial && <div className="font-mono text-[11px] text-zinc-400">{d.serial}</div>}
+                          <div className="font-mono text-[13px] font-semibold">
+                            {d.name}
+                            <span className="ml-1.5 font-sans font-medium text-zinc-500 sm:hidden">{bytes(d.size)}</span>
+                          </div>
+                          <div className="max-w-[8rem] truncate text-xs text-zinc-500 sm:max-w-[16rem]">{d.model}</div>
+                          {d.serial && <div className="hidden font-mono text-[11px] text-zinc-400 sm:block">{d.serial}</div>}
+                          <div className="mt-1 sm:hidden">
+                            <HealthBadge health={d.health} />
+                          </div>
                         </div>
                       </div>
                     </td>
-                    <td className="tabular px-3 py-3.5 font-medium">{bytes(d.size)}</td>
+                    <td className="tabular hidden px-3 py-3.5 font-medium sm:table-cell">{bytes(d.size)}</td>
                     <td className="hidden px-3 py-3.5 md:table-cell">
                       <Badge>{kindLabel[d.kind]}</Badge>
                     </td>
-                    <td className="px-3 py-3.5">
+                    <td className="hidden px-3 py-3.5 sm:table-cell">
                       <HealthBadge health={d.health} />
                     </td>
                     <td className="tabular hidden px-3 py-3.5 text-zinc-600 sm:table-cell dark:text-zinc-400">
@@ -85,7 +91,7 @@ export default function DisksPage() {
                     <td className="px-3 py-3.5">
                       <div className="flex flex-col items-start gap-0.5">
                         <DiskStatusBadge d={d} />
-                        <span className="max-w-[14rem] truncate text-xs text-zinc-500">{d.status_detail}</span>
+                        <span className="hidden max-w-[14rem] truncate text-xs text-zinc-500 sm:block">{d.status_detail}</span>
                       </div>
                     </td>
                     <td className="px-3 py-3.5">
