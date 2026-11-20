@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.51
+- Scheduled and OneDrive task lists readable on phones
+
 ## 1.0.50
 - iPhone: no more zooming in on fields, which made pages pan sideways
 - OneDrive task logs readable on phones: time, file and message per line

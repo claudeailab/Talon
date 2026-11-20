@@ -318,7 +318,7 @@ export default function OneDrivePage() {
                     </th>
                     <th className="hidden px-3 py-3 lg:table-cell">Schedule</th>
                     <th className="hidden px-3 py-3 sm:table-cell">Last run</th>
-                    <th className="px-3 py-3">Status</th>
+                    <th className="hidden px-3 py-3 sm:table-cell">Status</th>
                     <th className="w-24 px-3 py-3" />
                   </tr>
                 </thead>
@@ -334,6 +334,11 @@ export default function OneDrivePage() {
                               ? `${odPath(t.remote)} → ${nasPath(t)}`
                               : `${odPath(t.remote)} ⇄ ${nasPath(t)}`}
                         </div>
+                        {/* phones: status and schedule under the name */}
+                        <div className="mt-1.5 flex min-w-0 items-center gap-2 sm:hidden">
+                          <TaskStatus t={t} />
+                          <span className="truncate text-xs text-zinc-500">{scheduleLabel(t.schedule)}</span>
+                        </div>
                       </td>
                       <td className="hidden px-3 md:table-cell">
                         <Badge tone={DIR[t.direction].tone}>
@@ -348,7 +353,7 @@ export default function OneDrivePage() {
                           ? `${ago(t.last.finished)} · ${t.last.files} file${t.last.files === 1 ? "" : "s"}`
                           : "Never"}
                       </td>
-                      <td className="px-3">
+                      <td className="hidden px-3 sm:table-cell">
                         <TaskStatus t={t} />
                       </td>
                       <td className="px-3">

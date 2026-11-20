@@ -99,7 +99,7 @@ export default function ScheduledPage() {
                   <th className="hidden px-3 py-3 md:table-cell">Run as</th>
                   <th className="hidden px-3 py-3 lg:table-cell">Schedule</th>
                   <th className="hidden px-3 py-3 sm:table-cell">Last run</th>
-                  <th className="px-3 py-3">Status</th>
+                  <th className="hidden px-3 py-3 sm:table-cell">Status</th>
                   <th className="w-24 px-3 py-3" />
                 </tr>
               </thead>
@@ -109,6 +109,11 @@ export default function ScheduledPage() {
                     <td className="max-w-0 px-5 py-3.5 sm:max-w-none">
                       <div className="truncate font-medium">{t.name}</div>
                       <div className="max-w-md truncate font-mono text-xs text-zinc-500">{firstLine(t.script)}</div>
+                      {/* phones: status, schedule and last run under the name */}
+                      <div className="mt-1.5 flex min-w-0 items-center gap-2 sm:hidden">
+                        <TaskStatus t={t} />
+                        <span className="truncate text-xs text-zinc-500">{t.schedule_label}</span>
+                      </div>
                     </td>
                     <td className="hidden px-3 md:table-cell">
                       <Badge>{t.run_as}</Badge>
@@ -121,7 +126,7 @@ export default function ScheduledPage() {
                           ? `${ago(t.last.started)} · ${took(t.last.finished - t.last.started)}`
                           : "Never"}
                     </td>
-                    <td className="px-3">
+                    <td className="hidden px-3 sm:table-cell">
                       <TaskStatus t={t} />
                     </td>
                     <td className="px-3">
