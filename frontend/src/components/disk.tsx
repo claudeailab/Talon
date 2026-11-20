@@ -15,6 +15,7 @@ export const kindLabel: Record<string, string> = {
   nvme: "NVMe",
   usb: "USB",
   sd: "SD card",
+  virtual: "Virtual",
 };
 
 export function HealthBadge({ health }: { health: Disk["health"] }) {

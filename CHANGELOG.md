@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.15
+- Disks of virtual machines show a readable name, e.g. "VMware virtual disk"
+- No more single words left alone on the last line of a message
+
 ## 1.0.14
 - RAID and Volumes are now separate pages: create a RAID first, then a volume on it
 - Volumes can also be created on a single disk

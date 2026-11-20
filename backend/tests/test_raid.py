@@ -39,3 +39,13 @@ def test_recommendation():
     assert raid.recommended_level(2) == "raid1"
     assert raid.recommended_level(4) == "raid5"
     assert raid.recommended_level(8) == "raid6"
+
+
+def test_virtual_disk_names():
+    from talon.platform.real import virtual_disk_name
+    assert virtual_disk_name("sda", "VMware", "VMware Virtual S") == "VMware virtual disk"
+    assert virtual_disk_name("sda", "ATA", "QEMU HARDDISK") == "QEMU virtual disk"
+    assert virtual_disk_name("sdb", "ATA", "VBOX HARDDISK") == "VirtualBox virtual disk"
+    assert virtual_disk_name("sdc", "Msft", "Virtual Disk") == "Hyper-V virtual disk"
+    assert virtual_disk_name("vda", "", "") == "Virtual disk"
+    assert virtual_disk_name("sda", "ATA", "WDC WD40EFPX-68C6CN0") == ""

@@ -5,7 +5,7 @@ export interface Disk {
   vendor: string;
   serial: string;
   size: number;
-  kind: "hdd" | "ssd" | "nvme" | "usb" | "sd";
+  kind: "hdd" | "ssd" | "nvme" | "usb" | "sd" | "virtual";
   transport: string | null;
   rotational: boolean;
   removable: boolean;

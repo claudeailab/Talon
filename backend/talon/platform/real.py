@@ -50,6 +50,22 @@ def part_name(disk: str, n: int = 1) -> str:
     return f"{disk}p{n}" if disk[-1].isdigit() else f"{disk}{n}"
 
 
+VIRTUAL_DISKS = [("vmware", "VMware"), ("qemu", "QEMU"), ("vbox", "VirtualBox"),
+                 ("virtualbox", "VirtualBox"), ("msft", "Hyper-V"), ("xen", "Xen")]
+
+
+def virtual_disk_name(name: str, vendor: str, model: str) -> str:
+    """Readable name for disks of virtual machines, whose raw model strings are
+    cut off at 16 characters (e.g. "VMware Virtual S"). Empty for real disks."""
+    text = f"{vendor} {model}".lower()
+    for key, label in VIRTUAL_DISKS:
+        if key in text:
+            return f"{label} virtual disk"
+    if name.startswith("vd") or "virtual disk" in text:
+        return "Virtual disk"
+    return ""
+
+
 class RealPlatform:
     demo = False
 
@@ -80,7 +96,7 @@ class RealPlatform:
         for c in node.get("children") or []:
             self._walk(c, acc)
 
-    def scan_disks(self) -> List[dict]:
+    def scan_disks(self) -> List[dict]:  # noqa: C901
         out = []
         for d in self._lsblk():
             name = d["name"]
@@ -94,7 +110,12 @@ class RealPlatform:
             self._walk(d, acc)
             tran = (d.get("tran") or "").lower()
             rota = d.get("rota") in (True, "1", 1)
-            if name.startswith("nvme"):
+            vendor = (d.get("vendor") or "").strip()
+            model = (d.get("model") or "").strip()
+            virtual = virtual_disk_name(name, vendor, model)
+            if virtual:
+                kind = "virtual"
+            elif name.startswith("nvme"):
                 kind = "nvme"
             elif name.startswith("mmcblk"):
                 kind = "sd"
@@ -108,8 +129,8 @@ class RealPlatform:
             } for c in d.get("children") or [] if c.get("type") == "part"]
             out.append({
                 "name": name, "path": d.get("path") or _dev(name),
-                "model": (d.get("model") or "").strip() or "Unknown",
-                "vendor": (d.get("vendor") or "").strip(),
+                "model": virtual or model or "Unknown",
+                "vendor": vendor,
                 "serial": (d.get("serial") or "").strip(),
                 "wwn": d.get("wwn"), "size": int(d.get("size") or 0),
                 "rotational": rota, "transport": tran or None, "kind": kind,
