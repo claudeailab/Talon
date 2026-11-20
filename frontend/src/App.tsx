@@ -81,9 +81,10 @@ export default function App() {
 function Logo() {
   return (
     <div className="flex items-center gap-2.5">
-      <img src="/favicon.svg" alt="" className="size-8 drop-shadow-sm" />
-      <div className="leading-tight">
-        <div className="text-[15px] font-semibold tracking-tight">Talon</div>
+      <img src="/favicon.svg" alt="" className="size-8 drop-shadow-[0_4px_12px_rgba(99,102,241,0.35)]" />
+      <div className="text-[17px] leading-none font-bold tracking-tight">
+        Talon
+        <span className="ml-1.5 align-middle text-[10px] font-semibold tracking-widest text-brand-500 uppercase dark:text-brand-400">NAS</span>
       </div>
     </div>
   );

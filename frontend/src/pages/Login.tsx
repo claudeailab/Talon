@@ -40,7 +40,7 @@ export default function Login({ onLogin }: { onLogin: () => void }) {
 
       <div className="relative w-full max-w-[400px] animate-pop">
         <div className="mb-8 flex flex-col items-center text-center">
-          <img src="/favicon.svg" alt="" className="mb-5 size-14 drop-shadow-[0_8px_24px_rgba(99,102,241,0.5)]" />
+          <img src="/favicon.svg" alt="" className="mb-5 size-16 drop-shadow-[0_10px_32px_rgba(129,140,248,0.55)]" />
           <h1 className="text-2xl font-semibold tracking-tight text-white">Welcome to Talon</h1>
           <p className="mt-1.5 text-sm text-zinc-400">Sign in with an administrator account</p>
         </div>

@@ -1,4 +1,6 @@
-# Talon
+<p align="center"><img src="docs/logo.svg" width="112" alt="Talon logo"></p>
+
+<h1 align="center">Talon</h1>
 
 Turn any Debian/Ubuntu computer — x86 PC, mini-PC or Raspberry Pi — into a NAS with a modern web interface for disks, software RAID, shared folders and users.
 
