@@ -1,8 +1,8 @@
 # Changelog
 
-
 ## 1.0.30
 - Screenshot viewer closes back to the README, like a modal
+
 ## 1.0.29
 - Project website with a screenshot gallery: claudeailab.github.io/Talon
 
