@@ -90,6 +90,31 @@ jobs:
             fi
           done
 
+  about:
+    # Keeps the repository's About section (description, website, topics) in sync.
+    # Changing it needs a token with "Administration: write"; GITHUB_TOKEN cannot,
+    # so this runs only when the ADMIN_TOKEN secret exists.
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Update the About section
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::notice::No ADMIN_TOKEN secret: the About section was not updated"
+            exit 0
+          fi
+          gh api -X PATCH "repos/$REPO" \
+            -f description="Self-hosted NAS software for Debian, Ubuntu and Raspberry Pi OS: RAID, shared folders, users, OneDrive backup and alerts, managed from your browser." \
+            -f homepage="https://claudeailab.github.io/Talon/" >/dev/null
+          gh api -X PUT "repos/$REPO/topics" \
+            -f "names[]=nas" -f "names[]=self-hosted" -f "names[]=home-server" -f "names[]=file-server" \
+            -f "names[]=raid" -f "names[]=mdadm" -f "names[]=samba" -f "names[]=nfs" \
+            -f "names[]=debian" -f "names[]=ubuntu" -f "names[]=raspberry-pi" -f "names[]=onedrive" >/dev/null
+          echo "About section updated"
+
   pages:
     needs: test
     if: needs.test.outputs.site == '1'

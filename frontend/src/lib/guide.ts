@@ -288,7 +288,7 @@ export const GUIDE: Topic[] = [
             list: [
               "Choose where to browse with the button at the top left: your **Volumes**, **Other disks** (USB disks and other disks with a filesystem that are not part of a volume or RAID) and **OneDrive** when it is connected.",
               "Click once to select an item, double-click a folder to open it.",
-              "Use the path at the top to go back up, and **Filter this folder** to find a name.",
+              "Use the folder path next to the location to go back up (choose the location again to return to its top), and **Filter this folder** to find a name.",
               "Hidden items whose names start with a dot, like .recycle and .versions, are not shown.",
             ],
           },
@@ -660,9 +660,9 @@ export const GUIDE: Topic[] = [
         blocks: [
           {
             steps: [
-              "Open the [Notifications](/notifications) page, tab **E-mail**.",
+              "Open the [Notifications](/notifications) page, tab **Email**.",
               "Enter one or more addresses under **Send to**, separated by commas.",
-              "Under **Send an e-mail when**, choose the events: RAID degraded or failed, disk health warning, disk too hot, volume almost full, background task failed, OneDrive task failed, software update available, and failed sign-in attempt.",
+              "Under **Send an email when**, choose the events: RAID degraded or failed, disk health warning, disk too hot, volume almost full, background task failed, OneDrive task failed, software update available, and failed sign-in attempt.",
               "Click **Save**, then **Send test** to send a test email.",
             ],
           },
@@ -674,7 +674,7 @@ export const GUIDE: Topic[] = [
         id: "thresholds",
         title: "3. Alert thresholds",
         blocks: [
-          { p: "On the [Notifications](/notifications?tab=thresholds) page, the **Alert thresholds** tab sets when Talon warns you. The limits apply to the dashboard, the bell and e-mails, also without SMTP." },
+          { p: "On the [Notifications](/notifications?tab=thresholds) page, the **Alert thresholds** tab sets when Talon warns you. The limits apply to the dashboard, the bell and emails, also without SMTP." },
           {
             list: [
               "**Disk temperature**: a limit for **Hard disks (HDD)**, **SATA SSDs** and **NVMe SSDs**, because SSDs run warmer. Each shows the current temperatures of those disks.",

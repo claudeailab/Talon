@@ -19,7 +19,7 @@ export default function SmtpTab() {
   }, [q.data]);
   const body = f && { ...f, port: Number(f.port) };
   const save = useAction(() => api.put<SmtpConfig>("/settings/smtp", body), { success: "SMTP settings saved", invalidate: ["smtp", "notifications"] });
-  // checks connection, encryption, sign-in and sender without sending an e-mail
+  // checks connection, encryption, sign-in and sender without sending an email
   const [checks, setChecks] = useState<Check[] | null>(null);
   const test = useAction(() => api.post<{ checks: Check[] }>("/settings/smtp/test", { config: body }), {
     onSuccess: (r) => setChecks(r.checks),
@@ -40,7 +40,7 @@ export default function SmtpTab() {
             SMTP server {d.configured ? <Badge tone="green" dot>Configured</Badge> : <Badge dot>Not configured</Badge>}
           </span>
         }
-        subtitle="Used to send e-mail notifications"
+        subtitle="Used to send email notifications"
         actions={
           <div className="flex gap-2">
             <Button icon={<PlugZap className="size-4" />} disabled={!f.host || !f.sender} loading={test.isPending} onClick={() => test.mutate()}>

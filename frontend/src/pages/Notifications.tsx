@@ -25,7 +25,7 @@ export default function NotificationsPage() {
           value={tab}
           onChange={change}
           tabs={[
-            { value: "email", label: "E-mail" },
+            { value: "email", label: "Email" },
             { value: "thresholds", label: "Alert thresholds" },
           ]}
         />
@@ -64,7 +64,7 @@ function EmailTab() {
           <Empty
             icon={<Mail className="size-6" />}
             title="Set up SMTP first"
-            text="The NAS needs an SMTP server to send e-mail."
+            text="The NAS needs an SMTP server to send email."
             action={
               <Button variant="primary" onClick={() => navigate("/settings?tab=smtp")}>
                 Configure SMTP
@@ -81,7 +81,7 @@ function EmailTab() {
       <Card>
         <CardHeader
           icon={<BellRing className="size-4.5" />}
-          title="E-mail notifications"
+          title="Email notifications"
           subtitle="Each alert is sent once, and again if it comes back"
           actions={
             <div className="flex gap-2">
@@ -99,7 +99,7 @@ function EmailTab() {
             <Input value={recipients} onChange={(e) => setRecipients(e.target.value)} placeholder="you@example.com" />
           </Field>
           <div>
-            <div className="mb-1.5 text-[13px] font-medium">Send an e-mail when</div>
+            <div className="mb-1.5 text-[13px] font-medium">Send an email when</div>
             <div className="grid gap-2 md:grid-cols-2">
               {Object.entries(q.data.labels).map(([id, label]) => (
                 <div key={id} className="flex h-11 items-center justify-between gap-4 rounded-xl bg-zinc-50 px-3.5 dark:bg-white/[0.03]">
@@ -157,7 +157,7 @@ function ThresholdsCard() {
       <CardHeader
         icon={<Thermometer className="size-4.5" />}
         title="Alert thresholds"
-        subtitle="When the dashboard, the bell and e-mails warn you"
+        subtitle="When the dashboard, the bell and emails warn you"
         actions={
           <div className="flex gap-2">
             <Button variant="ghost" disabled={isDefault} onClick={() => load(q.data!.defaults)}>

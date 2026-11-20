@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.46
+- "Email" instead of "e-mail" everywhere
+- Files: the location name is no longer repeated next to its menu
+
 ## 1.0.45
 - New screenshots and a shorter description on GitHub and the website
 
@@ -9,7 +13,7 @@
 ## 1.0.43
 - Documentation reviewed and corrected, including how to sign in after installing
 - Menu order: RAID, Volumes, Disks, Files, OneDrive; Activity, Settings, Services
-- Notifications page has tabs: E-mail and Alert thresholds
+- Notifications page has tabs: Email and Alert thresholds
 
 ## 1.0.42
 - Alert thresholds: disk temperature per disk type, volume full, SSD wear, bad sectors
@@ -80,14 +84,14 @@
 - SMTP test shows its result step by step in the card, like the Entra ID test
 
 ## 1.0.23
-- SMTP Test checks the server without sending an e-mail
+- SMTP Test checks the server without sending an email
 - Activity log: 10 entries per page with Previous and Next
 - Dashboard: CPU temperature moved to the CPU card; speeds stay on one line
 
 ## 1.0.22
 - OneDrive service: back up to or from OneDrive, or two-way sync (beta), on a schedule
 - Settings now use tabs, with new Entra ID and SMTP tabs
-- New Notifications page for e-mail alerts
+- New Notifications page for email alerts
 
 ## 1.0.21
 - All messages, service cards and hints fit on a single line

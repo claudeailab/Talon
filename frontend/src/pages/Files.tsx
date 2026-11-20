@@ -275,10 +275,8 @@ export default function FilesPage() {
                 Eject
               </Button>
             )}
+            {/* the folder path inside the location; choosing the location again goes to its top */}
             <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1 text-[13px]">
-              <button className="font-medium text-brand-600 hover:underline dark:text-brand-400" onClick={() => open("")}>
-                {here?.name ?? volume}
-              </button>
               {parts.map((p, i) => (
                 <span key={i} className="flex items-center gap-1">
                   <ChevronRight className="size-3.5 text-zinc-400" />

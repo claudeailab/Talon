@@ -1,4 +1,4 @@
-"""SMTP e-mail and notification rules."""
+"""SMTP email and notification rules."""
 from __future__ import annotations
 
 import re
@@ -156,7 +156,7 @@ def send_mail(cfg: dict, to: List[str], subject: str, body: str, demo: bool = Fa
         raise UserError("No recipient")
     for addr in to:
         if not EMAIL_RE.match(addr):
-            raise UserError(f"Invalid e-mail address: {addr}")
+            raise UserError(f"Invalid email address: {addr}")
     if demo:
         return                                   # the demo never sends real mail
     msg = EmailMessage()
@@ -170,12 +170,12 @@ def parse_recipients(value) -> List[str]:
     out = [i.strip() for i in items if i and i.strip()]
     for addr in out:
         if not EMAIL_RE.match(addr):
-            raise UserError(f"Invalid e-mail address: {addr}")
+            raise UserError(f"Invalid email address: {addr}")
     return list(dict.fromkeys(out))
 
 
 class Notifier:
-    """Sends e-mails for enabled events; each alert is sent once until it clears."""
+    """Sends emails for enabled events; each alert is sent once until it clears."""
 
     def __init__(self, state, hostname: Callable[[], str], demo: bool = False):
         self.state = state

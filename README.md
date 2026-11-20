@@ -59,7 +59,7 @@ https://<nas-ip>/
 - **OneDrive:** back up to or from OneDrive, or two-way sync
 - **Networking:** DHCP or static IP, HTTPS on or off
 - **Scheduled:** run scripts on a schedule
-- **Notifications:** e-mail alerts with adjustable thresholds
+- **Notifications:** email alerts with adjustable thresholds
 - **Documentation:** built-in searchable guide
 
 ## Screenshots
