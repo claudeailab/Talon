@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.29
+- Project website with a screenshot gallery: claudeailab.github.io/Talon
+
 ## 1.0.28
 - README: screenshot gallery of the main pages
 

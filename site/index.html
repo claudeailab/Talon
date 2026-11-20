@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Talon: self-hosted NAS software for Debian, Ubuntu and Raspberry Pi</title>
+<meta name="description" content="Talon turns an ordinary PC, mini-PC or Raspberry Pi into a home NAS and file server: software RAID, SMB and NFS shares, Time Machine, OneDrive backup and a modern web interface.">
+<link rel="canonical" href="https://claudeailab.github.io/Talon/">
+<meta property="og:title" content="Talon: self-hosted NAS software">
+<meta property="og:description" content="Turn any Debian or Ubuntu computer into a NAS, with a modern web interface, software RAID, shared folders and users.">
+<meta property="og:image" content="https://claudeailab.github.io/Talon/screenshots/dashboard.png">
+<meta property="og:type" content="website">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<style>
+  :root { --bg:#fafafa; --fg:#18181b; --muted:#71717a; --card:#fff; --line:#e4e4e7; --brand:#4f46e5; --shade:rgba(9,9,11,.97); }
+  @media (prefers-color-scheme: dark) { :root { --bg:#09090b; --fg:#f4f4f5; --muted:#a1a1aa; --card:#18181b; --line:#27272a; --brand:#818cf8; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1120px; margin:0 auto; padding:40px 20px 64px; }
+  header { display:flex; align-items:center; gap:20px; }
+  header img { width:72px; height:72px; flex-shrink:0; }
+  h1 { margin:0; font-size:36px; letter-spacing:-.02em; }
+  .tag { margin:2px 0 0; color:var(--muted); font-size:18px; }
+  .intro { margin:28px 0 0; max-width:860px; }
+  .intro p { margin:0 0 12px; }
+  .actions { display:flex; flex-wrap:wrap; gap:10px; margin:20px 0 0; }
+  .btn { display:inline-flex; align-items:center; height:40px; padding:0 16px; border-radius:12px; font-weight:600; font-size:14px; text-decoration:none; border:1px solid var(--line); color:var(--fg); background:var(--card); }
+  .btn.primary { background:var(--brand); border-color:var(--brand); color:#fff; }
+  code.install { display:block; margin:16px 0 0; padding:12px 14px; border-radius:12px; background:var(--card); border:1px solid var(--line); font-size:14px; overflow-x:auto; white-space:nowrap; }
+  h2 { margin:44px 0 16px; font-size:22px; letter-spacing:-.01em; }
+  .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
+  @media (max-width:700px) { .grid { grid-template-columns:1fr; } header img { width:56px; height:56px; } h1 { font-size:28px; } }
+  .shot { margin:0; padding:0; border:0; background:none; text-align:left; color:inherit; cursor:zoom-in; font:inherit; }
+  .shot img { display:block; width:100%; aspect-ratio:16/10; object-fit:cover; object-position:top left; border-radius:14px; border:1px solid var(--line); transition:transform .15s, box-shadow .15s; }
+  .shot:hover img, .shot:focus-visible img { transform:translateY(-2px); box-shadow:0 12px 32px -12px rgba(0,0,0,.35); }
+  .shot span { display:block; margin-top:8px; font-size:14px; font-weight:600; }
+  footer { margin-top:48px; color:var(--muted); font-size:14px; }
+  footer a { color:inherit; }
+  /* viewer */
+  .viewer { position:fixed; inset:0; z-index:10; display:none; flex-direction:column; background:var(--shade); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); color:#fff; }
+  .viewer.open { display:flex; }
+  .bar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; font-size:14px; }
+  .bar .cap { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .stage { position:relative; flex:1; display:flex; align-items:center; justify-content:center; min-height:0; padding:0 72px 24px; }
+  .stage img { max-width:100%; max-height:100%; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.5); user-select:none; }
+  .nav, .close { border:0; cursor:pointer; color:#fff; background:rgba(255,255,255,.12); border-radius:999px; display:flex; align-items:center; justify-content:center; }
+  .nav:hover, .close:hover { background:rgba(255,255,255,.22); }
+  .nav { position:absolute; top:50%; transform:translateY(-50%); width:48px; height:48px; font-size:24px; }
+  .prev { left:14px; } .next { right:14px; }
+  .close { width:36px; height:36px; font-size:20px; flex-shrink:0; }
+  .count { color:rgba(255,255,255,.7); white-space:nowrap; }
+  @media (max-width:700px) { .stage { padding:0 8px 16px; } .nav { top:auto; bottom:22px; transform:none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img src="logo.svg" alt="Talon logo">
+    <div>
+      <h1>Talon</h1>
+      <p class="tag">Turn any Debian or Ubuntu computer into a NAS.</p>
+    </div>
+  </header>
+
+  <div class="intro">
+    <p><strong>Talon is self-hosted NAS software for Debian, Ubuntu and Raspberry Pi OS.</strong> It turns an ordinary PC, mini-PC or Raspberry Pi into a home NAS and file server that you manage entirely from your web browser.</p>
+    <p>Talon sets up Linux software RAID (mdadm), creates ext4 or XFS volumes, and shares folders with Windows, macOS and Linux over SMB (Samba) and NFS, including macOS Time Machine backups. It manages users and permissions, checks disk health with S.M.A.R.T., backs up or syncs folders with Microsoft OneDrive, and emails you when a disk or RAID array needs attention. One command installs it, and updates install from the web interface.</p>
+  </div>
+  <div class="actions">
+    <a class="btn primary" href="https://github.com/claudeailab/Talon">View on GitHub</a>
+    <a class="btn" href="https://github.com/claudeailab/Talon/releases">Releases</a>
+  </div>
+  <code class="install">curl -fsSL https://raw.githubusercontent.com/claudeailab/Talon/main/install.sh | bash</code>
+
+  <h2>Screenshots</h2>
+  <div class="grid" id="grid"></div>
+
+  <footer>Talon is MIT licensed. <a href="https://github.com/claudeailab/Talon">github.com/claudeailab/Talon</a></footer>
+</div>
+
+<div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-label="Screenshot viewer">
+  <div class="bar">
+    <span class="cap" id="cap"></span>
+    <span style="display:flex;align-items:center;gap:14px"><span class="count" id="count"></span><button class="close" id="close" aria-label="Close">✕</button></span>
+  </div>
+  <div class="stage" id="stage">
+    <button class="nav prev" id="prev" aria-label="Previous">‹</button>
+    <img id="big" alt="">
+    <button class="nav next" id="next" aria-label="Next">›</button>
+  </div>
+</div>
+
+<script>
+  // id = file name in screenshots/ and the link anchor (e.g. #onedrive)
+  const SHOTS = [
+    ["dashboard", "Dashboard"],
+    ["volumes", "Volumes on RAID or single disks"],
+    ["raid-wizard", "RAID wizard with capacity and protection"],
+    ["files", "Files: browse, upload and download"],
+    ["share-permissions", "Shared folder permissions"],
+    ["onedrive", "OneDrive backup and sync"],
+    ["users", "Users and groups"],
+    ["notifications", "E-mail notifications"],
+    ["dashboard-dark", "Dark mode"],
+  ];
+  const $ = (id) => document.getElementById(id);
+  const grid = $("grid"), viewer = $("viewer"), big = $("big");
+  SHOTS.forEach(([id, caption], i) => {
+    const b = document.createElement("button");
+    b.className = "shot";
+    b.innerHTML = `<img src="screenshots/${id}.png" alt="${caption}" loading="lazy"><span>${caption}</span>`;
+    b.onclick = () => { location.hash = id; };
+    grid.appendChild(b);
+  });
+  let current = -1;
+  function show(i) {
+    current = (i + SHOTS.length) % SHOTS.length;
+    const [id, caption] = SHOTS[current];
+    big.src = `screenshots/${id}.png`;
+    big.alt = caption;
+    $("cap").textContent = caption;
+    $("count").textContent = `${current + 1} / ${SHOTS.length}`;
+    viewer.classList.add("open");
+    document.body.style.overflow = "hidden";
+    new Image().src = `screenshots/${SHOTS[(current + 1) % SHOTS.length][0]}.png`; // preload next
+  }
+  function close() {
+    viewer.classList.remove("open");
+    document.body.style.overflow = "";
+    current = -1;
+    if (location.hash) history.replaceState(null, "", location.pathname);
+  }
+  const go = (d) => { location.hash = SHOTS[(current + d + SHOTS.length) % SHOTS.length][0]; };
+  function fromHash() {
+    const i = SHOTS.findIndex(([id]) => id === location.hash.slice(1));
+    i >= 0 ? show(i) : (current >= 0 && close());
+  }
+  window.addEventListener("hashchange", fromHash);
+  $("prev").onclick = () => go(-1);
+  $("next").onclick = () => go(1);
+  $("close").onclick = close;
+  $("stage").onclick = (e) => { if (e.target.id === "stage") close(); };
+  document.addEventListener("keydown", (e) => {
+    if (current < 0) return;
+    if (e.key === "ArrowLeft") go(-1);
+    else if (e.key === "ArrowRight") go(1);
+    else if (e.key === "Escape") close();
+  });
+  let x0 = null;
+  viewer.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  viewer.addEventListener("touchend", (e) => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
+    x0 = null;
+  });
+  fromHash();
+</script>
+</body>
+</html>
