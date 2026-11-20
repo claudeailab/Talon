@@ -8,6 +8,8 @@
   other sessions) once their commits are contained in `main`.
 - Raise `__version__` in `backend/talon/__init__.py` with **every** change (patch bump, e.g.
   1.0.1 → 1.0.2), so each change is published as a release.
+- Add a `## <version>` section to the top of `CHANGELOG.md` with 1–3 short bullet points
+  ("- Shorter install command"). They become the GitHub release notes.
 - The project is named **Talon** and lives at `claudeailab/Talon`. Never use the old names.
 
 ## Before pushing
