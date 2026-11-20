@@ -12,7 +12,6 @@ import {
   MemoryStick,
   Network,
   Server,
-  Thermometer,
   Users,
 } from "lucide-react";
 import { api } from "../lib/api";
@@ -92,7 +91,7 @@ export default function DashboardPage() {
           icon={<Cpu className="size-4" />}
           label="CPU"
           value={last ? `${last.cpu.toFixed(0)}%` : "—"}
-          sub={last ? `Load ${last.load.map((l) => l.toFixed(2)).join(" · ")}` : `${data.info.cores} cores`}
+          sub={last ? `Load ${last.load.map((l) => l.toFixed(2)).join(" · ")}${last.temp != null ? ` · ${last.temp.toFixed(0)}°C` : ""}` : `${data.info.cores} cores`}
           ring={last?.cpu ?? 0}
           chart={<AreaChart series={[{ values: hist.map((h) => h.cpu), color: "#6366f1" }]} max={100} height={52} />}
         />
@@ -115,13 +114,13 @@ export default function DashboardPage() {
               <div className="flex items-center gap-1 text-xs text-zinc-500">
                 <ArrowDownRight className="size-3.5 text-sky-500" /> In
               </div>
-              <div className="tabular text-lg font-semibold">{rate(last?.rx)}</div>
+              <div className="tabular text-lg font-semibold whitespace-nowrap">{rate(last?.rx)}</div>
             </div>
             <div>
               <div className="flex items-center gap-1 text-xs text-zinc-500">
                 <ArrowUpRight className="size-3.5 text-emerald-500" /> Out
               </div>
-              <div className="tabular text-lg font-semibold">{rate(last?.tx)}</div>
+              <div className="tabular text-lg font-semibold whitespace-nowrap">{rate(last?.tx)}</div>
             </div>
           </div>
           <div className="mt-3">
@@ -141,20 +140,12 @@ export default function DashboardPage() {
           <div className="mt-3 flex gap-6">
             <div>
               <div className="text-xs text-zinc-500">Read</div>
-              <div className="tabular text-lg font-semibold">{rate(last?.read)}</div>
+              <div className="tabular text-lg font-semibold whitespace-nowrap">{rate(last?.read)}</div>
             </div>
             <div>
               <div className="text-xs text-zinc-500">Write</div>
-              <div className="tabular text-lg font-semibold">{rate(last?.write)}</div>
+              <div className="tabular text-lg font-semibold whitespace-nowrap">{rate(last?.write)}</div>
             </div>
-            {last?.temp != null && (
-              <div className="ml-auto text-right">
-                <div className="flex items-center justify-end gap-1 text-xs text-zinc-500">
-                  <Thermometer className="size-3.5" /> CPU
-                </div>
-                <div className="tabular text-lg font-semibold">{last.temp.toFixed(0)}°C</div>
-              </div>
-            )}
           </div>
           <div className="mt-3">
             <AreaChart

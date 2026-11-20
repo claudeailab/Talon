@@ -3,30 +3,24 @@ import { useEffect, useState } from "react";
 import { Mail, Send } from "lucide-react";
 import { api } from "../lib/api";
 import { useAction } from "../lib/hooks";
-import type { NotificationSettings, SmtpConfig } from "../lib/types";
-import { Badge, Button, Card, CardHeader, Field, Input, Modal, PageLoader, Segmented } from "../components/ui";
+import type { SmtpConfig } from "../lib/types";
+import { Badge, Button, Card, CardHeader, Field, Input, PageLoader, Segmented } from "../components/ui";
 
 const DEFAULT_PORT = { starttls: 587, ssl: 465, none: 25 } as const;
 type Form = { host: string; port: string; security: SmtpConfig["security"]; username: string; password: string; sender: string };
 
 export default function SmtpTab() {
   const q = useQuery({ queryKey: ["smtp"], queryFn: () => api.get<SmtpConfig>("/settings/smtp") });
-  const notif = useQuery({ queryKey: ["notifications"], queryFn: () => api.get<NotificationSettings>("/notifications") });
   const [f, setF] = useState<Form | null>(null);
-  const [testOpen, setTestOpen] = useState(false);
-  const [to, setTo] = useState("");
   useEffect(() => {
     if (q.data)
       setF({ host: q.data.host, port: String(q.data.port), security: q.data.security, username: q.data.username, password: "", sender: q.data.sender });
   }, [q.data]);
-  useEffect(() => {
-    if (notif.data?.recipients.length && !to) setTo(notif.data.recipients[0]);
-  }, [notif.data]); // eslint-disable-line
   const body = f && { ...f, port: Number(f.port) };
   const save = useAction(() => api.put<SmtpConfig>("/settings/smtp", body), { success: "SMTP settings saved", invalidate: ["smtp", "notifications"] });
-  const test = useAction(() => api.post("/settings/smtp/test", { config: body, to }), {
-    success: `Test e-mail sent to ${to}`,
-    onSuccess: () => setTestOpen(false),
+  // checks connection, encryption, sign-in and sender without sending an e-mail
+  const test = useAction(() => api.post<{ message: string }>("/settings/smtp/test", { config: body }), {
+    success: (r) => r.message,
   });
   if (!q.data || !f) return <PageLoader />;
   const d = q.data;
@@ -47,7 +41,7 @@ export default function SmtpTab() {
         subtitle="Used to send e-mail notifications"
         actions={
           <div className="flex gap-2">
-            <Button icon={<Send className="size-4" />} disabled={!f.host || !f.sender} onClick={() => setTestOpen(true)}>
+            <Button icon={<Send className="size-4" />} disabled={!f.host || !f.sender} loading={test.isPending} onClick={() => test.mutate()}>
               Test
             </Button>
             <Button variant="primary" disabled={!changed} loading={save.isPending} onClick={() => save.mutate()}>
@@ -87,25 +81,6 @@ export default function SmtpTab() {
           <Input value={f.sender} onChange={(e) => set("sender", e.target.value.trim())} placeholder="nas@example.com" />
         </Field>
       </div>
-      <Modal
-        open={testOpen}
-        onClose={() => setTestOpen(false)}
-        title="Send a test e-mail"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setTestOpen(false)}>
-              Cancel
-            </Button>
-            <Button variant="primary" icon={<Send className="size-4" />} disabled={!to} loading={test.isPending} onClick={() => test.mutate()}>
-              Send
-            </Button>
-          </>
-        }
-      >
-        <Field label="Send to" hint="Uses the settings in the form, saved or not">
-          <Input value={to} onChange={(e) => setTo(e.target.value.trim())} placeholder="you@example.com" autoFocus />
-        </Field>
-      </Modal>
     </Card>
   );
 }

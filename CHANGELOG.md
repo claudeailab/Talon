@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.23
+- SMTP Test checks the server without sending an e-mail
+- Activity log: 10 entries per page with Previous and Next
+- Dashboard: CPU temperature moved to the CPU card; speeds stay on one line
+
 ## 1.0.22
 - OneDrive service: back up to or from OneDrive, or two-way sync (beta), on a schedule
 - Settings now use tabs, with new Entra ID and SMTP tabs

@@ -372,11 +372,7 @@ def create_app(cfg, platform) -> FastAPI:
     @app.post("/api/settings/smtp/test")
     def smtp_test(body: dict = Body(...), _u: str = Depends(current_user)):
         cfg_ = notify.smtp_validate(body.get("config") or {}, nas.state.get("smtp") or {})
-        to = notify.parse_recipients(body.get("to", ""))
-        host = platform.system_info().get("hostname", "nas")
-        notify.send_mail(cfg_, to, f"[Talon {host}] SMTP test",
-                         "This test e-mail confirms that Talon can send notifications.", cfg.demo)
-        return {"ok": True}
+        return {"ok": True, "message": notify.smtp_check(cfg_, cfg.demo)}
 
     @app.get("/api/notifications")
     def notifications_get(_u: str = Depends(current_user)):
@@ -483,8 +479,11 @@ def create_app(cfg, platform) -> FastAPI:
         return {"ok": True}
 
     @app.get("/api/activity")
-    def activity(_u: str = Depends(current_user)):
-        return nas.state.get("activity")[:200]
+    def activity(offset: int = 0, limit: int = 10, _u: str = Depends(current_user)):
+        items = nas.state.get("activity")
+        offset, limit = max(offset, 0), min(max(limit, 1), 100)
+        return {"items": items[offset:offset + limit], "total": len(items),
+                "offset": offset, "limit": limit}
 
     @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "DELETE"])
     def api_404(rest: str):

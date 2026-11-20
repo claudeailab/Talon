@@ -35,8 +35,8 @@ def test_smtp_and_notifications(client):
     assert r.status_code == 200 and r.json()["password_set"] and "password" not in r.json()
     assert client.post("/api/settings/smtp/test",
                        json={"config": {"host": "smtp.example.com", "port": 587,
-                                        "security": "starttls", "sender": "nas@example.com"},
-                             "to": "me@example.com"}).status_code == 200
+                                        "security": "starttls", "sender": "nas@example.com"}}
+                       ).json()["message"].startswith("SMTP works")
     assert client.post("/api/notifications/test").status_code == 400      # no recipients yet
     r = client.put("/api/notifications", json={"recipients": "me@example.com, you@example.com",
                                                "events": {"raid": False}})

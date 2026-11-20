@@ -1,14 +1,24 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2, Info, ListChecks, Loader2, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Info, ListChecks, Loader2, XCircle } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, dateTime } from "../lib/format";
 import type { Activity, Job } from "../lib/types";
 import { JobDialog } from "../components/jobs";
-import { Card, CardHeader, Empty, PageHeader, PageLoader } from "../components/ui";
+import { Button, Card, CardHeader, Empty, PageHeader, PageLoader, Select } from "../components/ui";
+
+type Page = { items: Activity[]; total: number; offset: number; limit: number };
+const PER_PAGE = [10, 25, 50, 100];
 
 export default function ActivityPage() {
-  const act = useQuery({ queryKey: ["activity"], queryFn: () => api.get<Activity[]>("/activity"), refetchInterval: 10000 });
+  const [perPage, setPerPage] = useState(10);
+  const [page, setPage] = useState(0);
+  const act = useQuery({
+    queryKey: ["activity", page, perPage],
+    queryFn: () => api.get<Page>(`/activity?offset=${page * perPage}&limit=${perPage}`),
+    refetchInterval: 10000,
+    placeholderData: (prev) => prev,
+  });
   const jobs = useQuery({ queryKey: ["jobs"], queryFn: () => api.get<Job[]>("/jobs"), refetchInterval: 3000 });
   const [job, setJob] = useState<string | null>(null);
   if (!act.data || !jobs.data) return <PageLoader />;
@@ -17,12 +27,12 @@ export default function ActivityPage() {
       <PageHeader title="Activity" description="Administrative actions and background tasks." />
       <div className="grid gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2">
-          <CardHeader title="Activity log" subtitle={`${act.data.length} recent events`} />
-          {act.data.length === 0 ? (
+          <CardHeader title="Activity log" subtitle={`${act.data.total} events`} />
+          {act.data.total === 0 ? (
             <Empty icon={<Info className="size-6" />} title="Nothing yet" />
           ) : (
             <ul className="divide-y divide-zinc-100 px-5 pb-2 dark:divide-white/5">
-              {act.data.map((a, i) => (
+              {act.data.items.map((a, i) => (
                 <li key={i} className="flex items-start gap-3 py-3">
                   {a.level === "error" ? (
                     <XCircle className="mt-0.5 size-4 shrink-0 text-rose-500" />
@@ -32,7 +42,9 @@ export default function ActivityPage() {
                     <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" />
                   )}
                   <div className="min-w-0 flex-1">
-                    <div className="text-[13px] break-words">{a.message}</div>
+                    <div className="truncate text-[13px]" title={a.message}>
+                      {a.message}
+                    </div>
                     <div className="text-xs text-zinc-500">
                       {a.user} · <span title={dateTime(a.ts)}>{ago(a.ts)}</span>
                     </div>
@@ -40,6 +52,38 @@ export default function ActivityPage() {
                 </li>
               ))}
             </ul>
+          )}
+          {act.data.total > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-zinc-100 px-5 py-3 dark:border-white/5">
+              <label className="flex items-center gap-2 text-[13px] whitespace-nowrap text-zinc-500">
+                Per page
+                <Select
+                  value={String(perPage)}
+                  onChange={(e) => {
+                    setPerPage(Number(e.target.value));
+                    setPage(0);
+                  }}
+                  className="text-[13px]"
+                  style={{ width: "5.5rem" }}
+                >
+                  {PER_PAGE.map((n) => (
+                    <option key={n}>{n}</option>
+                  ))}
+                </Select>
+              </label>
+              <div className="flex items-center gap-3">
+                <span className="tabular text-[13px] text-zinc-500">
+                  {page * perPage + 1}–{Math.min((page + 1) * perPage, act.data.total)} of {act.data.total}
+                </span>
+                <Button size="sm" icon={<ChevronLeft className="size-4" />} disabled={page === 0} onClick={() => setPage(page - 1)}>
+                  Previous
+                </Button>
+                <Button size="sm" disabled={(page + 1) * perPage >= act.data.total} onClick={() => setPage(page + 1)}>
+                  Next
+                  <ChevronRight className="size-4" />
+                </Button>
+              </div>
+            </div>
           )}
         </Card>
         <Card>

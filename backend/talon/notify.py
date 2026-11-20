@@ -58,19 +58,8 @@ def smtp_public(cfg: dict) -> dict:
             "configured": bool(cfg.get("host") and cfg.get("sender"))}
 
 
-def send_mail(cfg: dict, to: List[str], subject: str, body: str, demo: bool = False) -> None:
-    if not (cfg.get("host") and cfg.get("sender")):
-        raise UserError("SMTP is not configured")
-    if not to:
-        raise UserError("No recipient")
-    for addr in to:
-        if not EMAIL_RE.match(addr):
-            raise UserError(f"Invalid e-mail address: {addr}")
-    if demo:
-        return                                   # the demo never sends real mail
-    msg = EmailMessage()
-    msg["From"], msg["To"], msg["Subject"] = cfg["sender"], ", ".join(to), subject
-    msg.set_content(body)
+def _deliver(cfg: dict, action: Callable[[smtplib.SMTP], None]) -> None:
+    """Connect, secure and sign in as configured, then run ``action``."""
     try:
         ctx = ssl.create_default_context()
         if cfg.get("security") == "ssl":
@@ -84,7 +73,7 @@ def send_mail(cfg: dict, to: List[str], subject: str, body: str, demo: bool = Fa
                 smtp.ehlo()
             if cfg.get("username"):
                 smtp.login(cfg["username"], cfg.get("password", ""))
-            smtp.send_message(msg)
+            action(smtp)
     except smtplib.SMTPAuthenticationError:
         raise UserError("The SMTP server rejected the user name or password") from None
     except smtplib.SMTPNotSupportedError:
@@ -93,6 +82,40 @@ def send_mail(cfg: dict, to: List[str], subject: str, body: str, demo: bool = Fa
         raise UserError(f"SMTP error: {e}") from None
     except (socket.timeout, OSError) as e:
         raise UserError(f"Cannot connect to {cfg['host']}:{cfg['port']}: {e}") from None
+
+
+def smtp_check(cfg: dict, demo: bool = False) -> str:
+    """Test the server without sending mail: connect, encrypt, sign in, and
+    check that the sender address is accepted (MAIL FROM, then reset)."""
+    if not (cfg.get("host") and cfg.get("sender")):
+        raise UserError("Enter the SMTP server and the sender address")
+    if demo:
+        return "SMTP works: connected and sender accepted (demo)"
+
+    def probe(smtp: smtplib.SMTP) -> None:
+        code, msg = smtp.mail(cfg["sender"])
+        if code != 250:
+            raise UserError(f"The server refused the sender address: {msg.decode(errors='replace')}")
+        smtp.rset()
+    _deliver(cfg, probe)
+    return ("SMTP works: signed in and sender accepted" if cfg.get("username")
+            else "SMTP works: connected and sender accepted")
+
+
+def send_mail(cfg: dict, to: List[str], subject: str, body: str, demo: bool = False) -> None:
+    if not (cfg.get("host") and cfg.get("sender")):
+        raise UserError("SMTP is not configured")
+    if not to:
+        raise UserError("No recipient")
+    for addr in to:
+        if not EMAIL_RE.match(addr):
+            raise UserError(f"Invalid e-mail address: {addr}")
+    if demo:
+        return                                   # the demo never sends real mail
+    msg = EmailMessage()
+    msg["From"], msg["To"], msg["Subject"] = cfg["sender"], ", ".join(to), subject
+    msg.set_content(body)
+    _deliver(cfg, lambda smtp: smtp.send_message(msg))
 
 
 def parse_recipients(value) -> List[str]:

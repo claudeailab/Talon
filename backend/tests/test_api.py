@@ -163,3 +163,14 @@ def test_dashboard_and_settings(client):
     assert r.status_code == 200 and r.json()["workgroup"] == "HOME"
     assert client.put("/api/settings", json={"hostname": "-bad-"}).status_code == 400
     assert client.get("/api/activity").json()
+
+
+def test_activity_paging(client):
+    for i in range(25):
+        client.app.state.nas.state.log_activity("admin", f"event {i}")
+    first = client.get("/api/activity").json()
+    assert first["limit"] == 10 and len(first["items"]) == 10 and first["total"] >= 25
+    assert first["items"][0]["message"] == "event 24"            # newest first
+    second = client.get("/api/activity?offset=10&limit=10").json()
+    assert second["items"][0]["message"] == "event 14"
+    assert len(client.get("/api/activity?limit=1000").json()["items"]) <= 100
