@@ -6,6 +6,9 @@ on:
   push:
     branches: [main]
     paths: [backend/talon/__init__.py]
+  workflow_run:            # merges done by auto-merge.yml use GITHUB_TOKEN, which
+    workflows: [Auto-merge to main]   # does not trigger push workflows by itself
+    types: [completed]
   workflow_dispatch:
 permissions:
   contents: write
@@ -14,7 +17,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
+        with: { ref: main, fetch-depth: 0 }
       - name: Read version
         id: v
         run: |

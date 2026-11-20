@@ -1,0 +1,64 @@
+# Owner's rule: every change lands on main and no other branches are kept.
+# Any push to a branch other than main is merged into main here, then the
+# branch is deleted.
+#
+# GitHub never lets a repository's *default* branch be deleted, and the
+# built-in GITHUB_TOKEN cannot change the default. If the repository secret
+# ADMIN_TOKEN (fine-grained token, "Administration: write" + "Contents: write")
+# exists, this workflow also switches the default branch to main.
+name: Auto-merge to main
+on:
+  push:
+    branches-ignore: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: auto-merge
+  cancel-in-progress: false
+jobs:
+  merge:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: main, fetch-depth: 0 }
+      - name: Merge into main and delete the branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.event_name == 'push' && github.ref_name || '' }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          default=$(gh api "repos/$REPO" --jq .default_branch)
+          if [ "$default" != main ] && [ -n "$ADMIN_TOKEN" ]; then
+            GH_TOKEN="$ADMIN_TOKEN" gh api -X PATCH "repos/$REPO" -f default_branch=main >/dev/null
+            echo "Default branch switched from $default to main"
+            default=main
+          fi
+
+          # branches to process: the pushed one, or all non-main (manual run)
+          if [ -n "$BRANCH" ]; then branches="$BRANCH"
+          else branches=$(git ls-remote --heads origin | sed 's#.*refs/heads/##' | grep -vx main || true)
+          fi
+
+          for b in $branches; do
+            git fetch -q origin "refs/heads/$b"
+            if git merge-base --is-ancestor FETCH_HEAD HEAD; then
+              echo "$b: already contained in main"
+            else
+              git merge --no-edit -m "Merge branch '$b' into main" FETCH_HEAD \
+                || { echo "::error::Merge conflict between $b and main"; exit 1; }
+              git push origin HEAD:main
+              echo "$b: merged into main"
+            fi
+            if [ "$b" = "$default" ]; then
+              echo "::warning::$b is the repository's default branch; GitHub forbids deleting it. Add an ADMIN_TOKEN secret so this workflow can switch the default to main."
+            else
+              git push origin --delete "$b"
+              echo "$b: deleted"
+            fi
+          done
