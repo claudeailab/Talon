@@ -40,12 +40,12 @@ export default function DashboardPage() {
   const critical = data.alerts.filter((a) => a.level === "critical").length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* hero */}
-      <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-        <div>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">{greeting()}</p>
+      <div className="flex min-h-10 flex-col justify-between gap-3 sm:flex-row sm:items-center">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
           <h1 className="text-2xl font-semibold tracking-tight">{data.info.hostname}</h1>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">{greeting()}</p>
         </div>
         <div
           className={cx(

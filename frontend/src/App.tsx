@@ -289,7 +289,7 @@ function Shell({ me }: { me: Me }) {
           <div className="flex-1" />
           {notifications("right")}
         </header>
-        <main className="mx-auto max-w-[1400px] px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
+        <main className="mx-auto max-w-[1400px] px-4 pt-4 pb-6 sm:px-6 lg:px-8 lg:pt-3 lg:pb-8">
           <div key={path} className="animate-in">
             <Page />
           </div>
