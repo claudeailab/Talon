@@ -194,10 +194,10 @@ function Shell({ me }: { me: Me }) {
           <X className="size-5" />
         </IconButton>
       </div>
-      <nav className="flex-1 space-y-6 overflow-y-auto px-3 py-3">
+      <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-3 [scrollbar-width:none]">
         {NAV.map((s) => (
           <div key={s.section}>
-            {s.section && <div className="mb-1.5 px-3 text-[11px] font-semibold tracking-wider text-zinc-400 uppercase dark:text-zinc-500">{s.section}</div>}
+            {s.section && <div className="mb-1 px-3 text-[11px] font-semibold tracking-wider text-zinc-400 uppercase dark:text-zinc-500">{s.section}</div>}
             <div className="space-y-0.5">
               {s.items.filter((i) => visible(i.to)).map((i) => {
                 const active = i.to === path;

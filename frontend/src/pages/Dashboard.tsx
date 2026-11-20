@@ -22,6 +22,7 @@ import { AreaChart, Ring } from "../components/charts";
 import { Badge, Card, CardHeader, PageLoader, Progress, StatusDot, usageTone } from "../components/ui";
 import { DiskIcon, DiskStatusBadge, HealthBadge } from "../components/disk";
 import { VolumeStatusBadge } from "./Volumes";
+import { StatusBadge } from "../components/storage";
 
 function greeting() {
   const h = new Date().getHours();
@@ -36,6 +37,7 @@ export default function DashboardPage() {
   const last = hist[hist.length - 1];
   const totalSize = data.volumes.reduce((a, v) => a + v.size, 0);
   const totalUsed = data.volumes.reduce((a, v) => a + v.used, 0);
+  const shares = data.share_list;
   const critical = data.alerts.filter((a) => a.level === "critical").length;
 
   return (
@@ -185,29 +187,66 @@ export default function DashboardPage() {
                 {data.volumes.map((v) => {
                   const p = pct(v.used, v.size);
                   return (
-                    <Link
-                      key={v.name}
-                      to="/volumes"
-                      className="rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-200/60 transition hover:ring-brand-300 dark:bg-white/[0.03] dark:ring-white/5 dark:hover:ring-brand-400/40"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex min-w-0 items-center gap-2">
-                          <span className="truncate font-semibold">{v.name}</span>
-                          <Badge>{levelLabel[v.level] ?? v.level}</Badge>
-                        </div>
-                        <VolumeStatusBadge v={v} />
-                      </div>
-                      <div className="mt-3 flex items-baseline justify-between text-[13px]">
-                        <span className="tabular font-medium">{p.toFixed(0)}% used</span>
-                        <span className="tabular text-zinc-500">{bytes(v.free)} free</span>
-                      </div>
+                    <Tile key={"v" + v.name} to="/volumes">
+                      <TileHead name={v.name} badge={levelLabel[v.level] ?? v.level} status={<VolumeStatusBadge v={v} />} />
+                      <TileLine left={`${p.toFixed(0)}% used`} right={`${bytes(v.free)} free`} />
                       <Progress value={p} tone={usageTone(p)} className="mt-1.5" />
-                      {v.sync?.sync_progress != null && (
-                        <div className="mt-2 text-xs text-zinc-500">{v.status_detail}</div>
-                      )}
-                    </Link>
+                      {v.sync?.sync_progress != null && <div className="mt-2 truncate text-xs text-zinc-500">{v.status_detail}</div>}
+                    </Tile>
                   );
                 })}
+                {data.arrays.map((a) => {
+                  const active = a.members.filter((m) => m.state !== "spare");
+                  const sync = a.sync && a.sync.sync_action !== "idle" && a.sync.sync_progress != null ? a.sync : null;
+                  return (
+                    <Tile key={"a" + a.name} to="/raid">
+                      <TileHead name={a.name} badge="RAID array" status={<StatusBadge status={a.status} />} />
+                      <TileLine
+                        left={a.fault_tolerance ? `Survives ${a.fault_tolerance} disk failure${a.fault_tolerance > 1 ? "s" : ""}` : "No disk failure protection"}
+                        right={bytes(a.size)}
+                      />
+                      {sync ? (
+                        <Progress value={sync.sync_progress ?? 0} tone="blue" className="mt-1.5" />
+                      ) : (
+                        <Chips items={active.map((m) => ({ key: m.disk, label: m.disk, bad: m.state !== "active", mono: true }))} />
+                      )}
+                    </Tile>
+                  );
+                })}
+                <Tile to="/shares">
+                  <TileHead name="Shared folders" badge={String(shares.length)} />
+                  <TileLine
+                    left={shares.length ? count(shares, "smb", "SMB", "nfs", "NFS") : "No shared folders yet"}
+                    right={shares.some((x) => x.time_machine) ? "Time Machine" : ""}
+                  />
+                  <Chips items={shares.map((x) => ({ key: x.name, label: x.name }))} />
+                </Tile>
+                {data.onedrive && (
+                  <Tile to="/onedrive">
+                    <TileHead
+                      name="OneDrive"
+                      badge={`${data.onedrive.tasks} task${data.onedrive.tasks === 1 ? "" : "s"}`}
+                      status={
+                        !data.onedrive.connected ? (
+                          <Badge tone="amber" dot>Not connected</Badge>
+                        ) : data.onedrive.running ? (
+                          <Badge tone="blue" dot>Syncing</Badge>
+                        ) : data.onedrive.errors ? (
+                          <Badge tone="red" dot>{data.onedrive.errors} failed</Badge>
+                        ) : (
+                          <Badge tone="green" dot>Connected</Badge>
+                        )
+                      }
+                    />
+                    <TileLine
+                      left={data.onedrive.email ?? "Sign in to Microsoft"}
+                      right={data.onedrive.total ? `${bytes(data.onedrive.used ?? 0)} of ${bytes(data.onedrive.total)}` : ""}
+                    />
+                    {data.onedrive.total ? (
+                      <Progress value={pct(data.onedrive.used ?? 0, data.onedrive.total)} tone="blue" className="mt-1.5" />
+                    ) : null}
+                  </Tile>
+                )}
               </div>
             )}
           </div>
@@ -318,6 +357,68 @@ export default function DashboardPage() {
           </ul>
         </Card>
       </div>
+    </div>
+  );
+}
+
+function Tile({ to, children }: { to: string; children: React.ReactNode }) {
+  return (
+    <Link
+      to={to}
+      className="min-w-0 rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-200/60 transition hover:ring-brand-300 dark:bg-white/[0.03] dark:ring-white/5 dark:hover:ring-brand-400/40"
+    >
+      {children}
+    </Link>
+  );
+}
+
+function TileHead({ name, badge, status }: { name: string; badge: string; status?: React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex min-w-0 items-center gap-2">
+        <span className="truncate font-semibold">{name}</span>
+        <Badge>{badge}</Badge>
+      </div>
+      {status}
+    </div>
+  );
+}
+
+function TileLine({ left, right }: { left: string; right: string }) {
+  return (
+    <div className="mt-3 flex items-baseline justify-between gap-3 text-[13px]">
+      <span className="tabular truncate font-medium">{left}</span>
+      <span className="tabular shrink-0 text-zinc-500">{right}</span>
+    </div>
+  );
+}
+
+function count(list: Record<string, unknown>[], ...pairs: string[]) {
+  const out: string[] = [];
+  for (let i = 0; i < pairs.length; i += 2) {
+    const n = list.filter((x) => x[pairs[i]]).length;
+    if (n) out.push(`${n} ${pairs[i + 1]}`);
+  }
+  return out.join(" · ") || "Not shared";
+}
+
+function Chips({ items }: { items: { key: string; label: string; bad?: boolean; mono?: boolean }[] }) {
+  return (
+    <div className="mt-1.5 flex h-5 flex-wrap gap-1.5 overflow-hidden">
+      {items.map((i) => (
+        <span
+          key={i.key}
+          className={cx(
+            "max-w-40 truncate rounded-md px-1.5 text-[11px] leading-5 ring-1 ring-inset",
+            i.mono && "font-mono",
+            i.bad
+              ? "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-400/20"
+              : "bg-white text-zinc-600 ring-zinc-200 dark:bg-white/5 dark:text-zinc-300 dark:ring-white/10",
+          )}
+        >
+          {i.label}
+        </span>
+      ))}
     </div>
   );
 }

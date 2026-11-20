@@ -856,6 +856,12 @@ class Nas:
             "services": self.p.services() + [self.cloud.service_info()],
             "alerts": self.alerts(volumes, disks),
             "shares": len(self.state.get("shares")),
+            "share_list": [{"name": sh["name"], "volume": sh["volume"],
+                            "smb": sh["smb"]["enabled"], "nfs": sh["nfs"]["enabled"],
+                            "time_machine": sh["smb"]["enabled"] and sh["smb"]["time_machine"]}
+                           for sh in self.shares()],
+            "arrays": self.raid_arrays(),
+            "onedrive": self.cloud.summary(),
             "users": len(self.users()),
             "jobs": [j for j in self.jobs.list() if j["status"] in ("queued", "running")],
         }

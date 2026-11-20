@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.33
+- Dashboard Storage card also shows RAID arrays, shared folders and OneDrive
+
 ## 1.0.32
 - One workflow run per change; releases only after the tests pass
 

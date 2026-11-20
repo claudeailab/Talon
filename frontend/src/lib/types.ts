@@ -201,6 +201,17 @@ export interface Dashboard {
   services: Service[];
   alerts: Alert[];
   shares: number;
+  share_list: { name: string; volume: string; smb: boolean; nfs: boolean; time_machine: boolean }[];
+  arrays: RaidArray[];
+  onedrive: {
+    connected: boolean;
+    email: string | null;
+    used: number | null;
+    total: number | null;
+    tasks: number;
+    running: number;
+    errors: number;
+  } | null;
   users: number;
   jobs: Job[];
 }

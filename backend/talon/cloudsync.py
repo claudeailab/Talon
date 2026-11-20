@@ -207,6 +207,19 @@ class CloudSync:
                 "rclone": {"installed": bool(self.rclone_path()), "installing": self._installing},
                 "tasks": tasks}
 
+    def summary(self) -> Optional[dict]:
+        """Dashboard tile: None while the OneDrive service is off."""
+        st = self.status()
+        if not st["enabled"]:
+            return None
+        tasks = st["tasks"]
+        done = [t["last"] for t in tasks if t.get("last")]
+        acc = st["account"] or {}
+        return {"connected": st["connected"], "email": acc.get("email"),
+                "used": acc.get("used"), "total": acc.get("total"),
+                "tasks": len(tasks), "running": sum(1 for t in tasks if t["running"]),
+                "errors": sum(1 for d in done if d["status"] == "error")}
+
     def connect_start(self, origin: str) -> str:
         e = self._entra()
         if not entra.configured(e):

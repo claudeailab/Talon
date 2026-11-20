@@ -159,6 +159,8 @@ def test_expand_and_replace(client):
 def test_dashboard_and_settings(client):
     d = client.get("/api/dashboard").json()
     assert d["info"]["hostname"] and "volumes" in d
+    assert isinstance(d["arrays"], list) and isinstance(d["share_list"], list)
+    assert d["onedrive"] is None                      # service off by default
     r = client.put("/api/settings", json={"workgroup": "home", "hostname": "mynas"})
     assert r.status_code == 200 and r.json()["workgroup"] == "HOME"
     assert client.put("/api/settings", json={"hostname": "-bad-"}).status_code == 400
