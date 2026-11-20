@@ -1,0 +1,17 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - uses: actions/setup-node@v4
+        with: { node-version: "22" }
+      - run: pip install -r backend/requirements.txt pytest httpx shellcheck-py
+      - run: cd backend && python -m pytest -q tests
+      - run: shellcheck -S warning install.sh uninstall.sh
+      - run: cd frontend && npm ci && npm run build
+      - name: Committed web build is up to date
+        run: git diff --stat --exit-code -- backend/talon/web || (echo "Run 'npm run build' in frontend/ and commit" && exit 1)

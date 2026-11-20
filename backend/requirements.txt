@@ -1,0 +1,5 @@
+# Lower bounds only; pip picks the newest release compatible with the
+# system Python (3.10 on Ubuntu 22.04 ... 3.14 on Ubuntu 26.04).
+fastapi>=0.110,<1.0
+uvicorn>=0.29,<1.0
+psutil>=5.9,<8.0
