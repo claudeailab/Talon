@@ -446,6 +446,30 @@ class DemoPlatform:
         return bool(u and not u["disabled"] and u["password"] == password)
 
     # ----------------------------------------------------------- system
+    # ----------------------------------------------------------- network (IPv4)
+    _net = {"mode": "dhcp", "address": "192.168.1.50", "prefix": 24,
+            "gateway": "192.168.1.1", "dns": ["192.168.1.1"]}
+
+    def net_interfaces(self) -> List[dict]:
+        from ..network import mask_of
+        n = self._net
+        return [{"name": "enp1s0", "mac": "a8:a1:59:3c:21:7e", "up": True, "wireless": False,
+                 "manager": "networkmanager", "mode": n["mode"], "address": n["address"],
+                 "prefix": n["prefix"], "subnet": mask_of(n["prefix"]), "gateway": n["gateway"],
+                 "dns": list(n["dns"]), "default": True, "unsupported": None}]
+
+    def net_apply(self, iface: str, cfg: dict, log) -> dict:
+        old = dict(self._net)
+        if cfg["mode"] == "static":
+            self._net = {k: cfg[k] for k in ("mode", "address", "prefix", "gateway", "dns")}
+        else:
+            self._net = {"mode": "dhcp", "address": "192.168.1.50", "prefix": 24,
+                         "gateway": "192.168.1.1", "dns": ["192.168.1.1"]}
+        return {"old": old}
+
+    def net_restore(self, iface: str, token: dict, log) -> None:
+        self._net = token["old"]
+
     def system_info(self) -> dict:
         return {"hostname": self.hostname, "os": "Debian GNU/Linux 13 (trixie)",
                 "kernel": "6.12.48+deb13-amd64", "arch": "x86_64",

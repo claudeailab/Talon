@@ -108,6 +108,7 @@ def create_app(cfg, platform) -> FastAPI:
         if request.url.path.startswith("/api/") and request.method not in ("GET", "HEAD") \
                 and request.headers.get("x-requested-with") != "talon":
             return JSONResponse({"detail": "Missing CSRF header"}, status_code=403)
+        nas.network.seen_request(request.client.host if request.client else None)
         resp = await call_next(request)
         resp.headers["X-Content-Type-Options"] = "nosniff"
         resp.headers["X-Frame-Options"] = "DENY"
@@ -527,6 +528,15 @@ def create_app(cfg, platform) -> FastAPI:
     @app.get("/api/onedrive/tasks/{tid}/log")
     def onedrive_task_log(tid: str, _u: str = Depends(current_user)):
         return nas.cloud.task_log(tid)
+
+    # ------------------------------------------------------------ networking
+    @app.get("/api/network")
+    def network_info(_u: str = Depends(current_user)):
+        return nas.network.info()
+
+    @app.put("/api/network")
+    def network_apply(body: dict = Body(...), user: str = Depends(current_user)):
+        return nas.network.apply(body, user)
 
     # ------------------------------------------------------------ scheduled tasks
     @app.get("/api/scheduled")

@@ -7,11 +7,13 @@ import { useAction } from "../lib/hooks";
 import type { Settings, SysInfo, UpdateInfo } from "../lib/types";
 import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Field, Input, PageHeader, PageLoader, Select, Switch, Tabs } from "../components/ui";
 import EntraTab from "./SettingsEntra";
+import NetworkTab from "./SettingsNetwork";
 import SmtpTab from "./SettingsSmtp";
 
-type TabId = "general" | "entra" | "smtp" | "update" | "about";
+type TabId = "general" | "network" | "entra" | "smtp" | "update" | "about";
 const TABS: { value: TabId; label: string }[] = [
   { value: "general", label: "General" },
+  { value: "network", label: "Networking" },
   { value: "entra", label: "Entra ID" },
   { value: "smtp", label: "SMTP" },
   { value: "update", label: "Update" },
@@ -27,11 +29,12 @@ export default function SettingsPage() {
   };
   return (
     <>
-      <PageHeader title="Settings" description="System, Microsoft sign-in, e-mail and updates." />
+      <PageHeader title="Settings" description="System, network, Microsoft sign-in, e-mail and updates." />
       <div className="mb-5">
         <Tabs value={tab} onChange={change} tabs={TABS} />
       </div>
       {tab === "general" && <GeneralTab />}
+      {tab === "network" && <NetworkTab />}
       {tab === "entra" && <EntraTab />}
       {tab === "smtp" && <SmtpTab />}
       {tab === "update" && <SoftwareUpdate />}

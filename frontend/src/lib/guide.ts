@@ -680,7 +680,7 @@ export const GUIDE: Topic[] = [
     id: "settings",
     title: "Settings and updates",
     group: "System",
-    summary: "Name, time zone, Windows and macOS options, and software updates.",
+    summary: "Name, time zone, network address, Windows and macOS options, and updates.",
     page: { to: "/settings", label: "Open Settings" },
     sections: [
       {
@@ -697,6 +697,26 @@ export const GUIDE: Topic[] = [
               "**macOS compatibility**: faster Finder browsing and correct metadata for Macs.",
             ],
           },
+        ],
+      },
+      {
+        id: "network",
+        title: "Networking: DHCP or a static IP",
+        blocks: [
+          { p: "By default the NAS gets its address from your router (DHCP), so the address can change. A static IP keeps it the same." },
+          {
+            steps: [
+              "Open [Settings → Networking](/settings?tab=network). It shows the current address, subnet mask, gateway and DNS servers.",
+              "Choose **Static IP**. The fields start with the current values.",
+              "Enter the **IP address**, **Subnet mask** (usually 255.255.255.0), **Gateway** (usually your router) and a **DNS server** (your router or, for example, 1.1.1.1). A **Second DNS server** is optional.",
+              "Click **Save**, then **Apply**.",
+              "Open Talon at the new address shown, for example https://192.168.1.60/.",
+            ],
+          },
+          { img: "settings-network", alt: "Networking settings" },
+          { warn: "Pick an address outside the range your router hands out, or reserve it in the router, so no other device gets the same address." },
+          { p: "To go back, choose **Automatic (DHCP)** and click **Save**. The router may then give the NAS a different address; open it at **https://<hostname>.local/**." },
+          { tip: "If Talon is not opened at its new address within 3 minutes, for example because the gateway was wrong, the previous settings come back by themselves." },
         ],
       },
       {

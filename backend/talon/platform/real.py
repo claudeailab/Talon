@@ -8,6 +8,7 @@ import os
 import platform as pyplatform
 import pwd
 import re
+import shutil
 import socket
 import threading
 import time
@@ -634,6 +635,200 @@ class RealPlatform:
                                 "up": bool(stats.get(iface) and stats[iface].isup),
                                 "speed": stats[iface].speed if iface in stats else 0})
         return out
+
+    # ------------------------------------------------------------ network (IPv4)
+    NETPLAN_DIR = "/etc/netplan"
+    IFUPDOWN = "/etc/network/interfaces"
+    RESOLV = "/etc/resolv.conf"
+
+    @staticmethod
+    def _nm_split(line: str) -> List[str]:
+        """nmcli -t output: fields separated by ':', with ':' inside values escaped."""
+        return [f.replace("\\:", ":") for f in re.split(r"(?<!\\):", line)]
+
+    def _nm_connection(self, iface: str) -> Optional[str]:
+        if not shutil.which("nmcli"):
+            return None
+        if run(["systemctl", "is-active", "NetworkManager"], check=False, timeout=10).stdout.strip() != "active":
+            return None
+        out = run(["nmcli", "-t", "-f", "DEVICE,STATE,CONNECTION", "device"], check=False, timeout=15).stdout
+        for line in out.splitlines():
+            f = self._nm_split(line)
+            if len(f) >= 3 and f[0] == iface and f[1].startswith("connected") and f[2]:
+                return f[2]
+        return None
+
+    def _netplan_files(self) -> List[str]:
+        return sorted(glob.glob(os.path.join(self.NETPLAN_DIR, "*.yaml")))
+
+    def _talon_netplan(self, iface: str) -> str:
+        return os.path.join(self.NETPLAN_DIR, f"90-talon-{iface}.yaml")
+
+    def _ifupdown_file(self, iface: str) -> Optional[str]:
+        from ..network import ifupdown_method
+        files = [self.IFUPDOWN] + sorted(glob.glob("/etc/network/interfaces.d/*"))
+        for f in files:
+            if os.path.isfile(f) and ifupdown_method(read_file(f), iface):
+                return f
+        return None
+
+    def _net_manager(self, iface: str):
+        con = self._nm_connection(iface)
+        if con:
+            return "networkmanager", con
+        if shutil.which("netplan") and self._netplan_files():
+            return "netplan", None
+        f = self._ifupdown_file(iface)
+        if f and shutil.which("ifup"):
+            return "ifupdown", f
+        return None, None
+
+    def _dns(self, iface: str, manager: Optional[str]) -> List[str]:
+        if manager == "networkmanager":
+            out = run(["nmcli", "-g", "IP4.DNS", "device", "show", iface], check=False, timeout=15).stdout
+            return [d.strip() for d in re.split(r"[|\n]", out) if d.strip()]
+        if shutil.which("resolvectl"):
+            out = run(["resolvectl", "dns", iface], check=False, timeout=10).stdout
+            if ":" in out:
+                found = [d for d in out.split(":", 1)[1].split() if re.match(r"^\d+\.\d+\.\d+\.\d+$", d)]
+                if found:
+                    return found
+        return [ln.split()[1] for ln in read_file("/etc/resolv.conf").splitlines()
+                if ln.startswith("nameserver ") and len(ln.split()) > 1
+                and not ln.split()[1].startswith("127.")]
+
+    def net_interfaces(self) -> List[dict]:
+        from ..network import ifupdown_method, mask_of
+        try:
+            links = json.loads(run(["ip", "-j", "link", "show"], timeout=10).stdout or "[]")
+            addrs = json.loads(run(["ip", "-j", "-4", "addr", "show"], timeout=10).stdout or "[]")
+            routes = json.loads(run(["ip", "-j", "-4", "route", "show", "default"], timeout=10).stdout or "[]")
+        except (CommandError, ValueError):
+            return []
+        gw = {r.get("dev"): r.get("gateway") for r in routes if r.get("gateway")}
+        out = []
+        for ln in links:
+            name = ln.get("ifname", "")
+            if ln.get("link_type") != "ether" or name.startswith(("docker", "veth", "br-", "virbr", "tun", "tap")):
+                continue
+            if os.path.isdir(f"/sys/class/net/{name}/bridge") or not os.path.exists(f"/sys/class/net/{name}/device"):
+                continue                       # bridges and virtual devices
+            a4 = next((a for a in addrs if a.get("ifname") == name), {})
+            info = next((x for x in a4.get("addr_info", []) if x.get("family") == "inet"), None)
+            manager, ref = self._net_manager(name)
+            if manager == "networkmanager":
+                method = run(["nmcli", "-g", "ipv4.method", "connection", "show", ref],
+                             check=False, timeout=15).stdout.strip()
+                mode = "static" if method == "manual" else "dhcp"
+            elif manager == "netplan":
+                talon = read_file(self._talon_netplan(name))
+                mode = "static" if "dhcp4: false" in talon else (
+                    "dhcp" if talon or info is None or info.get("dynamic") else "static")
+            elif manager == "ifupdown":
+                mode = "static" if ifupdown_method(read_file(ref), name) == "static" else "dhcp"
+            else:
+                mode = "dhcp" if info and info.get("dynamic") else "static"
+            wireless = os.path.isdir(f"/sys/class/net/{name}/wireless")
+            out.append({
+                "name": name, "mac": ln.get("address", ""), "up": "UP" in (ln.get("flags") or []),
+                "wireless": wireless, "manager": manager, "mode": mode,
+                "address": info["local"] if info else None,
+                "prefix": info["prefixlen"] if info else None,
+                "subnet": mask_of(info["prefixlen"]) if info else None,
+                "gateway": gw.get(name), "dns": self._dns(name, manager) if info else [],
+                "default": name in gw,
+                "unsupported": None if manager else (
+                    "Talon can change the network settings only when NetworkManager, "
+                    "netplan or ifupdown manages the interface"),
+            })
+        out.sort(key=lambda i: (not i["default"], i["name"]))
+        return out
+
+    def net_apply(self, iface: str, cfg: dict, log: Logger) -> dict:
+        """Apply cfg; returns what net_restore needs to undo it."""
+        from ..network import ifupdown_replace, ifupdown_stanza, netplan_key, netplan_yaml
+        manager, ref = self._net_manager(iface)
+        if manager == "networkmanager":
+            keys = ("ipv4.method", "ipv4.addresses", "ipv4.gateway", "ipv4.dns", "ipv4.ignore-auto-dns")
+            old = {k: run(["nmcli", "-g", k, "connection", "show", ref], timeout=15).stdout.strip()
+                   for k in keys}
+            if cfg["mode"] == "static":
+                new = {"ipv4.method": "manual", "ipv4.addresses": f"{cfg['address']}/{cfg['prefix']}",
+                       "ipv4.gateway": cfg["gateway"], "ipv4.dns": " ".join(cfg["dns"]),
+                       "ipv4.ignore-auto-dns": "yes"}
+            else:
+                new = {"ipv4.method": "auto", "ipv4.addresses": "", "ipv4.gateway": "",
+                       "ipv4.dns": "", "ipv4.ignore-auto-dns": "no"}
+            self._nm_set(ref, new, log)
+            return {"manager": manager, "connection": ref, "old": old}
+        if manager == "netplan":
+            path = self._talon_netplan(iface)
+            backup = read_file(path) if os.path.exists(path) else None
+            others = [read_file(f) for f in self._netplan_files() if f != path]
+            key, fixed = netplan_key(others, iface)
+            if cfg["mode"] == "dhcp" and fixed:
+                raise UserError(f"{iface} has a fixed address in another file in /etc/netplan; "
+                                "remove it there to use DHCP")
+            if cfg["mode"] == "dhcp":
+                if os.path.exists(path):
+                    os.unlink(path)            # back to the system's own (DHCP) configuration
+            else:
+                write_atomic(path, netplan_yaml(key, cfg), mode=0o600)
+            try:
+                run(["netplan", "generate"], log=log, timeout=60)
+            except CommandError:
+                self._netplan_put(path, backup)
+                raise
+            run(["netplan", "apply"], log=log, timeout=120)
+            return {"manager": manager, "path": path, "backup": backup}
+        if manager == "ifupdown":
+            old = read_file(ref)
+            new = ifupdown_replace(old, iface, ifupdown_stanza(iface, cfg))
+            resolv = self.RESOLV
+            resolv_old = read_file(resolv) if os.path.isfile(resolv) and not os.path.islink(resolv) else None
+            write_atomic(ref, new or old)
+            if cfg["mode"] == "static" and resolv_old is not None:
+                write_atomic(resolv, "".join(f"nameserver {d}\n" for d in cfg["dns"]))
+            self._ifupdown_cycle(iface, log)
+            return {"manager": manager, "path": ref, "backup": old, "resolv": resolv_old}
+        raise UserError("Talon cannot change the network settings on this system")
+
+    def net_restore(self, iface: str, token: dict, log: Logger) -> None:
+        if not token:
+            return
+        if token["manager"] == "networkmanager":
+            self._nm_set(token["connection"], token["old"], log)
+        elif token["manager"] == "netplan":
+            self._netplan_put(token["path"], token["backup"])
+            run(["netplan", "apply"], log=log, timeout=120)
+        elif token["manager"] == "ifupdown":
+            write_atomic(token["path"], token["backup"])
+            if token.get("resolv") is not None:
+                write_atomic(self.RESOLV, token["resolv"])
+            self._ifupdown_cycle(iface, log)
+
+    def _nm_set(self, con: str, values: Dict[str, str], log: Logger) -> None:
+        args = ["nmcli", "connection", "modify", con]
+        for k in ("ipv4.method", "ipv4.addresses", "ipv4.gateway", "ipv4.dns", "ipv4.ignore-auto-dns"):
+            v = values.get(k, "")
+            if k == "ipv4.ignore-auto-dns":
+                v = "yes" if v in ("yes", "true") else "no"
+            args += [k, v.replace(", ", ",")]
+        run(args, log=log, timeout=30)
+        run(["nmcli", "connection", "up", con], log=log, timeout=90)
+
+    @staticmethod
+    def _netplan_put(path: str, content: Optional[str]) -> None:
+        if content is None:
+            if os.path.exists(path):
+                os.unlink(path)
+        else:
+            write_atomic(path, content, mode=0o600)
+
+    @staticmethod
+    def _ifupdown_cycle(iface: str, log: Logger) -> None:
+        run(["ifdown", "--force", iface], check=False, log=log, timeout=60)
+        run(["ifup", iface], log=log, timeout=120)
 
     def sample(self) -> dict:
         vm = psutil.virtual_memory()

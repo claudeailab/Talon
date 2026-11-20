@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.37
+- Settings > Networking: switch between DHCP and a static IP
+- Network changes undo themselves if Talon is not reached within 3 minutes
+
 ## 1.0.36
 - Scheduled: run commands and scripts on a schedule, with output history
 - Entra ID: client secret expiry date with email reminders

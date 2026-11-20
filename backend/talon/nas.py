@@ -12,6 +12,7 @@ from . import raid, sharecfg
 from .cloudsync import CloudSync
 from .files import FileBrowser
 from .jobs import JobRunner
+from .network import Network
 from .notify import Notifier
 from .scheduler import Scheduler
 from .state import State
@@ -43,6 +44,7 @@ class Nas:
         self.cloud = CloudSync(cfg, self.state, self, demo)
         self.files = FileBrowser(self, demo)
         self.scheduler = Scheduler(cfg, self.state, self, demo)
+        self.network = Network(platform, self.state, demo)
         self.history: collections.deque = collections.deque(maxlen=90)
         self._last_sample: Optional[dict] = None
         self._stop = threading.Event()
