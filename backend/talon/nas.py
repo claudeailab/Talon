@@ -924,10 +924,10 @@ class Nas:
         exp = self.cloud.secret_expiry()
         if exp and exp["remind"]:
             out.append({"level": "critical" if exp["days"] < 0 else "warning",
-                        "title": "Entra ID client secret " + (
+                        "title": "EntraID client secret " + (
                             "has expired" if exp["days"] < 0 else f"expires in {exp['days']} days"
                             if exp["days"] != 1 else "expires tomorrow"),
-                        "detail": "Create a new secret in Entra and save it in Settings > Entra ID",
+                        "detail": "Create a new secret in Entra and save it in Settings > EntraID",
                         "link": "/settings?tab=entra"})
         return out
 

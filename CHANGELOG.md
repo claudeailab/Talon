@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.48
+- Renamed: Thresholds tab and EntraID tab
+- Clearer description of the RAID data scrub
+
 ## 1.0.47
 - Website publishing no longer fails when GitHub lists the upload late
 

@@ -14,7 +14,7 @@ type TabId = "general" | "network" | "entra" | "smtp" | "update" | "about";
 const TABS: { value: TabId; label: string }[] = [
   { value: "general", label: "General" },
   { value: "network", label: "Networking" },
-  { value: "entra", label: "Entra ID" },
+  { value: "entra", label: "EntraID" },
   { value: "smtp", label: "SMTP" },
   { value: "update", label: "Update" },
   { value: "about", label: "About" },

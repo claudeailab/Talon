@@ -1,7 +1,7 @@
 """OneDrive service: account connection, sync tasks, schedule and rclone runs.
 
 Transfers are done by rclone (https://rclone.org). Talon signs in through its
-own Entra ID app (see ``entra.py``), keeps the tokens in its state file and
+own EntraID app (see ``entra.py``), keeps the tokens in its state file and
 writes a private rclone config for every run.
 """
 from __future__ import annotations
@@ -91,7 +91,7 @@ class CloudSync:
     def _entra(self) -> dict:
         return self.state.get("entra") or {}
 
-    # ------------------------------------------------------------ Entra ID settings
+    # ------------------------------------------------------------ EntraID settings
     def entra_public(self) -> dict:
         e = self._entra()
         return {"tenant": e.get("tenant", "common"), "client_id": e.get("client_id", ""),
@@ -131,7 +131,7 @@ class CloudSync:
         else:
             clean["reminded"] = old.get("reminded", [])
         self.state.update(lambda d: d.__setitem__("entra", clean))
-        self.state.log_activity(user, "Updated the Entra ID app settings")
+        self.state.log_activity(user, "Updated the EntraID app settings")
         return self.entra_public()
 
     def secret_expiry(self) -> Optional[dict]:
@@ -158,17 +158,17 @@ class CloudSync:
             return
         dmy = datetime.date.fromisoformat(exp["date"]).strftime("%d-%m-%Y")
         if stage == "soon":
-            subject = f"Entra ID client secret expires on {dmy}"
+            subject = f"EntraID client secret expires on {dmy}"
             when = "tomorrow" if exp["days"] == 1 else ("today" if exp["days"] == 0 else f"in {exp['days']} days")
-            body = (f"The client secret of the Entra ID app used by Talon for OneDrive expires {when} "
+            body = (f"The client secret of the EntraID app used by Talon for OneDrive expires {when} "
                     f"({dmy}).\n\n")
         else:
-            subject = "Entra ID client secret has expired"
-            body = f"The client secret of the Entra ID app used by Talon expired on {dmy}. " \
+            subject = "EntraID client secret has expired"
+            body = f"The client secret of the EntraID app used by Talon expired on {dmy}. " \
                    "OneDrive tasks cannot sign in until it is replaced.\n\n"
         body += ("To replace it: in entra.microsoft.com open the app > Certificates & secrets > "
                  "New client secret, then paste the new Value and its expiry date in "
-                 "Talon > Settings > Entra ID and click Save.")
+                 "Talon > Settings > EntraID and click Save.")
         to = e.get("remind_to") or self.nas.notifier.settings()["recipients"]
         if not to or not (self.state.get("smtp") or {}).get("host"):
             return                      # nowhere to send it yet; try again later
@@ -296,7 +296,7 @@ class CloudSync:
     def connect_start(self, origin: str) -> str:
         e = self._entra()
         if not entra.configured(e):
-            raise UserError("Configure the Entra ID app in Settings first")
+            raise UserError("Configure the EntraID app in Settings first")
         redirect = entra.redirect_uri(origin)
         state = secrets.token_urlsafe(24)
         verifier, challenge = entra.new_pkce()

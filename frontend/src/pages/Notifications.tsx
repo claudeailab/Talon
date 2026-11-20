@@ -26,7 +26,7 @@ export default function NotificationsPage() {
           onChange={change}
           tabs={[
             { value: "email", label: "Email" },
-            { value: "thresholds", label: "Alert thresholds" },
+            { value: "thresholds", label: "Thresholds" },
           ]}
         />
       </div>
@@ -139,7 +139,7 @@ function ThresholdsCard() {
   }, [q.data]);
   const body = () => ({ ...Object.fromEntries(ROWS.map((r) => [r.key, Number(f![r.key])])), bad_sectors: f!.bad_sectors });
   const save = useAction(() => api.put<ThresholdInfo>("/thresholds", body()), {
-    success: "Alert thresholds saved",
+    success: "Thresholds saved",
     invalidate: ["thresholds", "dashboard", "disks", "alerts"],
   });
   if (!q.data || !f) return null;
@@ -156,7 +156,7 @@ function ThresholdsCard() {
     <Card>
       <CardHeader
         icon={<Thermometer className="size-4.5" />}
-        title="Alert thresholds"
+        title="Thresholds"
         subtitle="When the dashboard, the bell and emails warn you"
         actions={
           <div className="flex gap-2">

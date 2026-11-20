@@ -219,14 +219,14 @@ export default function OneDrivePage() {
         <Card>
           <Empty
             icon={<KeyRound className="size-6" />}
-            title="Set up the Entra ID app first"
+            title="Set up the EntraID app first"
             text="OneDrive sign-in uses your own Microsoft Entra ID app."
             action={
               <Button
                 variant="primary"
                 onClick={() => navigate("/settings?tab=entra")}
               >
-                Open Entra ID settings
+                Open EntraID settings
               </Button>
             }
           />

@@ -123,7 +123,7 @@ def test_entra_secret_expiry_and_reminder(client):
     assert r["secret_expires"] == soon and r["remind_to"] == ["it@example.com", "me@example.com"]
     assert r["expiry"] == {"date": soon, "days": 10, "remind": True}
     alerts = client.get("/api/dashboard").json()["alerts"]
-    assert any(a["title"] == "Entra ID client secret expires in 10 days" for a in alerts)
+    assert any(a["title"] == "EntraID client secret expires in 10 days" for a in alerts)
     assert client.put("/api/settings/entra", json={**body, "secret_expires": "31-02-2028"}).status_code == 400
     eu = client.put("/api/settings/entra", json={**body, "secret_expires": "20-11-2028"}).json()
     assert eu["secret_expires"] == "2028-11-20"                     # dd-mm-yyyy accepted

@@ -59,7 +59,7 @@ export default function EntraTab() {
   const expiresIso = expires.trim() === "" ? "" : dmyToIso(expires);
   const body = { tenant, client_id: clientId.trim(), client_secret: secret };
   const save = useAction(() => api.put<EntraConfig>("/settings/entra", { ...body, secret_expires: expiresIso ?? "", remind_days: remindDays, remind_to: remindTo }), {
-    success: "Entra ID app saved",
+    success: "EntraID app saved",
     invalidate: ["entra", "onedrive"],
   });
   const test = useAction(() => api.post<{ checks: EntraCheck[] }>("/settings/entra/test", { config: body, origin: location.origin }), {
@@ -82,7 +82,7 @@ export default function EntraTab() {
         icon={<KeyRound className="size-4.5" />}
         title={
           <span className="flex items-center gap-2">
-            Entra ID app {q.data.configured ? <Badge tone="green" dot>Configured</Badge> : <Badge dot>Not configured</Badge>}
+            EntraID app {q.data.configured ? <Badge tone="green" dot>Configured</Badge> : <Badge dot>Not configured</Badge>}
           </span>
         }
         subtitle="Microsoft sign-in used by OneDrive"
@@ -191,7 +191,7 @@ function ExpiryBadge({ expiry }: { expiry: EntraConfig["expiry"] }) {
 
 export function SetupGuide({ onClose }: { onClose: () => void }) {
   return (
-    <Modal open onClose={onClose} size="lg" title="Set up the Entra ID app" description="One-time setup, about 5 minutes" footer={<Button variant="primary" onClick={onClose}>Done</Button>}>
+    <Modal open onClose={onClose} size="lg" title="Set up the EntraID app" description="One-time setup, about 5 minutes" footer={<Button variant="primary" onClick={onClose}>Done</Button>}>
       <ol className="space-y-4">
         <Step n={1} title="Open the Entra admin center">
           <p>

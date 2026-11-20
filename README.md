@@ -81,7 +81,7 @@ Click a screenshot to open the [gallery](https://claudeailab.github.io/Talon/).
   </tr>
   <tr>
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#scheduled"><img src="docs/screenshots/scheduled.png" alt="Scheduled scripts"></a><br><sub>Scheduled scripts</sub></td>
-    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#notifications"><img src="docs/screenshots/notifications.png" alt="Alert thresholds"></a><br><sub>Alert thresholds</sub></td>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#notifications"><img src="docs/screenshots/notifications.png" alt="Thresholds"></a><br><sub>Thresholds</sub></td>
   </tr>
   <tr>
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#documentation"><img src="docs/screenshots/documentation.png" alt="Built-in documentation"></a><br><sub>Built-in documentation</sub></td>

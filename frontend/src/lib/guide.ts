@@ -169,7 +169,7 @@ export const GUIDE: Topic[] = [
             list: [
               "**Add disk**: add a disk as a **Hot spare** (stands by and automatically replaces a failing disk), to **Expand capacity** (RAID 5 and RAID 6) or to **Add mirror** (RAID 1). RAID 0 and RAID 10 arrays cannot be extended, and RAID 0 has no hot spares.",
               "**Replace failed disk**: shown instead of **Add disk** when the array is degraded; rebuilds the missing data onto a new disk.",
-              "**Run data scrub**: read every block to find and repair hidden errors. Running one every month or two is good practice. **Stop data scrub** stops it. Not available for RAID 0.",
+              "**Run data scrub**: reads every block on every disk. A sector that cannot be read is rewritten from the other disks before it causes trouble in a rebuild. Running one every month or two is good practice. **Stop data scrub** stops it. Not available for RAID 0.",
               "**Delete RAID**: only possible after its volume is deleted.",
             ],
           },
@@ -505,7 +505,7 @@ export const GUIDE: Topic[] = [
     summary: "Back up or sync folders between this NAS and Microsoft OneDrive.",
     page: { to: "/onedrive", label: "Open OneDrive" },
     before: [
-      "A Microsoft Entra ID app, set up once in **Settings → Entra ID**. See [Entra ID](" + t("entra") + "). OneDrive cannot sign in without it.",
+      "A Microsoft Entra ID app, set up once in **Settings → EntraID**. See [EntraID](" + t("entra") + "). OneDrive cannot sign in without it.",
       "The **OneDrive** service turned on in [Services](/services).",
     ],
     sections: [
@@ -515,7 +515,7 @@ export const GUIDE: Topic[] = [
         blocks: [
           {
             steps: [
-              "Set up the Entra ID app and click **Test** until it passes. See [Entra ID](" + t("entra") + ").",
+              "Set up the EntraID app and click **Test** until it passes. See [EntraID](" + t("entra") + ").",
               "On the [Services](/services) page, turn on **OneDrive**. Talon downloads the transfer tool (rclone) and opens the OneDrive page.",
               "Click **Sign in with Microsoft**, sign in and allow access to your files. You return to Talon, which shows the account as **Connected**.",
               "Click **New task** to create your first backup.",
@@ -566,10 +566,10 @@ export const GUIDE: Topic[] = [
   },
   {
     id: "entra",
-    title: "Entra ID (Microsoft sign-in)",
+    title: "EntraID (Microsoft sign-in)",
     group: "Cloud and alerts",
     summary: "The one-time Microsoft app registration that OneDrive needs to sign in.",
-    page: { to: "/settings?tab=entra", label: "Open Settings → Entra ID" },
+    page: { to: "/settings?tab=entra", label: "Open Settings → EntraID" },
     sections: [
       {
         id: "why",
@@ -582,7 +582,7 @@ export const GUIDE: Topic[] = [
         id: "steps",
         title: "Step by step",
         blocks: [
-          { p: "Talon shows the same steps under **Settings → Entra ID → Setup guide**, with your exact redirect address and a **Copy** button." },
+          { p: "Talon shows the same steps under **Settings → EntraID → Setup guide**, with your exact redirect address and a **Copy** button." },
           {
             steps: [
               "Go to **entra.microsoft.com** and sign in with an account that can register apps.",
@@ -593,7 +593,7 @@ export const GUIDE: Topic[] = [
               "In Talon, choose the **Supported account types** you picked in step 2, click **Save**, then **Test**.",
             ],
           },
-          { img: "entra-guide", alt: "Entra ID setup guide" },
+          { img: "entra-guide", alt: "EntraID setup guide" },
           { p: "**Directory (tenant) ID** is only needed for **Only my organization**. Leave it empty for personal accounts." },
         ],
       },
@@ -617,13 +617,13 @@ export const GUIDE: Topic[] = [
         blocks: [
           {
             steps: [
-              "In [Settings → Entra ID](/settings?tab=entra), under **Client secret expiry**, enter the date in **Secret expires on**. Entra shows it under **Certificates & secrets**.",
+              "In [Settings → EntraID](/settings?tab=entra), under **Client secret expiry**, enter the date in **Secret expires on**. Entra shows it under **Certificates & secrets**.",
               "Choose when to **Send a reminder**: 7 to 90 days before.",
               "Enter the addresses in **Send the reminder to**, separated by commas. Leave it empty to use the recipients from the [Notifications](/notifications) page.",
               "Click **Save**.",
             ],
           },
-          { img: "settings-entra", alt: "Entra ID settings with the client secret expiry" },
+          { img: "settings-entra", alt: "EntraID settings with the client secret expiry" },
           { p: "Talon sends one email when the reminder period starts and one more if the secret expires. The dashboard also shows the expiry as an issue. Emails need [SMTP](" + t("email") + ") to be set up." },
           { p: "After you create a new secret, paste its Value and its new expiry date and click **Save**; the reminders start again for the new date." },
         ],
@@ -672,9 +672,9 @@ export const GUIDE: Topic[] = [
       },
       {
         id: "thresholds",
-        title: "3. Alert thresholds",
+        title: "3. Thresholds",
         blocks: [
-          { p: "On the [Notifications](/notifications?tab=thresholds) page, the **Alert thresholds** tab sets when Talon warns you. The limits apply to the dashboard, the bell and emails, also without SMTP." },
+          { p: "On the [Notifications](/notifications?tab=thresholds) page, the **Thresholds** tab sets when Talon warns you. The limits apply to the dashboard, the bell and emails, also without SMTP." },
           {
             list: [
               "**Disk temperature**: a limit for **Hard disks (HDD)**, **SATA SSDs** and **NVMe SSDs**, because SSDs run warmer. Each shows the current temperatures of those disks.",
@@ -683,7 +683,7 @@ export const GUIDE: Topic[] = [
               "**Bad sectors**: warn as soon as a disk reports reallocated or pending sectors.",
             ],
           },
-          { img: "notifications-thresholds", alt: "Alert thresholds" },
+          { img: "notifications-thresholds", alt: "Thresholds" },
           { p: "Change the values and click **Save**. **Reset to defaults** restores 55 °C, 65 °C and 75 °C, 90% full, 90% worn, and bad sector warnings on." },
         ],
       },
@@ -770,9 +770,9 @@ export const GUIDE: Topic[] = [
       },
       {
         id: "other",
-        title: "Entra ID, SMTP and About",
+        title: "EntraID, SMTP and About",
         blocks: [
-          { p: "**Entra ID** is the Microsoft sign-in for OneDrive ([Entra ID](" + t("entra") + ")). **SMTP** sends emails ([Email notifications](" + t("email") + ")). **About** shows the Talon version and the hardware." },
+          { p: "**EntraID** is the Microsoft sign-in for OneDrive ([EntraID](" + t("entra") + ")). **SMTP** sends emails ([Email notifications](" + t("email") + ")). **About** shows the Talon version and the hardware." },
         ],
       },
     ],
@@ -904,7 +904,7 @@ export const GUIDE: Topic[] = [
       {
         id: "onedrive",
         title: "OneDrive does not connect",
-        blocks: [{ p: "First check **Settings → Entra ID → Test**. Most problems are a redirect URI that does not match the address you use, or the Secret ID pasted instead of the secret Value. See [Entra ID](" + t("entra") + ")." }],
+        blocks: [{ p: "First check **Settings → EntraID → Test**. Most problems are a redirect URI that does not match the address you use, or the Secret ID pasted instead of the secret Value. See [EntraID](" + t("entra") + ")." }],
       },
       {
         id: "mail",
