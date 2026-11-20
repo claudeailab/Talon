@@ -209,15 +209,11 @@ function CreateVolumeDialog({
       ? { kind: "disk", name: sources.disks[0].name }
       : null;
   const [src, setSrc] = useState<Src | null>(first);
+  // first free name: volume1, volume2, ...
   const suggested = useMemo(() => {
-    if (src?.kind === "array" && !existing.includes(src.name)) return src.name;
     for (let i = 1; ; i++) if (!existing.includes(`volume${i}`)) return `volume${i}`;
-  }, [src, existing]);
+  }, [existing]);
   const [name, setName] = useState(suggested);
-  const [touched, setTouched] = useState(false);
-  useEffect(() => {
-    if (!touched) setName(suggested);
-  }, [suggested, touched]);
   const [fs, setFs] = useState<"ext4" | "xfs">("ext4");
   const [agree, setAgree] = useState(false);
   useEffect(() => setAgree(false), [src]);
@@ -294,10 +290,7 @@ function CreateVolumeDialog({
           <Field label="Volume name" error={nameErr} hint={`Mounted at /srv/nas/${name || "…"}`}>
             <Input
               value={name}
-              onChange={(e) => {
-                setTouched(true);
-                setName(e.target.value.toLowerCase());
-              }}
+              onChange={(e) => setName(e.target.value.toLowerCase())}
               maxLength={24}
             />
           </Field>

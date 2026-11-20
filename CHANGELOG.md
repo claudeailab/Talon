@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.16
+- New volumes are named volume1, volume2, … by default
+
 ## 1.0.15
 - Disks of virtual machines show a readable name, e.g. "VMware virtual disk"
 - No more single words left alone on the last line of a message
