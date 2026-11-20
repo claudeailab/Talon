@@ -39,7 +39,7 @@ export default function DisksPage() {
 
   return (
     <>
-      <PageHeader title="Disks" description="All physical disks detected in this computer, with health information from S.M.A.R.T." />
+      <PageHeader title="Disks" description="Physical disks and their health." />
       <Card className="overflow-hidden">
         {data.length === 0 ? (
           <Empty icon={<HardDrive className="size-6" />} title="No disks detected" />

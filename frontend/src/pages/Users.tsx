@@ -44,7 +44,7 @@ export default function UsersPage() {
     <>
       <PageHeader
         title="Users & groups"
-        description="Accounts that can access shared folders. Administrators can also sign in to this web interface."
+        description="Accounts for shared folders and this web interface."
         actions={
           tab === "users" ? (
             <Button variant="primary" icon={<UserPlus className="size-4" />} onClick={() => setUserDlg({ user: null })}>

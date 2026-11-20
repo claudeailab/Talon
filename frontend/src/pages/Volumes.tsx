@@ -30,7 +30,7 @@ export default function VolumesPage() {
 
   return (
     <>
-      <PageHeader title="Volumes" description="Filesystems on a RAID array or a single disk. Shared folders live on volumes." actions={button} />
+      <PageHeader title="Volumes" description="Storage on a RAID array or a single disk." actions={button} />
       {vols.data.length === 0 ? (
         <Card>
           <Empty

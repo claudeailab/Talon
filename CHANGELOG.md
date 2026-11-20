@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.20
+- Shorter page descriptions that fit on one line
+
 ## 1.0.19
 - Save buttons are greyed out until something is changed
 
