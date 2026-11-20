@@ -38,8 +38,8 @@ export default function VolumesPage() {
             title="No volumes yet"
             text={
               nSources
-                ? "Create a volume on a RAID array or a single disk to start storing data."
-                : "No unused RAID arrays or disks. Connect a disk, or free one up."
+                ? "Create one on a RAID array or a single disk."
+                : "No unused RAID arrays or disks."
             }
             action={nSources > 0 && button}
           />

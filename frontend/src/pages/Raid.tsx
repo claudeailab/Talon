@@ -34,8 +34,8 @@ export default function RaidPage() {
             title="No RAID arrays yet"
             text={
               free.length < 2
-                ? "A RAID array needs at least two unused disks."
-                : `${free.length} disks available. Create a RAID array, then a volume on it.`
+                ? "A RAID needs at least two unused disks."
+                : `${free.length} disks available.`
             }
             action={free.length >= 2 && create}
           />

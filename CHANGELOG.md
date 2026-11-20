@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.21
+- All messages, service cards and hints fit on a single line
+- Shorter service names, e.g. "Bonjour (mDNS)" and "NetBIOS"
+
 ## 1.0.20
 - Shorter page descriptions that fit on one line
 

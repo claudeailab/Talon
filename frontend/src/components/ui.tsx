@@ -533,7 +533,8 @@ export function Empty({ icon, title, text, action }: { icon: ReactNode; title: s
         {icon}
       </div>
       <h3 className="text-base font-semibold text-balance">{title}</h3>
-      {text && <p className="mt-1 max-w-md text-sm text-balance text-zinc-500 dark:text-zinc-400">{text}</p>}
+      {/* one line on anything wider than a phone */}
+      {text && <p className="mt-1 text-sm text-balance text-zinc-500 sm:whitespace-nowrap dark:text-zinc-400">{text}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
   );

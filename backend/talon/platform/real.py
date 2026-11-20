@@ -24,17 +24,17 @@ SYSTEM_MOUNTS = {"/", "/boot", "/boot/efi", "/boot/firmware", "/usr", "/var", "/
 SKIP_DISK_PREFIXES = ("loop", "ram", "zram", "sr", "fd", "md", "dm-", "nbd", "mtdblock")
 
 SERVICES = {
-    "smb": {"units": ["smbd"], "label": "SMB/CIFS (Samba)",
-            "description": "Windows, macOS and Linux file sharing"},
-    "netbios": {"units": ["nmbd"], "label": "NetBIOS name service",
-                "description": "Legacy name discovery for old Windows clients"},
-    "nfs": {"units": ["nfs-server", "nfs-kernel-server"], "label": "NFS server",
-            "description": "Network File System v3/v4 for Linux, macOS, VMware"},
+    "smb": {"units": ["smbd"], "label": "SMB (Samba)",
+            "description": "File sharing for Windows, macOS and Linux"},
+    "netbios": {"units": ["nmbd"], "label": "NetBIOS",
+                "description": "Name lookup for old Windows PCs"},
+    "nfs": {"units": ["nfs-server", "nfs-kernel-server"], "label": "NFS",
+            "description": "File sharing for Linux and VMware"},
     "wsdd": {"units": ["wsdd", "wsdd2"], "label": "WS-Discovery",
-             "description": "Makes the NAS appear in Windows Network"},
-    "mdns": {"units": ["avahi-daemon"], "label": "mDNS / Bonjour (Avahi)",
-             "description": "Makes the NAS appear in macOS Finder and Linux file managers"},
-    "ssh": {"units": ["ssh"], "label": "SSH", "description": "Secure shell remote access"},
+             "description": "Shows the NAS in Windows Network"},
+    "mdns": {"units": ["avahi-daemon"], "label": "Bonjour (mDNS)",
+             "description": "Shows the NAS in macOS Finder"},
+    "ssh": {"units": ["ssh"], "label": "SSH", "description": "Secure remote shell access"},
 }
 
 MDADM_CONF = "/etc/mdadm/mdadm.conf"

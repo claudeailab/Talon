@@ -76,7 +76,7 @@ export default function SharesPage() {
       )}
       {shares.data.length === 0 ? (
         <Card>
-          <Empty icon={<FolderOpen className="size-6" />} title="No shared folders" text="Create a shared folder to make storage available on your network." />
+          <Empty icon={<FolderOpen className="size-6" />} title="No shared folders" text="Make storage available on your network." />
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">

@@ -169,7 +169,7 @@ export default function UsersPage() {
             <Empty
               icon={<UsersIcon className="size-6" />}
               title="No groups"
-              text="Groups make it easy to give several users the same access to shared folders."
+              text="Give several users the same access to shared folders."
               action={
                 <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setGroupDlg({ group: null })}>
                   Add group

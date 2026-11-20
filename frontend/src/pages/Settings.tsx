@@ -54,14 +54,14 @@ export default function SettingsPage() {
             }
           />
           <div className="grid gap-x-8 gap-y-4 px-5 pb-5 md:grid-cols-2 [&>*]:min-w-0">
-            <Field label="Hostname" hint={`Reachable as ${form.hostname}.local on most networks`}>
+            <Field label="Hostname" hint={`Reachable as ${form.hostname}.local`}>
               <Input value={form.hostname} onChange={(e) => set("hostname", e.target.value)} />
             </Field>
             <div className="grid gap-4 sm:grid-cols-2 [&>*]:min-w-0">
               <Field label="Workgroup">
                 <Input value={form.workgroup} onChange={(e) => set("workgroup", e.target.value.toUpperCase())} maxLength={15} />
               </Field>
-              <Field label="Minimum SMB protocol" hint="SMB2_10 or newer is recommended">
+              <Field label="Minimum SMB protocol" hint="SMB2_10+ recommended">
                 <Select value={form.smb_min_protocol} onChange={(e) => set("smb_min_protocol", e.target.value)}>
                   {form.smb_protocols.map((p) => (
                     <option key={p}>{p}</option>

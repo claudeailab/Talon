@@ -28,14 +28,13 @@ export default function ServicesPage() {
         {data.map((s) => (
           <Card key={s.id} className="flex flex-col p-5">
             <div className="flex items-start justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex size-11 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600 dark:bg-white/5 dark:text-zinc-300">{ICONS[s.id]}</div>
-                <div>
-                  <div className="font-semibold">{s.label}</div>
-                  <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600 dark:bg-white/5 dark:text-zinc-300">{ICONS[s.id]}</div>
+                <div className="min-w-0">
+                  <div className="truncate font-semibold">{s.label}</div>
+                  <div className="flex items-center gap-1.5 text-xs whitespace-nowrap text-zinc-500">
                     <StatusDot tone={s.active ? "green" : "zinc"} pulse={s.active} />
                     {!s.installed ? "Not installed" : s.active ? "Running" : "Stopped"}
-                    {s.unit && <span className="font-mono text-zinc-400">· {s.unit}</span>}
                   </div>
                 </div>
               </div>
@@ -46,7 +45,9 @@ export default function ServicesPage() {
                 onChange={(v) => act.mutate({ id: s.id, action: v ? "enable" : "disable" })}
               />
             </div>
-            <p className="mt-3 flex-1 text-[13px] text-zinc-500 dark:text-zinc-400">{s.description}</p>
+            <p className="mt-3 truncate text-[13px] text-zinc-500 dark:text-zinc-400" title={s.description}>
+              {s.description}
+            </p>
             <div className="mt-4 flex items-center justify-between">
               {s.enabled ? <Badge tone="green">Starts at boot</Badge> : <Badge>Disabled at boot</Badge>}
               <Button size="sm" variant="ghost" icon={<RotateCw className="size-3.5" />} disabled={!s.installed || !s.active} onClick={() => act.mutate({ id: s.id, action: "restart" })}>
