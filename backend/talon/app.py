@@ -25,12 +25,18 @@ class LoginIn(BaseModel):
     password: str
 
 
-class VolumeIn(BaseModel):
+class RaidIn(BaseModel):
     name: str
     level: str
     disks: List[str]
     spares: List[str] = []
+
+
+class VolumeIn(BaseModel):
+    name: str
     fs: str = "ext4"
+    array: Optional[str] = None
+    disk: Optional[str] = None
 
 
 class OptionsIn(BaseModel):
@@ -182,37 +188,53 @@ def create_app(cfg, platform) -> FastAPI:
     def disk_wipe(name: str, user: str = Depends(current_user)):
         return nas.wipe_disk(name, user).to_dict()
 
+    # ------------------------------------------------------------ RAID
+    @app.get("/api/raid")
+    def raid_list(_u: str = Depends(current_user)):
+        return nas.raid_arrays()
+
+    @app.post("/api/raid/options")
+    def raid_options(body: OptionsIn, _u: str = Depends(current_user)):
+        return nas.raid_options(body.disks, body.spares)
+
+    @app.post("/api/raid")
+    def raid_create(body: RaidIn, user: str = Depends(current_user)):
+        return nas.create_array(body.name, body.level, body.disks, body.spares, user).to_dict()
+
+    @app.delete("/api/raid/{name}")
+    def raid_delete(name: str, user: str = Depends(current_user)):
+        return nas.delete_array(name, user).to_dict()
+
+    @app.post("/api/raid/{name}/disks")
+    def raid_add_disk(name: str, body: AddDiskIn, user: str = Depends(current_user)):
+        return nas.add_disk(name, body.disk, body.mode, user).to_dict()
+
+    @app.delete("/api/raid/{name}/members/{part}")
+    def raid_remove_member(name: str, part: str, user: str = Depends(current_user)):
+        return nas.remove_member(name, part, user).to_dict()
+
+    @app.post("/api/raid/{name}/scrub")
+    def raid_scrub(name: str, action: str = Body("check", embed=True),
+                   user: str = Depends(current_user)):
+        nas.scrub(name, action, user)
+        return {"ok": True}
+
     # ------------------------------------------------------------ volumes
     @app.get("/api/volumes")
     def volumes(_u: str = Depends(current_user)):
         return nas.volumes()
 
-    @app.post("/api/volumes/options")
-    def volume_options(body: OptionsIn, _u: str = Depends(current_user)):
-        return nas.raid_options(body.disks, body.spares)
+    @app.get("/api/volumes/sources")
+    def volume_sources(_u: str = Depends(current_user)):
+        return nas.volume_sources()
 
     @app.post("/api/volumes")
     def volume_create(body: VolumeIn, user: str = Depends(current_user)):
-        return nas.create_volume(body.name, body.level, body.disks, body.spares, body.fs,
-                                 user).to_dict()
+        return nas.create_volume(body.name, body.fs, body.array, body.disk, user).to_dict()
 
     @app.delete("/api/volumes/{name}")
     def volume_delete(name: str, user: str = Depends(current_user)):
         return nas.delete_volume(name, user).to_dict()
-
-    @app.post("/api/volumes/{name}/disks")
-    def volume_add_disk(name: str, body: AddDiskIn, user: str = Depends(current_user)):
-        return nas.add_disk(name, body.disk, body.mode, user).to_dict()
-
-    @app.delete("/api/volumes/{name}/members/{part}")
-    def volume_remove_member(name: str, part: str, user: str = Depends(current_user)):
-        return nas.remove_member(name, part, user).to_dict()
-
-    @app.post("/api/volumes/{name}/scrub")
-    def volume_scrub(name: str, action: str = Body("check", embed=True),
-                     user: str = Depends(current_user)):
-        nas.scrub(name, action, user)
-        return {"ok": True}
 
     @app.post("/api/volumes/{name}/expand")
     def volume_expand(name: str, user: str = Depends(current_user)):

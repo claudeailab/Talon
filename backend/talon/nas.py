@@ -31,10 +31,31 @@ class Nas:
         self.state = State(cfg.state_file)
         if getattr(platform, "demo", False):
             platform.seed_state(self.state)
+        self._migrate()
         self.jobs = JobRunner(on_done=self._job_done)
         self.history: collections.deque = collections.deque(maxlen=90)
         self._last_sample: Optional[dict] = None
         self._stop = threading.Event()
+
+    def _migrate(self) -> None:
+        """Volumes created before RAID and volumes were separated owned their md
+        array. Give each such array its own entry in ``arrays``."""
+        vols = self.state.get("volumes")
+        if all("array" in v for v in vols.values()):
+            return
+
+        def upd(d):
+            for v in d["volumes"].values():
+                if "array" in v:
+                    continue
+                if v.get("md_uuid") and v.get("level", "single") != "single":
+                    d["arrays"].setdefault(v["name"], {
+                        "name": v["name"], "level": v["level"], "md_uuid": v["md_uuid"],
+                        "created": v.get("created")})
+                    v["array"] = v["name"]
+                else:
+                    v["array"] = None
+        self.state.update(upd)
 
     # ---------------------------------------------------------------- lifecycle
     def start(self) -> None:
@@ -81,19 +102,20 @@ class Nas:
     # ---------------------------------------------------------------- disks
     def disks(self) -> List[dict]:
         vols = self.state.get("volumes")
-        arrays = {a["dev"]: a for a in self.p.md_arrays()}
-        md_to_vol = {}
-        for v in vols.values():
-            for a in arrays.values():
-                if v.get("md_uuid") and a.get("uuid") == v["md_uuid"]:
-                    md_to_vol[a["dev"]] = v["name"]
+        known = self.state.get("arrays")
+        md_by_dev = {a["dev"]: a for a in self.p.md_arrays()}
+        uuid_to_array = {r["md_uuid"]: n for n, r in known.items()}
+        array_to_vol = {v["array"]: v["name"] for v in vols.values() if v.get("array")}
         mp_to_vol = {v["mountpoint"]: v["name"] for v in vols.values()}
         out = []
         for d in self.p.scan_disks():
-            status, detail, volume = "available", "", None
-            if any(m in md_to_vol for m in d["md"]):
-                volume = next(md_to_vol[m] for m in d["md"] if m in md_to_vol)
-                status, detail = "volume", f"Member of volume {volume}"
+            status, detail, volume, array = "available", "", None, None
+            mine = [uuid_to_array[md_by_dev[m]["uuid"]] for m in d["md"]
+                    if m in md_by_dev and md_by_dev[m].get("uuid") in uuid_to_array]
+            if mine:
+                array = mine[0]
+                volume = array_to_vol.get(array)
+                status, detail = "raid", f"Member of RAID {array}"
             elif d["md"]:
                 status, detail = "raid_member", "Member of RAID " + ", ".join(d["md"])
             elif any(m in SYSTEM_MOUNTS for m in d["mounts"]):
@@ -108,7 +130,7 @@ class Nas:
                 status, detail = "has_data", f"Contains existing data ({fs}) - will be erased"
             smart = self.p.smart_cached(d["name"])
             out.append({**d, "status": status, "status_detail": detail, "volume": volume,
-                        "selectable": status in ("available", "has_data"),
+                        "array": array, "selectable": status in ("available", "has_data"),
                         "health": self._health(smart),
                         "temperature": smart.get("temperature"),
                         "power_on_hours": smart.get("power_on_hours")})
@@ -147,67 +169,44 @@ class Nas:
             raise UserError(f"Disk {name} is in use ({d['status_detail']})")
         return self.jobs.submit(f"Wipe disk {name}", user, lambda log: self.p.wipe_disk(name, log))
 
-    # ---------------------------------------------------------------- volumes
+    # ---------------------------------------------------------------- RAID arrays
     def raid_options(self, disks: List[str], spares: int) -> List[dict]:
         all_disks = {d["name"]: d for d in self.disks()}
         sizes = [all_disks[n]["size"] for n in disks if n in all_disks]
-        return raid.options_for(sizes, spares)
+        return [o for o in raid.options_for(sizes, spares) if o["id"] != "single"]
 
-    def _array_for(self, vol: dict, arrays: List[dict]) -> Optional[dict]:
-        for a in arrays:
-            if vol.get("md_uuid") and a.get("uuid") == vol["md_uuid"]:
-                return a
-        return None
+    def _live(self, record: dict, arrays: List[dict]) -> Optional[dict]:
+        return next((a for a in arrays if a.get("uuid") == record.get("md_uuid")), None)
 
-    def volumes(self) -> List[dict]:
+    def raid_arrays(self) -> List[dict]:
+        known = self.state.get("arrays")
         vols = self.state.get("volumes")
-        shares = self.state.get("shares")
-        arrays = self.p.md_arrays()
+        live = self.p.md_arrays()
         disks = {d["name"]: d for d in self.p.scan_disks()}
         out = []
-        for v in sorted(vols.values(), key=lambda x: x["name"]):
-            info = self.p.fs_info(v.get("uuid")) if v.get("uuid") else None
-            item = {
-                "name": v["name"], "level": v["level"], "fs": v["fs"],
-                "mountpoint": v["mountpoint"], "created": v.get("created"),
-                "mounted": bool(info and info.get("mounted")),
-                "size": (info or {}).get("size", 0), "used": (info or {}).get("used", 0),
-                "free": (info or {}).get("free", 0), "members": [], "array": None,
-                "shares": sorted(n for n, s in shares.items() if s["volume"] == v["name"]),
-                "can_expand_fs": False, "status": "healthy", "status_detail": "",
-            }
-            if v["level"] == "single":
-                dev = (info or {}).get("dev")
-                disk = next((n for n, d in disks.items()
-                             if dev and any(p["name"] == dev for p in d["partitions"])), None)
-                if disk:
-                    item["members"] = [{"disk": disk, "part": dev, "state": "active",
-                                        "model": disks[disk]["model"],
-                                        "size": disks[disk]["size"], "kind": disks[disk]["kind"]}]
-                if not info:
-                    item["status"], item["status_detail"] = "missing", "Disk not found"
+        for r in sorted(known.values(), key=lambda x: x["name"]):
+            item = {"name": r["name"], "level": r["level"], "created": r.get("created"),
+                    "volume": next((v["name"] for v in vols.values()
+                                    if v.get("array") == r["name"]), None),
+                    "size": 0, "members": [], "sync": None,
+                    "status": "healthy", "status_detail": ""}
+            a = self._live(r, live)
+            if not a:
+                item["status"], item["status_detail"] = "missing", "RAID array not assembled"
             else:
-                a = self._array_for(v, arrays)
-                if not a:
-                    item["status"], item["status_detail"] = "missing", "RAID array not assembled"
-                else:
-                    item["array"] = {k: a[k] for k in ("dev", "raid_disks", "size", "degraded",
-                                                       "sync_action", "sync_progress",
-                                                       "sync_speed_kbs", "array_state")}
-                    for m in a["members"]:
-                        d = disks.get(m["disk"], {})
-                        item["members"].append({**m, "model": d.get("model", "?"),
-                                                "size": d.get("size", 0),
-                                                "kind": d.get("kind", "hdd")})
-                    item["status"], item["status_detail"] = self._array_status(a)
-                    if info and info.get("mounted") and a["sync_action"] != "reshape" \
-                            and a["size"] > (v.get("fs_dev_size") or a["size"]):
-                        item["can_expand_fs"] = True
-            if item["status"] == "healthy" and not item["mounted"]:
-                item["status"], item["status_detail"] = "unmounted", "Filesystem is not mounted"
+                item["dev"] = a["dev"]
+                item["size"] = a["size"]
+                item["raid_disks"] = a["raid_disks"]
+                item["degraded"] = a["degraded"]
+                item["sync"] = {k: a[k] for k in ("sync_action", "sync_progress", "sync_speed_kbs")}
+                for m in a["members"]:
+                    d = disks.get(m["disk"], {})
+                    item["members"].append({**m, "model": d.get("model", "?"),
+                                            "size": d.get("size", 0),
+                                            "kind": d.get("kind", "hdd")})
+                item["status"], item["status_detail"] = self._array_status(a)
             item["fault_tolerance"] = raid.fault_tolerance(
-                v["level"], len([m for m in item["members"] if m["state"] != "spare"]) or 1) \
-                if v["level"] in raid.LEVELS else 0
+                r["level"], len([m for m in item["members"] if m["state"] != "spare"]) or 1)
             out.append(item)
         return out
 
@@ -231,120 +230,91 @@ class Nas:
             return "checking", "Data scrub in progress" + pct
         return "healthy", ""
 
-    def _vol(self, name: str) -> dict:
-        v = self.state.get("volumes").get(name)
-        if not v:
-            raise UserError(f"Volume {name} not found")
-        return v
+    def _check_disks(self, names: List[str]) -> Dict[str, dict]:
+        current = {d["name"]: d for d in self.disks()}
+        for n in names:
+            if n not in current:
+                raise UserError(f"Disk {n} not found")
+            if not current[n]["selectable"]:
+                raise UserError(f"Disk {n} is in use ({current[n]['status_detail']})")
+        return current
 
-    def create_volume(self, name: str, level: str, disks: List[str], spares: List[str],
-                      fs: str, user: str):
-        require(VOLUME_NAME_RE, name, "volume name (lowercase letters, digits, - and _)")
-        if name in self.state.get("volumes"):
-            raise UserError(f"A volume named {name} already exists")
-        if fs not in ("ext4", "xfs"):
-            raise UserError("Filesystem must be ext4 or xfs")
+    def create_array(self, name: str, level: str, disks: List[str], spares: List[str],
+                     user: str):
+        require(VOLUME_NAME_RE, name, "RAID name (lowercase letters, digits, - and _)")
+        if name in self.state.get("arrays"):
+            raise UserError(f"A RAID array named {name} already exists")
+        if level == "single" or level not in raid.LEVELS:
+            raise UserError("Choose a RAID level")
         disks, spares = unique(disks), unique(spares)
         if set(disks) & set(spares):
             raise UserError("A disk cannot be both a data disk and a spare")
         err = raid.validate(level, len(disks), len(spares))
         if err:
             raise UserError(err)
-        current = {d["name"]: d for d in self.disks()}
-        for n in disks + spares:
-            if n not in current:
-                raise UserError(f"Disk {n} not found")
-            if not current[n]["selectable"]:
-                raise UserError(f"Disk {n} is in use ({current[n]['status_detail']})")
-        usable = raid.usable_capacity(level, [current[n]["size"] for n in disks])
-        if fs == "xfs" and usable < 320 * 10**6:
-            raise UserError("XFS needs a volume of at least 300 MB; use ext4")
-        mountpoint = os.path.join(self.cfg.mount_root, name)
-        if os.path.ismount(mountpoint):
-            raise UserError(f"{mountpoint} is already a mount point")
+        self._check_disks(disks + spares)
         label = raid.LEVELS[level].label
 
         def work(log):
             for n in disks + spares:
                 log(f"-- preparing disk {n}")
                 self.p.wipe_disk(n, log)
-            parts = [self.p.make_partition(n, level != "single", log) for n in disks]
+            parts = [self.p.make_partition(n, True, log) for n in disks]
             sparts = [self.p.make_partition(n, True, log) for n in spares]
-            record = {"name": name, "level": level, "fs": fs, "mountpoint": mountpoint,
-                      "created": time.time(), "uuid": None, "md_uuid": None}
-            if level == "single":
-                dev = parts[0]
-            else:
-                log(f"-- creating {label} array")
-                md = self.p.md_create(name, level, parts, sparts, log)
-                dev = md["dev"]
-                record["md_uuid"] = md["uuid"]
-                self.state.update(lambda d: d["volumes"].__setitem__(name, dict(record)))
-            log(f"-- creating {fs} filesystem on {dev}")
-            record["uuid"] = self.p.mkfs(dev, fs, name, log)
-            record["fs_dev_size"] = self.p.block_size(dev)
-            self.state.update(lambda d: d["volumes"].__setitem__(name, dict(record)))
-            log(f"-- mounting at {mountpoint}")
-            self.p.mount_persist(record["uuid"], fs, mountpoint, log)
-            if level != "single":
-                self.p.save_mdadm_conf(log)
+            log(f"-- creating {label} array")
+            md = self.p.md_create(name, level, parts, sparts, log)
+            record = {"name": name, "level": level, "md_uuid": md["uuid"], "created": time.time()}
+            self.state.update(lambda d: d["arrays"].__setitem__(name, record))
+            self.p.save_mdadm_conf(log)
+            log("RAID array created. Create a volume on it to store data.")
 
-        return self.jobs.submit(f"Create volume {name} ({label}, {len(disks)} disk"
-                                f"{'s' if len(disks) > 1 else ''})", user, work)
+        return self.jobs.submit(f"Create RAID {name} ({label}, {len(disks)} disks)", user, work)
 
-    def delete_volume(self, name: str, user: str):
-        v = self._vol(name)
-        used_by = [n for n, s in self.state.get("shares").items() if s["volume"] == name]
-        if used_by:
-            raise UserError("Delete these shares first: " + ", ".join(sorted(used_by)))
-
-        def work(log):
-            arrays = self.p.md_arrays()
-            disks = self.p.scan_disks()
-            info = self.p.fs_info(v.get("uuid")) if v.get("uuid") else None
-            self.p.unmount_remove(v.get("uuid"), v["mountpoint"], log)
-            members: List[str] = []
-            if v["level"] == "single":
-                dev = (info or {}).get("dev")
-                members = [d["name"] for d in disks
-                           if dev and any(p["name"] == dev for p in d["partitions"])]
-            else:
-                a = self._array_for(v, arrays)
-                if a:
-                    self.p.md_destroy(a["dev"], [m["part"] for m in a["members"]], log)
-                    members = [m["disk"] for m in a["members"]]
-            for disk in unique(members):
-                self.p.wipe_disk(disk, log)
-            self.state.update(lambda d: d["volumes"].pop(name, None))
-            if v["level"] != "single":
-                self.p.save_mdadm_conf(log)
-
-        return self.jobs.submit(f"Delete volume {name}", user, work)
-
-    def _live_array(self, name: str):
-        v = self._vol(name)
-        if v["level"] == "single":
-            raise UserError("This operation needs a RAID volume")
-        a = self._array_for(v, self.p.md_arrays())
+    def _array(self, name: str):
+        r = self.state.get("arrays").get(name)
+        if not r:
+            raise UserError(f"RAID array {name} not found")
+        a = self._live(r, self.p.md_arrays())
         if not a:
             raise UserError("RAID array is not assembled")
-        return v, a
+        return r, a
+
+    def delete_array(self, name: str, user: str):
+        r = self.state.get("arrays").get(name)
+        if not r:
+            raise UserError(f"RAID array {name} not found")
+        used = next((v["name"] for v in self.state.get("volumes").values()
+                     if v.get("array") == name), None)
+        if used:
+            raise UserError(f"Delete volume {used} first")
+
+        def work(log):
+            a = self._live(r, self.p.md_arrays())
+            if a:
+                self.p.md_destroy(a["dev"], [m["part"] for m in a["members"]], log)
+                for disk in unique([m["disk"] for m in a["members"]]):
+                    self.p.wipe_disk(disk, log)
+            self.state.update(lambda d: d["arrays"].pop(name, None))
+            self.p.save_mdadm_conf(log)
+
+        return self.jobs.submit(f"Delete RAID {name}", user, work)
 
     def add_disk(self, name: str, disk: str, mode: str, user: str):
-        v, a = self._live_array(name)
+        r, a = self._array(name)
         d = self._disk(disk)
         if not d["selectable"]:
             raise UserError(f"Disk {disk} is in use ({d['status_detail']})")
         smallest = min((self.p.block_size(m["part"]) for m in a["members"]), default=0)
         if d["size"] < smallest:
             raise UserError(f"Disk {disk} is smaller than the existing members")
+        level = r["level"]
         if mode == "spare":
-            if v["level"] == "raid0":
+            if level == "raid0":
                 raise UserError("RAID 0 cannot use hot spares")
             title = f"Add hot spare {disk} to {name}"
         elif mode == "grow":
-            if v["level"] not in GROWABLE:
-                raise UserError(f"{raid.LEVELS[v['level']].label} cannot be expanded with "
+            if level not in GROWABLE:
+                raise UserError(f"{raid.LEVELS[level].label} cannot be expanded with "
                                 "more disks; add it as a hot spare instead")
             if a["degraded"] or a["sync_action"] != "idle":
                 raise UserError("Wait until the array is healthy and idle before expanding")
@@ -364,23 +334,23 @@ class Nas:
             self.p.md_add(a["dev"], part, log)
             if mode == "grow":
                 self.p.md_grow(a["dev"], a["raid_disks"] + 1, log)
-                log("Array reshape started. When it finishes, use 'Expand filesystem' "
-                    "to make the new space available." if v["level"] != "raid1" else
+                log("Array reshape started. When it finishes, use 'Expand filesystem' on "
+                    "the volume to make the new space available." if level != "raid1" else
                     "Disk added as an additional mirror.")
             self.p.save_mdadm_conf(log)
 
         return self.jobs.submit(title, user, work)
 
     def remove_member(self, name: str, part: str, user: str):
-        v, a = self._live_array(name)
+        r, a = self._array(name)
         member = next((m for m in a["members"] if m["part"] == part), None)
         if not member:
             raise UserError("Not a member of this array")
         if member["state"] not in ("spare", "faulty"):
             active = [m for m in a["members"] if m["state"] == "active"]
-            tolerance = raid.fault_tolerance(v["level"], a["raid_disks"])
+            tolerance = raid.fault_tolerance(r["level"], a["raid_disks"])
             if a["degraded"] + 1 > tolerance or len(active) <= 1:
-                raise UserError("Removing this disk would destroy the volume")
+                raise UserError("Removing this disk would destroy the array")
 
         def work(log):
             self.p.md_fail_remove(a["dev"], part, log)
@@ -390,15 +360,146 @@ class Nas:
         return self.jobs.submit(f"Remove disk {member['disk']} from {name}", user, work)
 
     def scrub(self, name: str, action: str, user: str) -> None:
-        _, a = self._live_array(name)
+        _, a = self._array(name)
         if action == "check" and a["sync_action"] != "idle":
             raise UserError("Array is busy")
         self.p.md_sync_action(a["dev"], action)
         self.state.log_activity(user, f"{'Started' if action == 'check' else 'Stopped'} "
-                                      f"data scrub on {name}")
+                                      f"data scrub on RAID {name}")
+
+    # ---------------------------------------------------------------- volumes
+    def volumes(self) -> List[dict]:
+        vols = self.state.get("volumes")
+        shares = self.state.get("shares")
+        arrays = {a["name"]: a for a in self.raid_arrays()}
+        disks = {d["name"]: d for d in self.p.scan_disks()}
+        out = []
+        for v in sorted(vols.values(), key=lambda x: x["name"]):
+            info = self.p.fs_info(v.get("uuid")) if v.get("uuid") else None
+            arr = arrays.get(v.get("array")) if v.get("array") else None
+            item = {
+                "name": v["name"], "fs": v["fs"], "mountpoint": v["mountpoint"],
+                "created": v.get("created"), "mounted": bool(info and info.get("mounted")),
+                "size": (info or {}).get("size", 0), "used": (info or {}).get("used", 0),
+                "free": (info or {}).get("free", 0),
+                "array": v.get("array"), "disk": None,
+                "level": arr["level"] if arr else "single",
+                "members": arr["members"] if arr else [], "sync": arr["sync"] if arr else None,
+                "fault_tolerance": arr["fault_tolerance"] if arr else 0,
+                "shares": sorted(n for n, s in shares.items() if s["volume"] == v["name"]),
+                "can_expand_fs": False, "status": "healthy", "status_detail": "",
+            }
+            if v.get("array"):
+                if not arr:
+                    item["status"], item["status_detail"] = "missing", f"RAID {v['array']} not found"
+                else:
+                    item["status"], item["status_detail"] = arr["status"], arr["status_detail"]
+                    sync = arr["sync"] or {}
+                    if info and info.get("mounted") and sync.get("sync_action") != "reshape" \
+                            and arr["size"] > (v.get("fs_dev_size") or arr["size"]):
+                        item["can_expand_fs"] = True
+            else:
+                dev = (info or {}).get("dev")
+                disk = next((n for n, d in disks.items()
+                             if dev and any(p["name"] == dev for p in d["partitions"])), None)
+                item["disk"] = disk
+                if disk:
+                    item["members"] = [{"disk": disk, "part": dev, "state": "active",
+                                        "model": disks[disk]["model"],
+                                        "size": disks[disk]["size"], "kind": disks[disk]["kind"]}]
+                if not info:
+                    item["status"], item["status_detail"] = "missing", "Disk not found"
+            if item["status"] == "healthy" and not item["mounted"]:
+                item["status"], item["status_detail"] = "unmounted", "Filesystem is not mounted"
+            out.append(item)
+        return out
+
+    def volume_sources(self) -> dict:
+        """RAID arrays without a volume, and unused disks, a volume can be created on."""
+        return {
+            "arrays": [{k: a[k] for k in ("name", "level", "size", "status")}
+                       for a in self.raid_arrays()
+                       if not a["volume"] and a["status"] not in ("missing", "failed")],
+            "disks": [{k: d[k] for k in ("name", "model", "size", "kind", "status")}
+                      for d in self.disks() if d["selectable"]],
+        }
+
+    def _vol(self, name: str) -> dict:
+        v = self.state.get("volumes").get(name)
+        if not v:
+            raise UserError(f"Volume {name} not found")
+        return v
+
+    def create_volume(self, name: str, fs: str, array: Optional[str], disk: Optional[str],
+                      user: str):
+        require(VOLUME_NAME_RE, name, "volume name (lowercase letters, digits, - and _)")
+        if name in self.state.get("volumes"):
+            raise UserError(f"A volume named {name} already exists")
+        if fs not in ("ext4", "xfs"):
+            raise UserError("Filesystem must be ext4 or xfs")
+        if bool(array) == bool(disk):
+            raise UserError("Choose a RAID array or a disk for the volume")
+        if array:
+            src = next((a for a in self.volume_sources()["arrays"] if a["name"] == array), None)
+            if not src:
+                raise UserError(f"RAID {array} is not available for a new volume")
+            size = src["size"]
+        else:
+            size = self._check_disks([disk])[disk]["size"]
+        if fs == "xfs" and size < 320 * 10**6:
+            raise UserError("XFS needs a volume of at least 300 MB; use ext4")
+        mountpoint = os.path.join(self.cfg.mount_root, name)
+        if os.path.ismount(mountpoint):
+            raise UserError(f"{mountpoint} is already a mount point")
+
+        def work(log):
+            record = {"name": name, "fs": fs, "mountpoint": mountpoint, "created": time.time(),
+                      "uuid": None, "array": array}
+            if array:
+                _, a = self._array(array)
+                dev = a["dev"]
+            else:
+                log(f"-- preparing disk {disk}")
+                self.p.wipe_disk(disk, log)
+                dev = self.p.make_partition(disk, False, log)
+            log(f"-- creating {fs} filesystem on {dev}")
+            record["uuid"] = self.p.mkfs(dev, fs, name, log)
+            record["fs_dev_size"] = self.p.block_size(dev)
+            self.state.update(lambda d: d["volumes"].__setitem__(name, dict(record)))
+            log(f"-- mounting at {mountpoint}")
+            self.p.mount_persist(record["uuid"], fs, mountpoint, log)
+
+        where = f"RAID {array}" if array else f"disk {disk}"
+        return self.jobs.submit(f"Create volume {name} on {where}", user, work)
+
+    def delete_volume(self, name: str, user: str):
+        v = self._vol(name)
+        used_by = [n for n, s in self.state.get("shares").items() if s["volume"] == name]
+        if used_by:
+            raise UserError("Delete these shares first: " + ", ".join(sorted(used_by)))
+
+        def work(log):
+            info = self.p.fs_info(v.get("uuid")) if v.get("uuid") else None
+            self.p.unmount_remove(v.get("uuid"), v["mountpoint"], log)
+            if v.get("array"):
+                r = self.state.get("arrays").get(v["array"])
+                a = self._live(r, self.p.md_arrays()) if r else None
+                if a:
+                    self.p.wipe_signatures(a["dev"], log)
+            else:
+                dev = (info or {}).get("dev")
+                for d in self.p.scan_disks():
+                    if dev and any(p["name"] == dev for p in d["partitions"]):
+                        self.p.wipe_disk(d["name"], log)
+            self.state.update(lambda d: d["volumes"].pop(name, None))
+
+        return self.jobs.submit(f"Delete volume {name}", user, work)
 
     def expand_fs(self, name: str, user: str):
-        v, a = self._live_array(name)
+        v = self._vol(name)
+        if not v.get("array"):
+            raise UserError("Only volumes on a RAID array can be expanded")
+        _, a = self._array(v["array"])
 
         def work(log):
             self.p.fs_grow(a["dev"], v["fs"], v["mountpoint"], log)
@@ -683,15 +784,20 @@ class Nas:
         volumes = volumes if volumes is not None else self.volumes()
         disks = disks if disks is not None else self.disks()
         out = []
+        for a in self.raid_arrays():
+            if a["status"] in ("degraded", "failed", "missing"):
+                out.append({"level": "critical" if a["status"] in ("failed", "missing")
+                            else "warning", "title": f"RAID {a['name']} is {a['status']}",
+                            "detail": a["status_detail"], "link": "/raid"})
         for v in volumes:
-            if v["status"] in ("degraded", "failed", "missing", "unmounted"):
-                out.append({"level": "critical" if v["status"] in ("failed", "missing")
-                            else "warning", "title": f"Volume {v['name']} is {v['status']}",
-                            "detail": v["status_detail"], "link": "/storage"})
+            if v["status"] == "unmounted" or (v["status"] == "missing" and not v["array"]):
+                out.append({"level": "critical" if v["status"] == "missing" else "warning",
+                            "title": f"Volume {v['name']} is {v['status']}",
+                            "detail": v["status_detail"], "link": "/volumes"})
             if v["size"] and v["used"] / v["size"] > 0.9:
                 out.append({"level": "warning", "title": f"Volume {v['name']} is almost full",
                             "detail": f"{v['used'] / v['size'] * 100:.0f}% used",
-                            "link": "/storage"})
+                            "link": "/volumes"})
         for d in disks:
             if d["health"] == "failing":
                 out.append({"level": "critical", "title": f"Disk {d['name']} is failing",
@@ -713,7 +819,7 @@ class Nas:
             "history": list(self.history),
             "volumes": volumes,
             "disks": [{k: d[k] for k in ("name", "model", "size", "kind", "status", "health",
-                                         "temperature", "volume")} for d in disks],
+                                         "temperature", "volume", "array")} for d in disks],
             "services": self.p.services(),
             "alerts": self.alerts(volumes, disks),
             "shares": len(self.state.get("shares")),

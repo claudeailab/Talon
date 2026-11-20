@@ -12,6 +12,7 @@ from .util import write_atomic
 
 DEFAULT_STATE: dict = {
     "version": 1,
+    "arrays": {},
     "volumes": {},
     "shares": {},
     "groups": [],

@@ -24,7 +24,7 @@ export function HealthBadge({ health }: { health: Disk["health"] }) {
   return <Badge dot>Unknown</Badge>;
 }
 
-export function DiskStatusBadge({ d }: { d: Pick<Disk, "status" | "volume"> }) {
+export function DiskStatusBadge({ d }: { d: Pick<Disk, "status" | "volume" | "array"> }) {
   switch (d.status) {
     case "available":
       return <Badge tone="blue">Available</Badge>;
@@ -32,6 +32,8 @@ export function DiskStatusBadge({ d }: { d: Pick<Disk, "status" | "volume"> }) {
       return <Badge tone="amber">Has data</Badge>;
     case "volume":
       return <Badge tone="violet">{d.volume}</Badge>;
+    case "raid":
+      return <Badge tone="violet">RAID {d.array}</Badge>;
     case "system":
       return <Badge>System</Badge>;
     case "raid_member":

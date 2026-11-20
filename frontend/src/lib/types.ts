@@ -11,9 +11,10 @@ export interface Disk {
   removable: boolean;
   partitions: { name: string; size: number; fstype: string | null; label: string | null; mountpoints: string[] }[];
   mounts: string[];
-  status: "available" | "has_data" | "volume" | "raid_member" | "system" | "mounted";
+  status: "available" | "has_data" | "volume" | "raid" | "raid_member" | "system" | "mounted";
   status_detail: string;
   volume: string | null;
+  array: string | null;
   selectable: boolean;
   health: "good" | "warning" | "failing" | "unknown";
   temperature: number | null;
@@ -30,6 +31,38 @@ export interface Member {
   kind: string;
 }
 
+export type StorageStatus =
+  | "healthy"
+  | "degraded"
+  | "rebuilding"
+  | "reshaping"
+  | "syncing"
+  | "checking"
+  | "failed"
+  | "missing"
+  | "unmounted";
+
+export interface SyncInfo {
+  sync_action: string;
+  sync_progress: number | null;
+  sync_speed_kbs: number;
+}
+
+export interface RaidArray {
+  name: string;
+  level: string;
+  created: number | null;
+  volume: string | null;
+  size: number;
+  members: Member[];
+  sync: SyncInfo | null;
+  raid_disks?: number;
+  degraded?: number;
+  status: StorageStatus;
+  status_detail: string;
+  fault_tolerance: number;
+}
+
 export interface Volume {
   name: string;
   level: string;
@@ -40,22 +73,20 @@ export interface Volume {
   size: number;
   used: number;
   free: number;
+  array: string | null;
+  disk: string | null;
   members: Member[];
-  array: {
-    dev: string;
-    raid_disks: number;
-    size: number;
-    degraded: number;
-    sync_action: string;
-    sync_progress: number | null;
-    sync_speed_kbs: number;
-    array_state: string;
-  } | null;
+  sync: SyncInfo | null;
   shares: string[];
   can_expand_fs: boolean;
-  status: "healthy" | "degraded" | "rebuilding" | "reshaping" | "syncing" | "checking" | "failed" | "missing" | "unmounted";
+  status: StorageStatus;
   status_detail: string;
   fault_tolerance: number;
+}
+
+export interface VolumeSources {
+  arrays: { name: string; level: string; size: number; status: StorageStatus }[];
+  disks: { name: string; model: string; size: number; kind: string; status: string }[];
 }
 
 export interface RaidOption {

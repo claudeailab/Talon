@@ -343,6 +343,12 @@ class DemoPlatform:
             self.fs[u]["mountpoint"] = mountpoint
             log(f"$ mount {mountpoint}")
 
+    def wipe_signatures(self, dev, log) -> None:
+        with self.lock:
+            log(f"$ wipefs -a /dev/{dev}")
+            for u in [u for u, f in self.fs.items() if f["dev"] == dev]:
+                self.fs.pop(u)
+
     def unmount_remove(self, u, mountpoint, log) -> None:
         with self.lock:
             if u in self.fs:

@@ -176,7 +176,7 @@ export default function DashboardPage() {
             title="Storage"
             subtitle={totalSize ? `${bytes(totalUsed)} used of ${bytes(totalSize)}` : "No volumes yet"}
             actions={
-              <Link to="/storage" className="text-[13px] font-medium text-brand-600 hover:text-brand-500 dark:text-brand-400">
+              <Link to="/volumes" className="text-[13px] font-medium text-brand-600 hover:text-brand-500 dark:text-brand-400">
                 Manage
               </Link>
             }
@@ -184,7 +184,7 @@ export default function DashboardPage() {
           <div className="px-5 pb-5">
             {data.volumes.length === 0 ? (
               <Link
-                to="/storage"
+                to="/volumes"
                 className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-zinc-200 py-10 text-sm font-medium text-zinc-500 hover:border-brand-300 hover:text-brand-600 dark:border-white/10"
               >
                 <Database className="size-4" /> Create your first volume
@@ -196,7 +196,7 @@ export default function DashboardPage() {
                   return (
                     <Link
                       key={v.name}
-                      to="/storage"
+                      to="/volumes"
                       className="rounded-xl bg-zinc-50 p-4 ring-1 ring-zinc-200/60 transition hover:ring-brand-300 dark:bg-white/[0.03] dark:ring-white/5 dark:hover:ring-brand-400/40"
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -211,7 +211,7 @@ export default function DashboardPage() {
                         <span className="tabular text-zinc-500">{bytes(v.free)} free</span>
                       </div>
                       <Progress value={p} tone={usageTone(p)} className="mt-1.5" />
-                      {v.array?.sync_progress != null && (
+                      {v.sync?.sync_progress != null && (
                         <div className="mt-2 text-xs text-zinc-500">{v.status_detail}</div>
                       )}
                     </Link>

@@ -395,6 +395,10 @@ class RealPlatform:
         run(["mount", mountpoint], log=log)
         os.chmod(mountpoint, 0o755)
 
+    def wipe_signatures(self, dev: str, log: Logger) -> None:
+        """Remove filesystem signatures from a block device (e.g. a RAID array)."""
+        run(["wipefs", "-a", _dev(dev)], log=log)
+
     def unmount_remove(self, uuid: str, mountpoint: str, log: Logger) -> None:
         if os.path.ismount(mountpoint):
             cp = run(["umount", mountpoint], check=False, log=log)

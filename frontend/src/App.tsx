@@ -8,6 +8,7 @@ import {
   FolderOpen,
   HardDrive,
   LayoutDashboard,
+  Layers,
   Loader2,
   LogOut,
   Menu as MenuIcon,
@@ -31,6 +32,7 @@ import { JobDialog } from "./components/jobs";
 import { Reconnecting, UpdateOverlay, UpdatePill } from "./components/update";
 import Login from "./pages/Login";
 import DashboardPage from "./pages/Dashboard";
+import RaidPage from "./pages/Raid";
 import VolumesPage from "./pages/Volumes";
 import DisksPage from "./pages/Disks";
 import SharesPage from "./pages/Shares";
@@ -46,7 +48,8 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
   {
     section: "Storage",
     items: [
-      { to: "/storage", label: "Volumes & RAID", icon: Database, page: VolumesPage },
+      { to: "/raid", label: "RAID", icon: Layers, page: RaidPage },
+      { to: "/volumes", label: "Volumes", icon: Database, page: VolumesPage },
       { to: "/disks", label: "Disks", icon: HardDrive, page: DisksPage },
     ],
   },
@@ -125,6 +128,9 @@ function Shell({ me }: { me: Me }) {
   }, [running.length]); // eslint-disable-line
 
   useEffect(() => setMobileNav(false), [path]);
+  useEffect(() => {
+    if (path === "/storage") navigate("/volumes"); // old address
+  }, [path]);
 
   const all = NAV.flatMap((s) => s.items);
   const current = all.find((i) => i.to === path) ?? (path === "/" ? all[0] : null);

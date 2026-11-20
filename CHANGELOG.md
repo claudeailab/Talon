@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.14
+- RAID and Volumes are now separate pages: create a RAID first, then a volume on it
+- Volumes can also be created on a single disk
+- Existing volumes are moved to the new layout automatically
+
 ## 1.0.13
 - Menus no longer get cut off or add scrollbars inside tables
 - Disks, Users and Settings pages fit on phone screens without sideways scrolling

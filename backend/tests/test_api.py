@@ -16,48 +16,87 @@ def test_auth_required_and_csrf(client):
 def test_disk_status(client):
     disks = {d["name"]: d for d in client.get("/api/disks").json()}
     assert disks["nvme0n1"]["status"] == "system" and not disks["nvme0n1"]["selectable"]
-    assert disks["sda"]["status"] == "volume" and disks["sda"]["volume"] == "tank"
+    assert disks["sda"]["status"] == "raid" and disks["sda"]["array"] == "tank"
+    assert disks["sda"]["volume"] == "tank"
     assert disks["sde"]["status"] == "volume"
     assert disks["sdd"]["status"] == "available" and disks["sdd"]["selectable"]
     assert disks["sdg"]["status"] == "has_data" and disks["sdg"]["selectable"]
 
 
+def test_existing_raid_volume_is_migrated(client):
+    arrays = {a["name"]: a for a in client.get("/api/raid").json()}
+    assert arrays["tank"]["level"] == "raid5" and arrays["tank"]["volume"] == "tank"
+    vols = {v["name"]: v for v in client.get("/api/volumes").json()}
+    assert vols["tank"]["array"] == "tank" and vols["tank"]["level"] == "raid5"
+    assert vols["backup"]["array"] is None and vols["backup"]["disk"] == "sde"
+
+
 def test_raid_options_endpoint(client):
-    opts = client.post("/api/volumes/options", json={"disks": ["sdd", "sdf"], "spares": 0}).json()
-    avail = {o["id"] for o in opts if o["available"]}
-    assert avail == {"raid0", "raid1"}
+    opts = client.post("/api/raid/options", json={"disks": ["sdd", "sdf"], "spares": 0}).json()
+    assert "single" not in {o["id"] for o in opts}
+    assert {o["id"] for o in opts if o["available"]} == {"raid0", "raid1"}
 
 
-def test_volume_lifecycle(client):
-    r = client.post("/api/volumes", json={"name": "fast", "level": "raid1",
-                                          "disks": ["sdd", "sdf"], "fs": "xfs"})
+def test_raid_then_volume_lifecycle(client):
+    r = client.post("/api/raid", json={"name": "fast", "level": "raid1", "disks": ["sdd", "sdf"]})
+    assert r.status_code == 200, r.text
+    assert wait_job(client, r.json())["status"] == "success"
+    arrays = {a["name"]: a for a in client.get("/api/raid").json()}
+    assert arrays["fast"]["volume"] is None and len(arrays["fast"]["members"]) == 2
+    # in-use disks cannot be reused
+    assert client.post("/api/raid", json={"name": "x", "level": "raid1",
+                                          "disks": ["sdd", "sdg"]}).status_code == 400
+    # the new array is offered as a volume source
+    src = client.get("/api/volumes/sources").json()
+    assert "fast" in {a["name"] for a in src["arrays"]}
+    assert "tank" not in {a["name"] for a in src["arrays"]}   # already has a volume
+    r = client.post("/api/volumes", json={"name": "fastvol", "fs": "xfs", "array": "fast"})
     assert r.status_code == 200, r.text
     assert wait_job(client, r.json())["status"] == "success"
     vols = {v["name"]: v for v in client.get("/api/volumes").json()}
-    assert vols["fast"]["level"] == "raid1" and vols["fast"]["mounted"]
-    assert len(vols["fast"]["members"]) == 2
-    # in-use disks cannot be reused
-    r = client.post("/api/volumes", json={"name": "x", "level": "single", "disks": ["sdd"]})
-    assert r.status_code == 400
-    # share blocks deletion
-    s = client.post("/api/shares", json={"name": "Fast", "volume": "fast",
+    assert vols["fastvol"]["level"] == "raid1" and vols["fastvol"]["mounted"]
+    # the array cannot be deleted while a volume uses it
+    assert client.delete("/api/raid/fast").status_code == 400
+    # share blocks volume deletion
+    s = client.post("/api/shares", json={"name": "Fast", "volume": "fastvol",
                                          "users": {"alice": "rw"}, "smb": {"enabled": True}})
     assert s.status_code == 200, s.text
-    assert client.delete("/api/volumes/fast").status_code == 400
+    assert client.delete("/api/volumes/fastvol").status_code == 400
     assert client.delete("/api/shares/Fast").status_code == 200
-    r = client.delete("/api/volumes/fast")
+    r = client.delete("/api/volumes/fastvol")
+    assert wait_job(client, r.json())["status"] == "success"
+    # deleting the volume keeps the array
+    assert "fast" in {a["name"] for a in client.get("/api/raid").json()}
+    r = client.delete("/api/raid/fast")
     assert wait_job(client, r.json())["status"] == "success"
     disks = {d["name"]: d for d in client.get("/api/disks").json()}
     assert disks["sdd"]["status"] == "available"
 
 
-def test_invalid_volume_requests(client):
+def test_single_disk_volume(client):
+    r = client.post("/api/volumes", json={"name": "scratch", "fs": "ext4", "disk": "sdd"})
+    assert wait_job(client, r.json())["status"] == "success"
+    vols = {v["name"]: v for v in client.get("/api/volumes").json()}
+    assert vols["scratch"]["level"] == "single" and vols["scratch"]["disk"] == "sdd"
+    r = client.delete("/api/volumes/scratch")
+    assert wait_job(client, r.json())["status"] == "success"
+
+
+def test_invalid_raid_and_volume_requests(client):
     for body in [
         {"name": "Bad Name", "level": "raid1", "disks": ["sdd", "sdf"]},
         {"name": "v", "level": "raid5", "disks": ["sdd", "sdf"]},
         {"name": "v", "level": "raid1", "disks": ["nvme0n1", "sdd"]},
-        {"name": "v", "level": "raid1", "disks": ["sdd", "sdf"], "fs": "btrfs"},
+        {"name": "v", "level": "single", "disks": ["sdd"]},
         {"name": "tank", "level": "raid1", "disks": ["sdd", "sdf"]},
+    ]:
+        assert client.post("/api/raid", json=body).status_code == 400, body
+    for body in [
+        {"name": "v", "fs": "btrfs", "disk": "sdd"},
+        {"name": "v", "fs": "ext4"},
+        {"name": "v", "fs": "ext4", "array": "tank"},
+        {"name": "v", "fs": "ext4", "disk": "nvme0n1"},
+        {"name": "tank", "fs": "ext4", "disk": "sdd"},
     ]:
         assert client.post("/api/volumes", json=body).status_code == 400, body
 
@@ -98,22 +137,22 @@ def test_users_groups(client):
 
 
 def test_expand_and_replace(client):
-    r = client.post("/api/volumes/tank/disks", json={"disk": "sdd", "mode": "spare"})
+    r = client.post("/api/raid/tank/disks", json={"disk": "sdd", "mode": "spare"})
     assert wait_job(client, r.json())["status"] == "success"
-    tank = next(v for v in client.get("/api/volumes").json() if v["name"] == "tank")
+    tank = next(a for a in client.get("/api/raid").json() if a["name"] == "tank")
     assert any(m["state"] == "spare" for m in tank["members"])
     part = next(m["part"] for m in tank["members"] if m["state"] == "spare")
-    r = client.delete(f"/api/volumes/tank/members/{part}")
+    r = client.delete(f"/api/raid/tank/members/{part}")
     assert wait_job(client, r.json())["status"] == "success"
     # removing an active member of a RAID5 is allowed once (fault tolerance 1)
-    r = client.delete("/api/volumes/tank/members/sda1")
+    r = client.delete("/api/raid/tank/members/sda1")
     assert wait_job(client, r.json())["status"] == "success"
-    tank = next(v for v in client.get("/api/volumes").json() if v["name"] == "tank")
+    tank = next(a for a in client.get("/api/raid").json() if a["name"] == "tank")
     assert tank["status"] == "degraded"
-    assert client.delete("/api/volumes/tank/members/sdb1").status_code == 400
-    r = client.post("/api/volumes/tank/disks", json={"disk": "sdd", "mode": "replace"})
+    assert client.delete("/api/raid/tank/members/sdb1").status_code == 400
+    r = client.post("/api/raid/tank/disks", json={"disk": "sdd", "mode": "replace"})
     assert wait_job(client, r.json())["status"] == "success"
-    tank = next(v for v in client.get("/api/volumes").json() if v["name"] == "tank")
+    tank = next(a for a in client.get("/api/raid").json() if a["name"] == "tank")
     assert tank["status"] == "rebuilding"
 
 
