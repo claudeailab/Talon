@@ -332,14 +332,14 @@ export function Tabs<T extends string>({
   tabs: { value: T; label: ReactNode }[];
 }) {
   return (
-    <div className="flex gap-1 overflow-x-auto border-b border-zinc-200 dark:border-white/10">
+    <div className="flex gap-1 overflow-x-auto overflow-y-hidden shadow-[inset_0_-1px_0_var(--color-zinc-200)] [scrollbar-width:none] dark:shadow-[inset_0_-1px_0_rgb(255_255_255/0.1)] [&::-webkit-scrollbar]:hidden">
       {tabs.map((t) => (
         <button
           key={t.value}
           type="button"
           onClick={() => onChange(t.value)}
           className={cx(
-            "-mb-px flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition",
+            "flex items-center gap-2 border-b-2 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition",
             value === t.value
               ? "border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300"
               : "border-transparent text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200",
