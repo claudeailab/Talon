@@ -430,9 +430,8 @@ function OutputDialog({ task, onClose }: { task: ScheduledTask; onClose: () => v
     queryFn: () => api.get<TaskRun[]>(`/scheduled/${task.id}/runs`),
     refetchInterval: (query) => (query.state.data?.[0]?.status === "running" ? 1500 : false),
   });
-  const [sel, setSel] = useState<string | null>(null);
   const runs = q.data ?? [];
-  const run = runs.find((r) => r.id === sel) ?? runs[0];
+  const run = runs[0];            // the latest run only; earlier runs are in the activity log
   // keep the newest output in view, unless the user scrolled up to read something
   const out = useRef<HTMLUListElement>(null);
   const follow = useRef(true);
@@ -440,7 +439,7 @@ function OutputDialog({ task, onClose }: { task: ScheduledTask; onClose: () => v
     if (out.current && follow.current) out.current.scrollTop = out.current.scrollHeight;
   }, [run?.output, run?.id]);
   return (
-    <Modal open onClose={onClose} size="xl" title={task.name} description="The last 20 runs are kept" footer={<Button onClick={onClose}>Close</Button>}>
+    <Modal open onClose={onClose} size="xl" title={task.name} description="Earlier runs are in the activity log" footer={<Button onClick={onClose}>Close</Button>}>
       {!q.data ? (
         <PageLoader />
       ) : runs.length === 0 ? (
@@ -449,19 +448,8 @@ function OutputDialog({ task, onClose }: { task: ScheduledTask; onClose: () => v
         <div>
           {run && (
             <div className="min-w-0">
-              {/* the newest run is shown; earlier runs are one choice away, not a list */}
               <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-zinc-500">
-                {runs.length > 1 ? (
-                  <Select value={run.id} onChange={(e) => setSel(e.target.value)} className="w-full sm:w-auto" aria-label="Run">
-                    {runs.map((r) => (
-                      <option key={r.id} value={r.id}>
-                        {dateTime(r.started)} · {runLabel(r)}
-                      </option>
-                    ))}
-                  </Select>
-                ) : (
-                  <span>Started {dateTime(run.started)}</span>
-                )}
+                <span>Started {dateTime(run.started)} · {runLabel(run)}</span>
                 <span>
                   {run.finished ? `Took ${took(run.finished - run.started)} · ` : ""}
                   {run.trigger === "manual" ? "Started by hand" : "Started by schedule"}

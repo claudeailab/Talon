@@ -234,6 +234,7 @@ export interface Activity {
   user: string;
   message: string;
   level: "info" | "warning" | "error";
+  category: string;
 }
 
 export interface UpdateStatus {

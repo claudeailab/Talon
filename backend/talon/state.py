@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import threading
 import time
-from typing import Any, Callable
+from typing import Any, Callable, Optional
 
 from .util import write_atomic
 
@@ -32,9 +33,16 @@ DEFAULT_STATE: dict = {
 
 class State:
     def __init__(self, path: str):
+        from .activity import ActivityLog
         self.path = path
         self._lock = threading.RLock()
         self._data = self._load()
+        # the activity log lives in its own file (see activity.py); move entries
+        # that earlier versions kept in the state file
+        self.activity = ActivityLog(os.path.join(os.path.dirname(os.path.abspath(path)), "activity.jsonl"))
+        if self._data.get("activity"):
+            self.activity.migrate(self._data["activity"])
+            self.update(lambda d: d.__setitem__("activity", []))
 
     def _load(self) -> dict:
         try:
@@ -67,9 +75,6 @@ class State:
             self._data = data
             return result
 
-    def log_activity(self, user: str, message: str, level: str = "info") -> None:
-        def add(d):
-            d["activity"].insert(0, {"ts": time.time(), "user": user, "message": message,
-                                     "level": level})
-            del d["activity"][500:]
-        self.update(add)
+    def log_activity(self, user: str, message: str, level: str = "info",
+                     category: Optional[str] = None) -> None:
+        self.activity.add(user, message, level, category)

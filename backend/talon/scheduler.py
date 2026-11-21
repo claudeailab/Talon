@@ -22,7 +22,7 @@ from typing import Callable, Dict, List, Optional
 
 from .util import UserError, write_atomic
 
-KEEP_RUNS = 20
+KEEP_RUNS = 2       # the last run's output; earlier runs are in the activity log
 MAX_OUTPUT = 256 * 1024                    # bytes of output kept per run
 # progress a script reports: rsync --info=progress2 ("  1,234,567  45%  12.3MB/s  0:01:23 ..."),
 # or a line "PROGRESS 45" from any script. These update the progress bar and are not logged.
@@ -458,6 +458,8 @@ class Scheduler:
                 return
             self._running[t["id"]] = {"started": time.time(), "trigger": trigger,
                                       "output": [], "size": 0, "cancel": False, "proc": None}
+        if trigger != "manual":                 # by hand: logged with who started it
+            self.state.log_activity("talon", f"Scheduled task {t['name']} started ({trigger})", "info", "scheduled")
         threading.Thread(target=self._run, args=(t, trigger), daemon=True,
                          name=f"task-{t['id']}").start()
 
@@ -523,8 +525,15 @@ class Scheduler:
             self._running.pop(t["id"], None)
             again = t["id"] in self._pending
             self._pending.discard(t["id"])
+        secs = int(finished - r["started"])
+        took = f"{secs} s" if secs < 90 else f"{round(secs / 60)} min" if secs < 5400 else f"{secs / 3600:.1f} h"
+        if status == "success":
+            self.state.log_activity("talon", f"Scheduled task {t['name']} finished in {took}", "info", "scheduled")
+        elif status == "cancelled":
+            self.state.log_activity("talon", f"Scheduled task {t['name']} was stopped after {took}", "warning", "scheduled")
         if status == "error":
-            self.state.log_activity("talon", f"Scheduled task {t['name']} failed (exit {code})", "error")
+            self.state.log_activity("talon", f"Scheduled task {t['name']} failed (exit {code}) after {took}",
+                                    "error", "scheduled")
             if t.get("notify"):
                 tail = "".join(run["output"])[-4000:]
                 self.nas.notifier.send(

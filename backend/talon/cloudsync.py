@@ -837,6 +837,9 @@ class CloudSync:
         # remembered in the state file until the run ends, so a restart can resume it
         self._update(lambda od: od["tasks"].get(tid) is not None and
                      od["tasks"][tid].__setitem__("interrupted", {"user": user, "since": time.time(), "mode": mode}))
+        what = {"run": "run", "quick": "quick check", "full": "full check"}.get(mode, "run")
+        self.state.log_activity(user, f"OneDrive task {t['name']}: {what} started"
+                                + (" (resumed after a restart)" if resumed else ""), "info", "onedrive")
         threading.Thread(target=self._run, args=(t, user), daemon=True,
                          name=f"cloud-{tid}").start()
 

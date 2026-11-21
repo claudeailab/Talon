@@ -14,9 +14,10 @@ from typing import List, Optional
 from fastapi import Body, Depends, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, StreamingResponse
 from starlette.concurrency import run_in_threadpool
+from starlette.routing import Match
 from pydantic import BaseModel
 
-from . import webconfig, __version__, notify
+from . import activity, webconfig, __version__, notify
 from .auth import COOKIE, Sessions
 from .nas import Nas
 from .update import DemoUpdater, Updater, health as health_info
@@ -73,6 +74,76 @@ class GroupIn(BaseModel):
     members: List[str] = []
 
 
+# Every request that changes something is in the activity log: the category of
+# each endpoint, and the entry written when the endpoint logged nothing itself.
+# None: not logged (it changes nothing, or logs in its own words).
+ACTIONS = {
+    "POST /api/auth/login": ("signin", None),
+    "POST /api/auth/logout": ("signin", "Signed out"),
+    "POST /api/update/check": ("updates", "Checked for updates"),
+    "PUT /api/update/settings": ("updates", None),
+    "POST /api/update/install": ("updates", "Started installing an update"),
+    "POST /api/disks/{name}/smart-test": ("storage", "Started a S.M.A.R.T. self-test on {name}"),
+    "POST /api/disks/{name}/wipe": ("storage", "Wiped disk {name}"),
+    "POST /api/raid/options": ("storage", None),
+    "POST /api/raid": ("storage", "Created a RAID array"),
+    "DELETE /api/raid/{name}": ("storage", "Deleted RAID array {name}"),
+    "POST /api/raid/{name}/disks": ("storage", "Added a disk to RAID array {name}"),
+    "DELETE /api/raid/{name}/members/{part}": ("storage", "Removed {part} from RAID array {name}"),
+    "POST /api/raid/{name}/scrub": ("storage", "Data scrub on RAID array {name}"),
+    "POST /api/volumes": ("storage", "Created a volume"),
+    "DELETE /api/volumes/{name}": ("storage", "Deleted volume {name}"),
+    "POST /api/volumes/{name}/expand": ("storage", "Expanded volume {name}"),
+    "POST /api/shares": ("sharing", "Created a shared folder"),
+    "PUT /api/shares/{name}": ("sharing", "Updated shared folder {name}"),
+    "DELETE /api/shares/{name}": ("sharing", "Deleted shared folder {name}"),
+    "POST /api/users": ("users", "Created a user"),
+    "PUT /api/users/{name}": ("users", "Updated user {name}"),
+    "DELETE /api/users/{name}": ("users", "Deleted user {name}"),
+    "POST /api/groups": ("users", "Created a group"),
+    "PUT /api/groups/{name}": ("users", "Updated group {name}"),
+    "DELETE /api/groups/{name}": ("users", "Deleted group {name}"),
+    "POST /api/services/{sid}/{action}": ("services", "Service {sid}: {action}"),
+    "PUT /api/settings/entra": ("onedrive", "Updated the EntraID app settings"),
+    "POST /api/settings/entra/test": ("onedrive", "Tested the EntraID app"),
+    "PUT /api/settings/smtp": ("settings", "Updated the SMTP settings"),
+    "POST /api/settings/smtp/test": ("alerts", "Sent a test email"),
+    "PUT /api/thresholds": ("settings", "Updated the alert thresholds"),
+    "PUT /api/notifications": ("settings", "Updated the notification settings"),
+    "POST /api/notifications/test": ("alerts", "Sent a test notification"),
+    "POST /api/files/eject": ("files", None),
+    "POST /api/files/folder": ("files", None),
+    "POST /api/files/rename": ("files", None),
+    "POST /api/files/move": ("files", None),
+    "POST /api/files/delete": ("files", None),
+    "PUT /api/files/upload": ("files", "Uploaded a file"),
+    "POST /api/files/versions/restore": ("files", None),
+    "POST /api/files/bin/restore": ("files", None),
+    "POST /api/files/bin/delete": ("files", None),
+    "POST /api/onedrive/connect": ("onedrive", "Started signing in to OneDrive"),
+    "POST /api/onedrive/disconnect": ("onedrive", None),
+    "POST /api/onedrive/refresh": ("onedrive", None),
+    "POST /api/onedrive/local-folders": ("onedrive", "Created a NAS folder for a OneDrive task"),
+    "POST /api/onedrive/tasks": ("onedrive", None),
+    "PUT /api/onedrive/tasks/{tid}": ("onedrive", None),
+    "DELETE /api/onedrive/tasks/{tid}": ("onedrive", None),
+    "POST /api/onedrive/tasks/{tid}/run": ("onedrive", "Started a OneDrive task"),
+    "POST /api/onedrive/tasks/{tid}/verify": ("onedrive", "Started checking a OneDrive task"),
+    "POST /api/onedrive/tasks/{tid}/stop": ("onedrive", "Stopped a OneDrive task"),
+    "PUT /api/settings/web": ("settings", "Updated the web interface settings"),
+    "PUT /api/network": ("settings", "Updated the network settings"),
+    "POST /api/scheduled": ("scheduled", None),
+    "POST /api/scheduled/test": ("scheduled", None),
+    "PUT /api/scheduled/{tid}": ("scheduled", None),
+    "DELETE /api/scheduled/{tid}": ("scheduled", None),
+    "POST /api/scheduled/{tid}/run": ("scheduled", None),
+    "POST /api/scheduled/{tid}/stop": ("scheduled", "Stopped a scheduled task"),
+    "POST /api/scheduled/{tid}/{action}": ("scheduled", None),
+    "PUT /api/settings": ("settings", "Updated the general settings"),
+    "POST /api/system/power": ("system", None),
+}
+
+
 def create_app(cfg, platform) -> FastAPI:
     nas = Nas(cfg, platform)
     sessions = Sessions(cfg.session_hours, cfg.sessions_file)
@@ -81,10 +152,12 @@ def create_app(cfg, platform) -> FastAPI:
 
     @contextlib.asynccontextmanager
     async def lifespan(_app):
+        nas.state.log_activity("talon", f"Talon {__version__} started", "info", "system")
         nas.start()
         threading.Thread(target=updater.background_loop, args=(nas._stop,), daemon=True,
                          name="update-check").start()
         yield
+        nas.state.log_activity("talon", "Talon stopped", "info", "system")
         nas.stop()
 
     app = FastAPI(title="Talon", version=__version__, docs_url=None, redoc_url=None,
@@ -110,7 +183,30 @@ def create_app(cfg, platform) -> FastAPI:
                 and request.headers.get("x-requested-with") != "talon":
             return JSONResponse({"detail": "Missing CSRF header"}, status_code=403)
         nas.network.seen_request(request.client.host if request.client else None)
-        resp = await call_next(request)
+        # the activity log: the category of this endpoint, and what it logged
+        action = None
+        if request.url.path.startswith("/api/") and request.method in ("POST", "PUT", "DELETE"):
+            for route in app.routes:
+                match, child = route.matches(request.scope)
+                if match == Match.FULL and getattr(route, "path", "").startswith("/api/"):
+                    action = ACTIONS.get(f"{request.method} {route.path}")
+                    params = child.get("path_params", {})
+                    break
+        cat_token = activity.request_category.set(action[0] if action else None)
+        logged: list = []
+        log_token = activity.request_logged.set(logged)
+        try:
+            resp = await call_next(request)
+        finally:
+            activity.request_category.reset(cat_token)
+            activity.request_logged.reset(log_token)
+        if action and action[1] and not logged and 200 <= resp.status_code < 300:
+            user = sessions.get(request.cookies.get(COOKIE)) or sessions.get(request.cookies.get(COOKIE_HTTP)) or "?"
+            try:
+                text = action[1].format(**params)
+            except (KeyError, IndexError):
+                text = action[1]
+            nas.state.log_activity(user, text, "info", action[0])
         resp.headers["X-Content-Type-Options"] = "nosniff"
         resp.headers["X-Frame-Options"] = "DENY"
         resp.headers["Referrer-Policy"] = "same-origin"
@@ -160,6 +256,9 @@ def create_app(cfg, platform) -> FastAPI:
 
     @app.post("/api/auth/logout")
     def logout(request: Request, response: Response):
+        user = sessions.get(request.cookies.get(COOKIE)) or sessions.get(request.cookies.get(COOKIE_HTTP))
+        if user:
+            nas.state.log_activity(user, "Signed out", "info", "signin")
         for name in (COOKIE, COOKIE_HTTP):
             sessions.drop(request.cookies.get(name))
             response.delete_cookie(name, path="/")
@@ -712,11 +811,9 @@ def create_app(cfg, platform) -> FastAPI:
         return {"ok": True}
 
     @app.get("/api/activity")
-    def activity(offset: int = 0, limit: int = 10, _u: str = Depends(current_user)):
-        items = nas.state.get("activity")
-        offset, limit = max(offset, 0), min(max(limit, 1), 100)
-        return {"items": items[offset:offset + limit], "total": len(items),
-                "offset": offset, "limit": limit}
+    def activity_log(offset: int = 0, limit: int = 10, category: str = "", level: str = "",
+                     q: str = "", _u: str = Depends(current_user)):
+        return nas.state.activity.query(offset, limit, category, level, q)
 
     @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "DELETE"])
     def api_404(rest: str):

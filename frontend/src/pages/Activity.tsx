@@ -1,36 +1,65 @@
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Info, ListChecks, Loader2, XCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Info, ListChecks, Loader2, Search, XCircle } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, cx, dateTime } from "../lib/format";
 import type { Activity, Job } from "../lib/types";
 import { JobDialog } from "../components/jobs";
-import { Button, Card, CardHeader, Empty, PageHeader, PageLoader, Select } from "../components/ui";
+import { Button, Card, CardHeader, Empty, Input, PageHeader, PageLoader, Select } from "../components/ui";
 
-type Page = { items: Activity[]; total: number; offset: number; limit: number };
+type Page = { items: Activity[]; total: number; offset: number; limit: number; categories: { id: string; label: string }[] };
 const PER_PAGE = [10, 25, 50, 100];
 
 export default function ActivityPage() {
   const [perPage, setPerPage] = useState(10);
   const [page, setPage] = useState(0);
   const [open, setOpen] = useState<string | null>(null); // the entry shown in full
+  const [category, setCategory] = useState("");
+  const [level, setLevel] = useState("");
+  const [search, setSearch] = useState("");
+  const [q, setQ] = useState("");                 // the search, once typing pauses
+  useEffect(() => {
+    const t = setTimeout(() => setQ(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+  useEffect(() => setPage(0), [category, level, q, perPage]);
   const act = useQuery({
-    queryKey: ["activity", page, perPage],
-    queryFn: () => api.get<Page>(`/activity?offset=${page * perPage}&limit=${perPage}`),
+    queryKey: ["activity", page, perPage, category, level, q],
+    queryFn: () =>
+      api.get<Page>(`/activity?${new URLSearchParams({ offset: String(page * perPage), limit: String(perPage), category, level, q })}`),
     refetchInterval: 10000,
     placeholderData: (prev) => prev,
   });
+  const filtered = !!(category || level || q);
   const jobs = useQuery({ queryKey: ["jobs"], queryFn: () => api.get<Job[]>("/jobs"), refetchInterval: 3000 });
   const [job, setJob] = useState<string | null>(null);
   if (!act.data || !jobs.data) return <PageLoader />;
   return (
     <>
-      <PageHeader title="Activity" description="Administrative actions and background tasks." />
+      <PageHeader title="Activity" description="Everything that happens in Talon." />
       <div className="grid gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2">
-          <CardHeader title="Activity Log" subtitle={`${act.data.total} event${act.data.total === 1 ? "" : "s"}`} />
+          <CardHeader title="Activity Log" subtitle={`${act.data.total} event${act.data.total === 1 ? "" : "s"}${filtered ? " found" : ""}`} />
+          {/* filters: which kind of operation, how serious, and a text search */}
+          <div className="grid gap-2 px-5 pb-3 sm:grid-cols-[1fr_1fr_1.4fr]">
+            <Select value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Operation">
+              <option value="">All operations</option>
+              {act.data.categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </Select>
+            <Select value={level} onChange={(e) => setLevel(e.target.value)} aria-label="Level">
+              <option value="">All events</option>
+              <option value="warning">Warnings and errors</option>
+              <option value="error">Errors only</option>
+            </Select>
+            <div className="relative">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-zinc-400" />
+              <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search" className="pl-9" aria-label="Search" />
+            </div>
+          </div>
           {act.data.total === 0 ? (
-            <Empty icon={<Info className="size-6" />} title="Nothing yet" />
+            <Empty icon={<Info className="size-6" />} title={filtered ? "Nothing found" : "Nothing yet"} text={filtered ? "Try another operation or search." : undefined} />
           ) : (
             <ul className="divide-y divide-zinc-100 px-5 pb-2 dark:divide-white/5">
               {act.data.items.map((a, i) => (
@@ -56,7 +85,8 @@ export default function ActivityPage() {
                       {a.message}
                     </div>
                     <div className="text-xs text-zinc-500">
-                      {a.user} · <span title={dateTime(a.ts)}>{ago(a.ts)}</span>
+                      {a.user} · {act.data.categories.find((c) => c.id === a.category)?.label ?? a.category} ·{" "}
+                      <span title={dateTime(a.ts)}>{ago(a.ts)}</span>
                     </div>
                   </div>
                 </li>

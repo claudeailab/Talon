@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.72
+- Activity log records everything that happens in Talon, kept up to 20,000 entries
+- Activity log: filter by operation and level, and search
+- Scheduled output shows the latest run; earlier runs are in the activity log
+
 ## 1.0.71
 - Scheduled output: earlier runs are in a dropdown instead of a list above the output
 

@@ -251,6 +251,11 @@ class Notifier:
         with self._lock:
             sent = set(self.state.get("notify_sent") or [])
             current = {a["title"]: a for a in alerts}
+            for title in set(current) - sent:
+                lvl = "error" if current[title].get("level") in ("error", "danger", "critical") else "warning"
+                self.state.log_activity("talon", f"Alert: {title}", lvl, "alerts")
+            for title in sent - set(current):
+                self.state.log_activity("talon", f"Resolved: {title}", "info", "alerts")
             for title, a in current.items():
                 if title not in sent:
                     ev = self.classify(a)

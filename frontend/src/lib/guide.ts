@@ -721,7 +721,8 @@ export const GUIDE: Topic[] = [
         title: "Activity log and tasks",
         blocks: [
           { img: "activity", alt: "Activity" },
-          { p: "**Tasks** lists background jobs, such as creating a RAID array or installing an update, with their progress and result. The **Activity Log** lists who changed what and when. Choose how many entries to show per page and use **Previous** and **Next**." },
+          { p: "**Tasks** lists background jobs, such as creating a RAID array or installing an update, with their progress and result. The **Activity Log** lists everything that happens in Talon: every change made in the web interface, sign-ins, OneDrive and scheduled task runs with their results, alerts and emails, updates and restarts, with who did it and when." },
+          { p: "Narrow it down by **operation** (for example OneDrive, Scheduled or Files), show **Warnings and errors** or **Errors only**, and **Search** for words in the message or a user name. Choose how many entries to show per page and use **Previous** and **Next**. The newest 20,000 entries are kept." },
         ],
       },
     ],
@@ -876,7 +877,7 @@ export const GUIDE: Topic[] = [
         blocks: [
           { img: "scheduled", alt: "Scheduled page" },
           { p: "Each task shows who it runs as, its schedule, its last run and its status: **Succeeded**, **Running**, **Failed** with the exit code, **Stopped** or **Paused**. **Run now** starts it at once and **Stop** ends a running task." },
-          { p: "The **⋯** menu has **Edit**, **View output** (the last 20 runs with their full output, start time, duration and exit code; each line shows when it was printed, and while a task runs it keeps the newest line in view and shows **Working**, or in amber how long the script has printed nothing), **Pause** or **Resume**, **Duplicate** and **Delete**." },
+          { p: "The **⋯** menu has **Edit**, **View output** (the latest run with its full output, start time, duration and exit code; earlier runs are in the [Activity](/activity) log; each line shows when it was printed, and while a task runs it keeps the newest line in view and shows **Working**, or in amber how long the script has printed nothing), **Pause** or **Resume**, **Duplicate** and **Delete**." },
           { p: "A progress bar shows how far a running task is when the script reports it: rsync with **--info=progress2** (add **--no-inc-recursive** so the percentage covers the whole job from the start), or any script that prints a line such as **PROGRESS 45**. Those lines move the bar and are not shown in the output. Otherwise the bar moves without a percentage and shows how long the task has been running and how long the last run took." },
           { p: "Every change is recorded in [Activity](/activity)." },
         ],

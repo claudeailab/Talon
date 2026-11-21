@@ -35,14 +35,21 @@ class Job:
 
 
 class JobRunner:
-    def __init__(self, on_done: Optional[Callable[[Job], None]] = None):
+    def __init__(self, on_done: Optional[Callable[[Job], None]] = None,
+                 on_start: Optional[Callable[[Job], None]] = None):
         self.jobs: Dict[str, Job] = {}
         self._storage_lock = threading.Lock()
         self._on_done = on_done
+        self._on_start = on_start
 
     def submit(self, title: str, user: str, fn: Callable[[Callable[[str], None]], None]) -> Job:
         job = Job(title, user)
         self.jobs[job.id] = job
+        if self._on_start:
+            try:
+                self._on_start(job)
+            except Exception:
+                pass
         if len(self.jobs) > 100:
             for old in sorted(self.jobs.values(), key=lambda j: j.started)[: len(self.jobs) - 100]:
                 if old.status not in ("queued", "running"):

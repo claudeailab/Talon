@@ -31,13 +31,17 @@ class Nas:
     def __init__(self, cfg, platform):
         self.cfg = cfg
         self.p = platform
-        if getattr(platform, "demo", False) and os.path.exists(cfg.state_file):
-            os.unlink(cfg.state_file)   # the simulated host is rebuilt on every start
+        if getattr(platform, "demo", False):
+            # the simulated host is rebuilt on every start, its activity log too
+            for f in (cfg.state_file, os.path.join(os.path.dirname(os.path.abspath(cfg.state_file)), "activity.jsonl")):
+                if os.path.exists(f):
+                    os.unlink(f)
         self.state = State(cfg.state_file)
         if getattr(platform, "demo", False):
             platform.seed_state(self.state)
         self._migrate()
-        self.jobs = JobRunner(on_done=self._job_done)
+        self.jobs = JobRunner(on_done=self._job_done,
+                              on_start=lambda job: self.state.log_activity(job.user, f"{job.title} started"))
         demo = bool(getattr(platform, "demo", False))
         self.notifier = Notifier(self.state, lambda: self.p.system_info().get("hostname", "nas"),
                                  demo)
