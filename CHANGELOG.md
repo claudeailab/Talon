@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.69
+- Scheduled: progress bar with rsync's real progress (--info=progress2) or "PROGRESS 45" lines
+- Scripts that report nothing show how long they have been running and how long the last run took
+
 ## 1.0.68
 - Scheduled output works like the OneDrive log: a time on every line, paths wrap at "/"
 - While a task runs: "Working", or how long the script has printed nothing

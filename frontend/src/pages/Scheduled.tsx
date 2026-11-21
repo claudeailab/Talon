@@ -2,10 +2,10 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Clock, Copy, FileText, MoreHorizontal, Pause, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
-import { ago, cx, dateTime, sameValue } from "../lib/format";
+import { ago, bytes, cx, dateTime, sameValue } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { ScheduledTask, TaskRun, TaskSchedule } from "../lib/types";
-import { Badge, Button, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Select, TimeInput } from "../components/ui";
+import { Badge, Button, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Select, TimeInput } from "../components/ui";
 import { ToggleBox } from "./OneDrive";
 
 type Data = { tasks: ScheduledTask[]; run_as: string[] };
@@ -200,7 +200,15 @@ export default function ScheduledPage() {
 }
 
 function TaskStatus({ t }: { t: ScheduledTask }) {
-  if (t.running) return <Badge tone="blue" dot>Running</Badge>;
+  if (t.running)
+    return (
+      <div className="w-28">
+        <Badge tone="blue" dot>
+          Running{t.running.percent != null ? ` ${Math.floor(t.running.percent)}%` : ""}
+        </Badge>
+        <Progress value={t.running.percent} tone="blue" className="mt-1.5 h-1" />
+      </div>
+    );
   if (!t.enabled) return <Badge dot>Paused</Badge>;
   if (!t.last) return <Badge dot>Not run yet</Badge>;
   if (t.last.status === "success") return <Badge tone="green" dot>Succeeded</Badge>;
@@ -462,6 +470,7 @@ function OutputDialog({ task, onClose }: { task: ScheduledTask; onClose: () => v
                 {run.exit_code !== null && <span>Exit code {run.exit_code}</span>}
                 <span>{run.trigger === "manual" ? "Started by hand" : "Started by schedule"}</span>
               </div>
+              {run.status === "running" && <RunProgress run={run} />}
               {run.status === "running" && <Activity idle={run.idle ?? 0} />}
               {run.output ? (
                 <ul
@@ -484,6 +493,29 @@ function OutputDialog({ task, onClose }: { task: ScheduledTask; onClose: () => v
         </div>
       )}
     </Modal>
+  );
+}
+
+/** The real progress when the script reports it (rsync --info=progress2, or "PROGRESS 45");
+ * otherwise a moving bar with how long it has been running. Never a guessed percentage. */
+function RunProgress({ run }: { run: TaskRun }) {
+  const p = run.progress;
+  const elapsed = Date.now() / 1000 - run.started;
+  const detail = p
+    ? p.source === "rsync"
+      ? [p.bytes != null && `${bytes(p.bytes)} copied`, p.speed && `${bytes(p.speed)}/s`, p.eta ? `about ${took(p.eta)} left` : ""]
+          .filter(Boolean)
+          .join(" · ")
+      : `Running for ${took(elapsed)}`
+    : `Running for ${took(elapsed)}` + (run.last_took ? ` · the last run took ${took(run.last_took)}` : "");
+  return (
+    <div className="mb-2">
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <span className="shrink-0 font-medium">{p ? `Running ${Math.floor(p.percent)}%` : "Running"}</span>
+        <span className="truncate text-zinc-500">{detail}</span>
+      </div>
+      <Progress value={p ? p.percent : null} tone="blue" className="mt-1.5 h-1.5" />
+    </div>
   );
 }
 

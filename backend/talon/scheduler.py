@@ -24,6 +24,26 @@ from .util import UserError, write_atomic
 
 KEEP_RUNS = 20
 MAX_OUTPUT = 256 * 1024                    # bytes of output kept per run
+# progress a script reports: rsync --info=progress2 ("  1,234,567  45%  12.3MB/s  0:01:23 ..."),
+# or a line "PROGRESS 45" from any script. These update the progress bar and are not logged.
+RSYNC_PROGRESS = re.compile(r"^\s*([\d,]+)\s+(\d{1,3})%\s+([\d.]+)([kMGT]?)B/s\s+(\d+:\d\d:\d\d)(.*)$")
+PLAIN_PROGRESS = re.compile(r"^PROGRESS\s+(\d{1,3}(?:\.\d+)?)\s*%?\s*$")
+
+
+def parse_progress(seg: str) -> Optional[dict]:
+    m = RSYNC_PROGRESS.match(seg)
+    if m:
+        mult = {"": 1, "k": 1024, "M": 1024 ** 2, "G": 1024 ** 3, "T": 1024 ** 4}[m.group(4)]
+        hms = [int(x) for x in m.group(5).split(":")]
+        done = "xfr#" in m.group(6) and "to-chk=0/" in m.group(6)
+        # while copying the time is what is left; on a line closing a file it is the time taken
+        eta = None if "xfr#" in m.group(6) else hms[0] * 3600 + hms[1] * 60 + hms[2]
+        return {"percent": min(100, int(m.group(2))), "bytes": int(m.group(1).replace(",", "")),
+                "speed": float(m.group(3)) * mult, "eta": 0 if done else eta, "source": "rsync"}
+    m = PLAIN_PROGRESS.match(seg)
+    if m:
+        return {"percent": min(100.0, float(m.group(1))), "source": "script"}
+    return None
 MAX_SCRIPT = 64 * 1024
 TIMEOUTS = (0, 5, 15, 30, 60, 120, 360, 720, 1440)     # minutes, 0 = no limit
 INTERVALS = (15, 30, 60, 180, 360, 720)                # minutes
@@ -146,8 +166,21 @@ def schedule_label(s: dict) -> str:
 
 
 # ---------------------------------------------------------------- execution
+def _segment(raw: bytes, on_output, on_progress) -> None:
+    seg = raw.decode("utf-8", "replace")
+    if not seg.strip():
+        return
+    prog = parse_progress(seg)
+    if prog:
+        if on_progress:
+            on_progress(prog)
+        return
+    on_output(seg + "\n")
+
+
 def execute(script: str, run_as: str, timeout_s: float,
-            on_output: Callable[[str], None], started: Callable[[subprocess.Popen], None]) -> int:
+            on_output: Callable[[str], None], started: Callable[[subprocess.Popen], None],
+            on_progress: Optional[Callable[[dict], None]] = None) -> int:
     """Run `script` with bash as `run_as`; returns the exit code (124 on time-out)."""
     fd, path = tempfile.mkstemp(prefix="talon-task-", suffix=".sh")
     try:
@@ -179,8 +212,19 @@ def execute(script: str, run_as: str, timeout_s: float,
             timer.daemon = True
             timer.start()
         assert proc.stdout is not None
-        for raw in iter(proc.stdout.readline, b""):
-            on_output(raw.decode("utf-8", "replace"))
+        # split on carriage returns too: rsync rewrites its progress line with "\r"
+        buf = b""
+        fd_out = proc.stdout.fileno()
+        while True:
+            chunk = os.read(fd_out, 65536)
+            if not chunk:
+                break
+            buf += chunk
+            *parts, buf = re.split(rb"[\r\n]", buf)
+            for raw in parts:
+                _segment(raw, on_output, on_progress)
+        if buf:
+            _segment(buf, on_output, on_progress)
         code = proc.wait()
         if timer:
             timer.cancel()
@@ -243,7 +287,8 @@ class Scheduler:
         return {**{k: v for k, v in t.items() if k not in ("due_after", "boot")},
                 "schedule_label": schedule_label(t["schedule"]),
                 "next_run": None if not t.get("enabled", True) else self._next(t),
-                "running": {"started": r["started"]} if r else None}
+                "running": {"started": r["started"],
+                            "percent": (r.get("progress") or {}).get("percent")} if r else None}
 
     def list(self) -> List[dict]:
         return [self._view(t) for t in sorted(self._tasks().values(), key=lambda x: x["name"].lower())]
@@ -346,7 +391,8 @@ class Scheduler:
             out.append({"id": "running", "started": r["started"], "finished": None,
                         "status": "running", "exit_code": None, "trigger": r["trigger"],
                         "output": "".join(r["output"]),
-                        "idle": int(time.time() - r.get("last_output", r["started"]))})
+                        "idle": int(time.time() - r.get("last_output", r["started"])),
+                        "progress": r.get("progress")})
         d = os.path.join(self.dir, tid)
         try:
             names = sorted((n for n in os.listdir(d) if n.endswith(".json")), reverse=True)
@@ -358,6 +404,9 @@ class Scheduler:
                     out.append(json.load(f))
             except (OSError, ValueError):
                 continue
+        if r:          # for reference while running: how long the last good run took
+            last = next((x for x in out if x.get("status") == "success" and x.get("finished")), None)
+            out[0]["last_took"] = round(last["finished"] - last["started"]) if last else None
         return out
 
     def _save_run(self, tid: str, run: dict) -> None:
@@ -438,9 +487,22 @@ class Scheduler:
             if self.demo:
                 time.sleep(1.5)
                 out(_demo_output(t["script"]))
+                if "rsync" in t["script"]:            # demo: show what rsync progress looks like
+                    total = 2_400_000_000
+                    for i in range(1, 13):
+                        if r["cancel"]:
+                            break
+                        time.sleep(0.7)
+                        r.update(last_output=time.time(), progress={
+                            "percent": round(i * 100 / 12), "bytes": total * i // 12,
+                            "speed": 48 * 1024 ** 2, "eta": (12 - i) * 4, "source": "rsync"})
+                        out(f"Photos/2026/Holiday in Paphos/IMG_{4100 + i}.HEIC")
                 code = 0
             else:
-                code = execute(t["script"], t["run_as"], t["timeout"] * 60, out, started)
+                code = execute(t["script"], t["run_as"], t["timeout"] * 60, out, started,
+                               lambda p: r.update(last_output=time.time(), progress={
+                                   **(r.get("progress") or {}),
+                                   **{k: v for k, v in p.items() if v is not None}}))
         except Exception as e:        # noqa: BLE001 - report any failure as the run result
             out(f"\nCould not run the task: {e}\n")
             code = 127

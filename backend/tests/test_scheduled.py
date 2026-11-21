@@ -156,3 +156,16 @@ def test_output_lines_carry_their_time(client):
     out = client.get(f"/api/scheduled/{t['id']}/runs").json()[0]["output"]
     lines = [ln for ln in out.split("\n") if ln]
     assert lines and all(re.match(r"^\d\d:\d\d:\d\d\t", ln) for ln in lines)
+
+
+def test_progress_lines_update_the_bar_and_are_not_logged():
+    out, prog = [], []
+    script = ("printf 'copying\\n'\n"
+              "printf '\\r   1,048,576  25%%    1.00MB/s    0:00:03  \\r   2,097,152  50%%    2.00MB/s    0:00:02  '\n"
+              "printf '\\nfile2\\n'\n"
+              "echo 'PROGRESS 75'\n")
+    assert sch.execute(script, "root", 30, out.append, lambda p: None, prog.append) == 0
+    assert "".join(out) == "copying\nfile2\n"
+    assert [p["percent"] for p in prog] == [25, 50, 75]
+    assert prog[1]["bytes"] == 2_097_152 and prog[1]["speed"] == 2 * 1024 ** 2 and prog[1]["eta"] == 2
+    assert prog[2] == {"percent": 75.0, "source": "script"}

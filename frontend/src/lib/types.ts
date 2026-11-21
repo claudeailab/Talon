@@ -387,7 +387,7 @@ export interface ScheduledTask {
   created: number;
   next_run: number | null;
   last: { started: number; finished: number; status: "success" | "error" | "cancelled"; exit_code: number } | null;
-  running: { started: number } | null;
+  running: { started: number; percent: number | null } | null;
 }
 
 export interface TaskRun {
@@ -400,4 +400,8 @@ export interface TaskRun {
   output: string;
   /** running: seconds since the script last printed something */
   idle?: number;
+  /** running: progress the script reports (rsync --info=progress2, or "PROGRESS 45") */
+  progress?: { percent: number; source: "rsync" | "script"; bytes?: number; speed?: number; eta?: number | null } | null;
+  /** running: how long the last successful run took, in seconds */
+  last_took?: number | null;
 }
