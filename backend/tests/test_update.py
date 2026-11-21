@@ -73,3 +73,12 @@ def test_demo_update_flow(client):
     assert saw_restart
     assert client.get("/api/update/status").json()["state"] == "success"
     assert client.get("/api/auth/me").json()["version"] == "1.1.0"   # session survived
+
+
+def test_update_check_interval(client):
+    assert client.get("/api/update").json()["interval_hours"] == 6
+    assert client.put("/api/update/settings", json={"interval_hours": 24}).json()["interval_hours"] == 24
+    assert client.get("/api/update").json()["interval_hours"] == 24
+    assert client.put("/api/update/settings", json={"interval_hours": 0}).json()["interval_hours"] == 0
+    for bad in (5, "x", None, -1):
+        assert client.put("/api/update/settings", json={"interval_hours": bad}).status_code == 400

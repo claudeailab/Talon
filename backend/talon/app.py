@@ -183,6 +183,12 @@ def create_app(cfg, platform) -> FastAPI:
         updater.check(force=True)
         return updater.info()
 
+    @app.put("/api/update/settings")
+    def update_settings(body: dict = Body(...), user: str = Depends(current_user)):
+        h = updater.set_interval(body.get("interval_hours"))
+        nas.state.log_activity(user, "Update checks: " + ("only when checked manually" if not h else f"every {h} hour(s)"))
+        return updater.info()
+
     @app.get("/api/update/status")
     def update_status(_u: str = Depends(current_user)):
         return updater.status()

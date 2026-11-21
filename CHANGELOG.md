@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.62
+- Settings → Update: choose how often to check for updates (hourly to weekly, or never)
+
 ## 1.0.61
 - Dark theme: dropdown lists are readable (dark list, light text)
 - Menu and card titles capitalised: Shared Folders, Users & Groups, Activity Log, General & Sharing, …

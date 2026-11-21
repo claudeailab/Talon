@@ -779,7 +779,7 @@ export const GUIDE: Topic[] = [
         title: "Software updates",
         blocks: [
           { img: "settings-update", alt: "Software update" },
-          { p: "Talon checks for a new version every 6 hours. When one is available, a button at the bottom of the menu says so. Open [Settings → Update](/settings?tab=update) and click **Install now**." },
+          { p: "Talon checks for a new version every 6 hours; change this under **Check for updates** (every hour up to every week, or **Never** to check only with **Check now**). Nothing installs by itself. When a new version is available, a button at the bottom of the menu says so. Open [Settings → Update](/settings?tab=update) and click **Install now**." },
           { p: "An update takes about 1–3 minutes. The web interface restarts and reloads by itself. Shared folders stay available and volumes are not touched. If anything fails, the previous version is restored automatically." },
         ],
       },

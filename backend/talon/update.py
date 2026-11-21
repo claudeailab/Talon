@@ -17,7 +17,8 @@ from typing import Optional
 from . import __version__
 from .util import UserError, read_file, run, write_atomic
 
-CHECK_INTERVAL = 6 * 3600
+CHECK_INTERVAL = 6 * 3600                 # default; changeable in Settings > Update
+INTERVAL_CHOICES = (0, 1, 6, 12, 24, 168)   # hours; 0 = only when "Check now" is clicked
 HEARTBEAT_TIMEOUT = 180
 USER_AGENT = f"Talon-NAS/{__version__}"
 
@@ -64,7 +65,7 @@ class Updater:
     # ------------------------------------------------------------ checking
     def check(self, force: bool = False) -> dict:
         cached = self.state.get("update_check") or {}
-        if not force and cached and time.time() - cached.get("checked_at", 0) < CHECK_INTERVAL:
+        if not force and cached and time.time() - cached.get("checked_at", 0) < self.interval() * 3600:
             return cached
         result = {"checked_at": time.time(), "error": None, "latest": None}
         try:
@@ -80,15 +81,30 @@ class Updater:
         self.state.update(lambda d: d.__setitem__("update_check", result))
         return result
 
+    def interval(self) -> int:
+        """Hours between automatic checks (0: never)."""
+        h = self.state.get("update_interval")
+        return h if h in INTERVAL_CHOICES else CHECK_INTERVAL // 3600
+
+    def set_interval(self, hours) -> int:
+        try:
+            hours = int(hours)
+        except (TypeError, ValueError):
+            hours = -1
+        if hours not in INTERVAL_CHOICES:
+            raise UserError("Choose how often to check for updates")
+        self.state.update(lambda d: d.__setitem__("update_interval", hours))
+        return hours
+
     def background_loop(self, stop: threading.Event) -> None:
         stop.wait(60)
         while not stop.is_set():
-            if self.cfg.update_check:
+            if self.cfg.update_check and self.interval():
                 try:
-                    self.check()
+                    self.check()                  # only asks GitHub when the interval has passed
                 except Exception:
                     pass
-            stop.wait(1800)
+            stop.wait(300)
 
     def info(self) -> dict:
         c = self.state.get("update_check") or {}
@@ -97,7 +113,8 @@ class Updater:
                 "available": bool(latest and is_newer(latest, self.current)),
                 "name": c.get("name"), "notes": c.get("notes"), "url": c.get("url"),
                 "published_at": c.get("published_at"), "checked_at": c.get("checked_at"),
-                "error": c.get("error"), "repo": self.cfg.repo, "status": self.status()}
+                "error": c.get("error"), "repo": self.cfg.repo, "status": self.status(),
+                "interval_hours": self.interval()}
 
     # ------------------------------------------------------------ status
     def status(self) -> dict:

@@ -157,12 +157,25 @@ function ReleaseNotes({ text }: { text: string }) {
   );
 }
 
+const CHECK_EVERY: [number, string][] = [
+  [1, "Every hour"],
+  [6, "Every 6 hours"],
+  [12, "Every 12 hours"],
+  [24, "Every day"],
+  [168, "Every week"],
+  [0, "Never (only Check now)"],
+];
+
 function SoftwareUpdate() {
   const { data } = useQuery({ queryKey: ["update"], queryFn: () => api.get<UpdateInfo>("/update") });
   const [confirm, setConfirm] = useState(false);
   const check = useAction(() => api.post<UpdateInfo>("/update/check"), {
     invalidate: ["update"],
     success: (r) => (r.error ? "" : r.available ? `Talon ${r.latest} is available` : "Talon is up to date"),
+  });
+  const interval = useAction((h: number) => api.put<UpdateInfo>("/update/settings", { interval_hours: h }), {
+    invalidate: ["update"],
+    success: "Saved",
   });
   const install = useAction(() => api.post("/update/install"), {
     invalidate: ["update-status", "update"],
@@ -174,9 +187,7 @@ function SoftwareUpdate() {
       <CardHeader
         icon={<Sparkles className="size-4.5" />}
         title="Software Update"
-        subtitle={
-          data.checked_at ? `Last checked ${ago(data.checked_at)} · checks automatically every 6 hours` : "Checks automatically every 6 hours"
-        }
+        subtitle={data.checked_at ? `Last checked ${ago(data.checked_at)}` : "Not checked yet"}
         actions={
           <Button size="sm" icon={<RefreshCw className="size-3.5" />} loading={check.isPending} onClick={() => check.mutate()}>
             Check now
@@ -184,6 +195,22 @@ function SoftwareUpdate() {
         }
       />
       <div className="space-y-4 px-5 pb-5">
+        <div className="flex min-h-14 flex-wrap items-center justify-between gap-3 rounded-xl bg-zinc-50 px-3.5 py-2 dark:bg-white/[0.03]">
+          <div className="min-w-0">
+            <div className="text-[13px] font-medium">Check for updates</div>
+            <div className="text-xs text-zinc-500">You are told when a new version is available; nothing installs by itself</div>
+          </div>
+          <Select
+            value={data.interval_hours}
+            onChange={(e) => interval.mutate(Number(e.target.value))}
+            className="w-full sm:w-56"
+            aria-label="Check for updates"
+          >
+            {CHECK_EVERY.map(([h, label]) => (
+              <option key={h} value={h}>{label}</option>
+            ))}
+          </Select>
+        </div>
         {data.error && <Callout tone="warning" title="Could not check for updates">{data.error}</Callout>}
         {data.available ? (
           <div className="rounded-2xl bg-gradient-to-br from-brand-50 to-violet-50 p-5 ring-1 ring-brand-200/70 dark:from-brand-500/10 dark:to-violet-500/10 dark:ring-brand-400/20">

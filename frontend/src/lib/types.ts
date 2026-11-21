@@ -250,6 +250,7 @@ export interface UpdateStatus {
 
 export interface UpdateInfo {
   current: string;
+  interval_hours: number;
   latest: string | null;
   available: boolean;
   name: string | null;
