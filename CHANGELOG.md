@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.80
+- New screenshots in the gallery: OneDrive wizard, recycle bin and activity log
+- Updated features list
+
 ## 1.0.79
 - Files on phones and tablets: tap a folder to open it; the checkboxes select
 

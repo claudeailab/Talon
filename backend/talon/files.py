@@ -199,8 +199,8 @@ class FileBrowser:
                 "@onedrive/Notes.txt": 2_000,
             }
             # previous versions and the recycle bin (see restore.py)
-            def stamp(days):
-                return time.strftime("%Y-%m-%d_%H%M%S", time.localtime(time.time() - days * 86400))
+            def stamp(days):            # a fixed time of day: the same paths on every start
+                return time.strftime("%Y-%m-%d_020000", time.localtime(time.time() - days * 86400))
             samples.update({
                 f"tank/Media/Photos/.versions/{stamp(1)}/Album list.xlsx": 36_000,
                 f"tank/Media/Photos/.versions/{stamp(7)}/Album list.xlsx": 35_000,

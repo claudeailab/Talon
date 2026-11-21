@@ -49,17 +49,20 @@ https://<nas-ip>/
 </div>
 
 - **Dashboard:** live system stats, storage health and alerts
+- **Disks:** S.M.A.R.T. health, temperatures, self-tests and wipe
 - **RAID:** hot spares, expansion, disk replacement and data scrub
 - **Volumes:** ext4 or XFS on a RAID array or a single disk
-- **Disks:** S.M.A.R.T. health, temperatures, self-tests and wipe
-- **Files:** browse volumes, USB disks and OneDrive; restore deleted files and old versions
+- **Files:** browse volumes, USB disks and OneDrive in the browser
+- **Recycle bin:** restore deleted files and earlier versions for 30 days
+- **OneDrive:** backup or two-way sync, verified after each run
 - **Shared Folders:** SMB, NFS and Time Machine with per-user permissions
 - **Users & Groups:** accounts for shared folders and the web interface
 - **Discovery:** appears in Windows Network and macOS Finder
-- **OneDrive:** back up or two-way sync, set up in a short wizard, verified after each run
+- **Activity:** a searchable log of everything that happens
 - **Networking:** DHCP or static IP, HTTPS on or off
-- **Scheduled:** run scripts on a schedule
+- **Scheduled:** scripts on a schedule, with live output and progress
 - **Notifications:** email alerts with adjustable thresholds
+- **Mobile:** works on phones and tablets, light and dark mode
 - **Documentation:** built-in searchable guide
 
 ## Screenshots
@@ -73,19 +76,27 @@ Click a screenshot to open the [gallery](https://claudeailab.github.io/Talon/).
   </tr>
   <tr>
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#files"><img src="docs/screenshots/files.png" alt="Files on volumes, USB disks and OneDrive"></a><br><sub>Files on volumes, USB disks and OneDrive</sub></td>
-    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#share-permissions"><img src="docs/screenshots/share-permissions.png" alt="Shared folder permissions"></a><br><sub>Shared folder permissions</sub></td>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#recycle-bin"><img src="docs/screenshots/recycle-bin.png" alt="Recycle bin"></a><br><sub>Recycle bin</sub></td>
   </tr>
   <tr>
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#onedrive"><img src="docs/screenshots/onedrive.png" alt="OneDrive backup and sync"></a><br><sub>OneDrive backup and sync</sub></td>
-    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#users"><img src="docs/screenshots/users.png" alt="Users and groups"></a><br><sub>Users and groups</sub></td>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#onedrive-wizard"><img src="docs/screenshots/onedrive-wizard.png" alt="OneDrive task wizard"></a><br><sub>OneDrive task wizard</sub></td>
   </tr>
   <tr>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#share-permissions"><img src="docs/screenshots/share-permissions.png" alt="Shared folder permissions"></a><br><sub>Shared folder permissions</sub></td>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#users"><img src="docs/screenshots/users.png" alt="Users &amp; Groups"></a><br><sub>Users &amp; Groups</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#activity"><img src="docs/screenshots/activity.png" alt="Activity log"></a><br><sub>Activity log</sub></td>
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#scheduled"><img src="docs/screenshots/scheduled.png" alt="Scheduled scripts"></a><br><sub>Scheduled scripts</sub></td>
-    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#notifications"><img src="docs/screenshots/notifications.png" alt="Thresholds"></a><br><sub>Thresholds</sub></td>
   </tr>
   <tr>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#notifications"><img src="docs/screenshots/notifications.png" alt="Thresholds"></a><br><sub>Thresholds</sub></td>
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#documentation"><img src="docs/screenshots/documentation.png" alt="Built-in documentation"></a><br><sub>Built-in documentation</sub></td>
+  </tr>
+  <tr>
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/#dashboard-dark"><img src="docs/screenshots/dashboard-dark.png" alt="Dark mode"></a><br><sub>Dark mode</sub></td>
+    <td width="50%"></td>
   </tr>
 </table>
 
