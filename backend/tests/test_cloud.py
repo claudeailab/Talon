@@ -181,9 +181,10 @@ def test_rclone_log_lines_keep_time_level_file_and_message():
                      '"time":"2026-11-20T02:00:03.123+02:00"}', r)
     CloudSync._parse('{"level":"error","msg":"Failed to copy: quota exceeded","time":"2026-11-20T02:00:04+02:00"}', r)
     CloudSync._parse("plain text from rclone", r)
-    assert r["log"] == ["02:00:03\tINFO\tPictures/a b.jpg\tCopied (new)",
-                        "02:00:04\tERROR\t\tFailed to copy: quota exceeded",
-                        "plain text from rclone"]
+    assert r["log"][:2] == ["02:00:03\tINFO\tPictures/a b.jpg\tCopied (new)",
+                            "02:00:04\tERROR\t\tFailed to copy: quota exceeded"]
+    when, level, file, msg = r["log"][2].split("\t")              # plain lines get a time too
+    assert when.count(":") == 2 and (level, file, msg) == ("INFO", "", "plain text from rclone")
 
 
 def test_rclone_error_detection():
@@ -194,3 +195,63 @@ def test_rclone_error_detection():
     assert CloudSync._is_error("Error: unknown flag: --foo")
     assert CloudSync._message('{"level":"error","object":"a/b.jpg","msg":"Failed to copy: quota"}') == "a/b.jpg: Failed to copy: quota"
     assert RCLONE_EXIT[2] == "rclone: syntax or usage error"
+
+
+def _connected_task(client, **extra):
+    client.put("/api/settings/entra", json={"tenant": "common", "client_id": GUID, "client_secret": "s"})
+    client.post("/api/services/onedrive/enable")
+    url = client.post("/api/onedrive/connect", json={"origin": ORIGIN}).json()["url"]
+    client.get("/api/onedrive/callback?" + url.split("?", 1)[1])
+    r = client.post("/api/onedrive/tasks", json={
+        "name": "Photos", "direction": "pull", "remote": "Pictures", "volume": "tank",
+        "folder": "Photos", "schedule": {"kind": "manual"}, **extra})
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+def _wait_done(client, tid, timeout=20):
+    end = time.time() + timeout
+    while time.time() < end:
+        t = next(x for x in client.get("/api/onedrive").json()["tasks"] if x["id"] == tid)
+        if not t["running"] and t["last"]:
+            return t
+        time.sleep(0.2)
+    raise AssertionError("task did not finish")
+
+
+def test_failed_runs_are_retried(client, monkeypatch):
+    from talon import cloudsync
+    monkeypatch.setattr(cloudsync, "RETRY_DELAY", 0)
+    task = _connected_task(client, retries=2)
+    assert task["retries"] == 2
+    assert client.post("/api/onedrive/tasks", json={**task, "name": "x", "retries": 4}).status_code == 400
+    calls = []
+
+    def flaky(self, t, r, log):
+        calls.append(1)
+        return ("error", "network down") if len(calls) < 3 else ("success", None)
+    monkeypatch.setattr(cloudsync.CloudSync, "_attempt", flaky)
+    client.post(f"/api/onedrive/tasks/{task['id']}/run")
+    assert _wait_done(client, task["id"])["last"]["status"] == "success" and len(calls) == 3
+    log = client.get(f"/api/onedrive/tasks/{task['id']}/log").json()
+    assert all(line.split("\t")[0].count(":") == 2 for line in log)          # every line has a time
+    assert any("Attempt 1 of 3 failed: network down" in line for line in log)
+
+
+def test_interrupted_run_resumes_after_restart(client, monkeypatch):
+    from talon import cloudsync
+    task = _connected_task(client, retries=0)
+    cloud = client.app.state.nas.cloud
+    # a run that was going when Talon stopped leaves its mark in the state file
+    monkeypatch.setattr(cloudsync.CloudSync, "_attempt", lambda self, t, r, log: ("interrupted", "x"))
+    client.post(f"/api/onedrive/tasks/{task['id']}/run")
+    time.sleep(0.5)
+    assert cloud._od()["tasks"][task["id"]].get("interrupted")
+    # next start: it runs again by itself and the mark is cleared
+    monkeypatch.setattr(cloudsync, "RESUME_DELAY", 0)
+    monkeypatch.setattr(cloudsync.CloudSync, "_attempt", lambda self, t, r, log: ("success", None))
+    cloud._resume()
+    t = _wait_done(client, task["id"])
+    assert t["last"]["status"] == "success" and "interrupted" not in cloud._od()["tasks"][task["id"]]
+    log = client.get(f"/api/onedrive/tasks/{task['id']}/log").json()
+    assert "resumed after a restart" in log[0]

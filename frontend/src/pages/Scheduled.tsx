@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Clock, Copy, FileText, MoreHorizontal, Pause, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, cx, dateTime, sameValue } from "../lib/format";
@@ -425,6 +425,12 @@ function OutputDialog({ task, onClose }: { task: ScheduledTask; onClose: () => v
   const [sel, setSel] = useState<string | null>(null);
   const runs = q.data ?? [];
   const run = runs.find((r) => r.id === sel) ?? runs[0];
+  // keep the newest output in view, unless the user scrolled up to read something
+  const out = useRef<HTMLPreElement>(null);
+  const follow = useRef(true);
+  useEffect(() => {
+    if (out.current && follow.current) out.current.scrollTop = out.current.scrollHeight;
+  }, [run?.output, run?.id]);
   return (
     <Modal open onClose={onClose} size="xl" title={task.name} description="The last 20 runs are kept" footer={<Button onClick={onClose}>Close</Button>}>
       {!q.data ? (
@@ -456,7 +462,13 @@ function OutputDialog({ task, onClose }: { task: ScheduledTask; onClose: () => v
                 {run.exit_code !== null && <span>Exit code {run.exit_code}</span>}
                 <span>{run.trigger === "manual" ? "Started by hand" : "Started by schedule"}</span>
               </div>
-              <pre className="h-80 overflow-auto rounded-xl bg-zinc-950 px-4 py-3 font-mono text-[12px] leading-5 whitespace-pre-wrap text-zinc-300 [overflow-wrap:anywhere]">
+              <pre
+                ref={out}
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+                }}
+                className="h-80 max-h-[45dvh] overflow-auto rounded-xl bg-zinc-950 px-4 py-3 font-mono text-[12px] leading-5 whitespace-pre-wrap text-zinc-300 [overflow-wrap:anywhere]">
                 {run.output || "No output"}
               </pre>
             </div>

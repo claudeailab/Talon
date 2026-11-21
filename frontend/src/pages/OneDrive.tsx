@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeftRight,
   ArrowRight,
@@ -494,6 +494,7 @@ type Form = {
   versions: boolean;
   max_delete: number;
   source_file: boolean;
+  retries: number;
 };
 
 const parentOf = (p: string) => p.split("/").slice(0, -1).join("/");
@@ -516,6 +517,7 @@ function toForm(t: CloudTask | null, volumes: Volume[]): Form {
     versions: t?.versions ?? true,
     max_delete: t?.max_delete ?? 50,
     source_file: t?.source_file ?? false,
+    retries: t?.retries ?? 2,
   };
 }
 
@@ -557,6 +559,7 @@ function TaskDialog({
     versions: f.versions,
     max_delete: f.max_delete,
     source_file: f.source_file,
+    retries: f.retries,
   };
   const save = useAction(
     () =>
@@ -666,7 +669,7 @@ function TaskDialog({
           </Field>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-3 [&>*]:min-w-0">
+        <div className="grid gap-4 md:grid-cols-4 [&>*]:min-w-0">
           <Field label="Task name">
             <Input
               value={f.name}
@@ -705,6 +708,15 @@ function TaskDialog({
               <option value="5M">5 MB/s</option>
               <option value="10M">10 MB/s</option>
               <option value="50M">50 MB/s</option>
+            </Select>
+          </Field>
+          <Field label="If it fails">
+            <Select value={f.retries} onChange={(e) => set("retries", Number(e.target.value))}>
+              <option value={0}>Don't retry</option>
+              <option value={1}>Retry once</option>
+              <option value={2}>Retry 2 times</option>
+              <option value={3}>Retry 3 times</option>
+              <option value={5}>Retry 5 times</option>
             </Select>
           </Field>
         </div>
@@ -1013,6 +1025,13 @@ function LogDialog({
     queryFn: () => api.get<string[]>(`/onedrive/tasks/${task.id}/log`),
     refetchInterval: 2000,
   });
+  // keep the newest line in view, unless the user scrolled up to read something
+  const list = useRef<HTMLUListElement>(null);
+  const follow = useRef(true);
+  useEffect(() => {
+    const el = list.current;
+    if (el && follow.current) el.scrollTop = el.scrollHeight;
+  }, [q.data]);
   return (
     <Modal
       open
@@ -1027,7 +1046,14 @@ function LogDialog({
         </Callout>
       )}
       {q.data?.length ? (
-        <ul className="max-h-[60vh] divide-y divide-zinc-100 overflow-y-auto rounded-xl ring-1 ring-zinc-200 dark:divide-white/5 dark:ring-white/10">
+        <ul
+          ref={list}
+          onScroll={(e) => {
+            const el = e.currentTarget;
+            follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+          }}
+          className="max-h-[50vh] max-h-[50dvh] divide-y divide-zinc-100 overflow-y-auto rounded-xl ring-1 ring-zinc-200 sm:max-h-[60vh] dark:divide-white/5 dark:ring-white/10"
+        >
           {q.data.map((line, i) => (
             <LogLine key={i} line={line} />
           ))}

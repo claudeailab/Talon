@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.53
+- OneDrive tasks: retry when they fail, and resume after a restart
+- Logs show the time of every line and follow the newest one
+- Dialogs on phones no longer slip under Safari's toolbar
+
 ## 1.0.52
 - Activity: tap an entry to read the whole message
 - Failed OneDrive tasks report rclone's actual error

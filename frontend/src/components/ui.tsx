@@ -640,7 +640,7 @@ export function Modal({
       <div
         ref={ref}
         className={cx(
-          "relative flex max-h-[92vh] w-full animate-pop flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl ring-1 ring-zinc-900/5 sm:rounded-2xl dark:bg-zinc-900 dark:ring-white/10",
+          "relative flex max-h-[92vh] max-h-[92dvh] w-full animate-pop flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl ring-1 ring-zinc-900/5 sm:rounded-2xl dark:bg-zinc-900 dark:ring-white/10",
           {
             sm: "sm:max-w-md",
             md: "sm:max-w-lg",
@@ -667,7 +667,8 @@ export function Modal({
         </div>
         <div className="flex-1 overflow-y-auto px-6 py-5">{children}</div>
         {footer && (
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50/60 px-6 py-3.5 dark:border-white/5 dark:bg-white/[0.02]">
+          // on phones the sheet sits at the bottom: keep the buttons clear of the home bar
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50/60 px-6 pt-3.5 pb-[max(0.875rem,env(safe-area-inset-bottom))] dark:border-white/5 dark:bg-white/[0.02]">
             {footer}
           </div>
         )}

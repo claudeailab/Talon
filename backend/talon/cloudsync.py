@@ -43,6 +43,10 @@ RCLONE_EXIT = {
     10: "rclone: time limit reached",
 }
 
+RETRY_CHOICES = (0, 1, 2, 3, 5)
+RETRY_DELAY = 120                # seconds between attempts
+RESUME_DELAY = 30                # seconds after start-up before interrupted runs resume
+
 REMIND_DAYS = (7, 14, 30, 60, 90)
 REMIND_DEFAULT = 30
 
@@ -479,6 +483,12 @@ class CloudSync:
             raise UserError("Invalid delete limit") from None
         if not 1 <= max_delete <= 100:
             raise UserError("Delete limit must be 1-100%")
+        try:
+            retries = int(data.get("retries", 2))
+        except (TypeError, ValueError):
+            retries = -1
+        if retries not in RETRY_CHOICES:
+            raise UserError("Choose how often to retry")
         # the source may be a single file: OneDrive for "pull", the NAS for "push"
         source_file = bool(data.get("source_file"))
         if source_file and direction == "bisync":
@@ -489,7 +499,7 @@ class CloudSync:
                 "folder": folder, "schedule": sched, "bwlimit": bw, "source_file": source_file,
                 "delete": bool(data.get("delete")) and direction != "bisync" and not source_file,
                 "versions": bool(data.get("versions")) and direction != "bisync",
-                "max_delete": max_delete}
+                "max_delete": max_delete, "retries": retries}
 
     def _task(self, tid: str) -> dict:
         t = self._od().get("tasks", {}).get(tid)
@@ -571,6 +581,21 @@ class CloudSync:
 
     def start(self) -> None:
         threading.Thread(target=self._scheduler, daemon=True, name="cloudsync").start()
+        threading.Thread(target=self._resume, daemon=True, name="cloud-resume").start()
+
+    def _resume(self) -> None:
+        """Restart runs that were interrupted by a restart of Talon or the NAS.
+        rclone skips what was already copied, so the run carries on."""
+        interrupted = [t for t in (self._od().get("tasks") or {}).values() if t.get("interrupted")]
+        if not interrupted:
+            return
+        self._stop.wait(RESUME_DELAY)                 # let the network and rclone come up
+        for t in interrupted:
+            try:
+                self.run_task(t["id"], t["interrupted"].get("user") or "schedule", resumed=True)
+            except UserError as e:
+                self._update(lambda od, tid=t["id"]: od["tasks"].get(tid, {}).pop("interrupted", None))
+                self.state.log_activity("talon", f"OneDrive task {t['name']} could not resume: {e}", "warning")
 
     def stop(self) -> None:
         self._stop.set()
@@ -589,7 +614,7 @@ class CloudSync:
                 pass
 
     # ------------------------------------------------------------ running
-    def run_task(self, tid: str, user: str) -> None:
+    def run_task(self, tid: str, user: str, resumed: bool = False) -> None:
         t = self._task(tid)
         od = self._od()
         if not od.get("enabled"):
@@ -603,7 +628,10 @@ class CloudSync:
                 raise UserError("The task is already running")
             self._running[tid] = {"started": time.time(), "files": 0, "total_files": 0, "bytes": 0,
                                   "total_bytes": 0, "speed": 0, "proc": None, "cancel": False,
-                                  "log": collections.deque(maxlen=500)}
+                                  "log": collections.deque(maxlen=1000), "resumed": resumed}
+        # remembered in the state file until the run ends, so a restart can resume it
+        self._update(lambda od: od["tasks"].get(tid) is not None and
+                     od["tasks"][tid].__setitem__("interrupted", {"user": user, "since": time.time()}))
         threading.Thread(target=self._run, args=(t, user), daemon=True,
                          name=f"cloud-{tid}").start()
 
@@ -678,54 +706,101 @@ class CloudSync:
             args += ["--backup-dir", f"{base}{VERSIONS}/{stamp}"]
         return args
 
+    def _attempt(self, t: dict, r: dict, log) -> tuple:
+        """One run of rclone; returns (status, error). Errors are returned, not
+        raised, so the caller can try again."""
+        tid = t["id"]
+        status, error = "success", None
+        try:
+            local = os.path.join(self._volume_root(t["volume"]), t["folder"])
+            if self.demo:
+                return self._simulate(r)
+            if t.get("source_file") and t["direction"] == "push":
+                if not os.path.isfile(local):
+                    raise UserError(f"File not found: {t['volume']}/{t['folder']}")
+            else:
+                os.makedirs(local, exist_ok=True)
+            self.access_token()                       # refresh before writing the config
+            conf = self._rclone_conf(tid)
+            first = t["direction"] == "bisync" and not t.get("bisync_ready")
+            cmd = self.command(t, conf, local, first)
+            log.append(self._line("$ " + " ".join(a if "conf" not in a else "<config>" for a in cmd)))
+            proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                    text=True, bufsize=1)
+            r["proc"] = proc
+            last_err = ""
+            for line in proc.stdout:
+                self._parse(line, r)
+                if self._is_error(line):
+                    last_err = line
+            rc = proc.wait()
+            self._read_back_token(conf)
+            if r["cancel"]:
+                status, error = "cancelled", "Stopped"
+            elif rc < 0 or self._stop.is_set():
+                # killed by a signal (Talon or the NAS is shutting down): resume later
+                status, error = "interrupted", "Interrupted by a restart"
+            elif rc != 0:
+                status = "error"
+                error = self._message(last_err) or RCLONE_EXIT.get(rc, f"rclone exited with code {rc}")
+            elif first:
+                self._update(lambda od: od["tasks"].get(tid, {}).__setitem__("bisync_ready", True))
+            if status == "success" and t["versions"]:
+                self._prune_versions(t, conf, local)
+        except UserError as e:
+            status, error = "error", str(e)
+        except Exception as e:  # noqa: BLE001 - reported as the result of this attempt
+            status, error = "error", f"{type(e).__name__}: {e}"
+        return status, error
+
+    @staticmethod
+    def _line(text: str, level: str = "INFO") -> str:
+        """A log line of Talon's own, in the same time/level/file/message form as rclone's."""
+        return "\t".join((time.strftime("%H:%M:%S"), level, "", text))
+
     def _run(self, t: dict, user: str) -> None:
         tid = t["id"]
         r = self._running[tid]
         status, error = "success", None
         log = r["log"]
+        attempts = 1 + int(t.get("retries", 0))
+        log.append(self._line(time.strftime("Run started %d-%m-%Y %H:%M") + (
+            " (resumed after a restart)" if r.get("resumed") else "")))
         try:
-            local = os.path.join(self._volume_root(t["volume"]), t["folder"])
-            if self.demo:
-                status, error = self._simulate(r)
-            else:
-                if t.get("source_file") and t["direction"] == "push":
-                    if not os.path.isfile(local):
-                        raise UserError(f"File not found: {t['volume']}/{t['folder']}")
-                else:
-                    os.makedirs(local, exist_ok=True)
-                self.access_token()                       # refresh before writing the config
-                conf = self._rclone_conf(tid)
-                first = t["direction"] == "bisync" and not t.get("bisync_ready")
-                cmd = self.command(t, conf, local, first)
-                log.append("$ " + " ".join(a if "conf" not in a else "<config>" for a in cmd))
-                proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                                        text=True, bufsize=1)
-                r["proc"] = proc
-                last_err = ""
-                for line in proc.stdout:
-                    self._parse(line, r)
-                    if self._is_error(line):
-                        last_err = line
-                rc = proc.wait()
-                self._read_back_token(conf)
+            for attempt in range(1, attempts + 1):
+                status, error = self._attempt(t, r, log)
+                if status != "error" or r["cancel"] or attempt == attempts or self._stop.is_set():
+                    break
+                log.append(self._line(f"Attempt {attempt} of {attempts} failed: {error}. "
+                                      f"Trying again in {RETRY_DELAY // 60} minutes.", "NOTICE"))
+                end = time.time() + RETRY_DELAY
+                while time.time() < end and not r["cancel"] and not self._stop.is_set():
+                    time.sleep(1)
                 if r["cancel"]:
                     status, error = "cancelled", "Stopped"
-                elif rc != 0:
-                    status = "error"
-                    error = self._message(last_err) or RCLONE_EXIT.get(rc, f"rclone exited with code {rc}")
-                elif first:
-                    self._update(lambda od: od["tasks"].get(tid, {}).__setitem__("bisync_ready", True))
-                if status == "success" and t["versions"]:
-                    self._prune_versions(t, conf, local)
+                    break
+                r.update(files=0, bytes=0, total_files=0, total_bytes=0, speed=0)
+                log.append(self._line(f"Attempt {attempt + 1} of {attempts}"))
+            log.append(self._line("Finished" if status == "success" else
+                                  "Stopped" if status == "cancelled" else f"Failed: {error}",
+                                  "INFO" if status != "error" else "ERROR"))
         except UserError as e:
             status, error = "error", str(e)
         except Exception as e:  # noqa: BLE001
             status, error = "error", f"{type(e).__name__}: {e}"
         finally:
+            if status == "interrupted" or self._stop.is_set():
+                # keep the "interrupted" mark: the run resumes when Talon starts again
+                with self._lock:
+                    self._running.pop(tid, None)
+                return
             last = {"started": r["started"], "finished": time.time(), "status": status,
                     "files": r["files"], "bytes": r["bytes"], "error": error}
-            self._update(lambda od: od["tasks"].get(tid) is not None and
-                         od["tasks"][tid].__setitem__("last", last))
+            def done(od):
+                if od["tasks"].get(tid) is not None:
+                    od["tasks"][tid]["last"] = last
+                    od["tasks"][tid].pop("interrupted", None)
+            self._update(done)
             try:
                 os.makedirs(os.path.join(self.base, "cloud-logs"), exist_ok=True)
                 write_atomic(os.path.join(self.base, "cloud-logs", f"{tid}.log"),
@@ -766,8 +841,8 @@ class CloudSync:
         try:
             d = json.loads(line)
         except ValueError:
-            if line:
-                r["log"].append(line)
+            if line.strip():
+                r["log"].append("\t".join((time.strftime("%H:%M:%S"), "INFO", "", line.strip())))
             return
         st = d.get("stats")
         if st:

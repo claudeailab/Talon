@@ -310,6 +310,7 @@ export interface CloudTask {
   delete: boolean;
   versions: boolean;
   max_delete: number;
+  retries?: number;
   source_file?: boolean;
   created: number;
   next_run: number | null;
