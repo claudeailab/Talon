@@ -288,7 +288,7 @@ export const GUIDE: Topic[] = [
           {
             list: [
               "Choose where to browse with the button at the top left: your **Volumes**, **Other disks** (USB disks and other disks with a filesystem that are not part of a volume or RAID) and **OneDrive** when it is connected.",
-              "Click once to select an item, double-click a folder to open it.",
+              "Click once to select an item, double-click a folder to open it. On a phone or tablet, tap a folder to open it and use the checkboxes to select.",
               "Use the folder path next to the location to go back up (choose the location again to return to its top), and **Filter this folder** to find a name.",
               "Hidden items whose names start with a dot are not shown. Earlier copies and deleted files are under **Previous versions** and **Recycle bin**.",
             ],
@@ -549,7 +549,7 @@ export const GUIDE: Topic[] = [
           {
             steps: [
               "**What do you want to do?** **Back up OneDrive to the NAS**, **Back up the NAS to OneDrive**, or **Keep both the same** (beta: changes on either side go to the other; folders only; a file changed on both sides is kept twice, one copy renamed).",
-              "**Which folders?** Click **Change** to pick the OneDrive folder and the NAS folder. Click once to select, double-click to open a folder, or use **New folder**. A backup can also copy a single file.",
+              "**Which folders?** Click **Change** to pick the OneDrive folder and the NAS folder. Click once to select, click **›** (or double-click) to open a folder, or use **New folder**. A backup can also copy a single file.",
               "**When should it run?** **Every day** at a set time, **Every few hours** (every 15 minutes up to every 12 hours), or **Only when I start it**.",
               "**How carefully should Talon check?** **Don't check**, **Quick check** (recommended) or **Full check**, plus an optional full check every week or every month. See [Run and check tasks](" + t("onedrive") + ").",
               "**Almost done**: check the summary and the **Name**, then click **Create task**.",

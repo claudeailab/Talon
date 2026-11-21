@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.79
+- Files on phones and tablets: tap a folder to open it; the checkboxes select
+
 ## 1.0.78
 - Documentation Contents on phones: bold group titles with a line between groups
 

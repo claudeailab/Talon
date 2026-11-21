@@ -1184,7 +1184,7 @@ function FolderPicker({
       open
       onClose={onClose}
       title={kind === "remote" ? "Choose from OneDrive" : "Choose from the NAS"}
-      description="Click to select. Double-click a folder to open it."
+      description="Click to select; › or a double-click opens a folder."
       footer={
         <div className="flex w-full items-center justify-between gap-2">
           <div>

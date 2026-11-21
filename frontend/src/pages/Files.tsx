@@ -71,6 +71,7 @@ export default function FilesPage() {
   const [dragging, setDragging] = useState(false);
   const [versionsOf, setVersionsOf] = useState<string | null>(null);   // a file's previous versions
   const [showBin, setShowBin] = useState(false);
+  const touch = useMemo(() => window.matchMedia("(hover: none) and (pointer: coarse)").matches, []);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const places = locs.data ?? [];
@@ -337,7 +338,14 @@ export default function FilesPage() {
                 return (
                   <tr
                     key={it.name}
-                    onClick={(e) => (e.metaKey || e.ctrlKey ? toggle(it.name) : setSel(on && sel.size === 1 ? new Set() : new Set([it.name])))}
+                    onClick={(e) => {
+                      // touch screens have no double-click: a tap opens a folder (the
+                      // checkbox selects); with a mouse a click selects, a double-click opens
+                      if (touch && it.folder && !sel.size) return open(join(path, it.name));
+                      if (touch) return toggle(it.name);
+                      if (e.metaKey || e.ctrlKey) toggle(it.name);
+                      else setSel(on && sel.size === 1 ? new Set() : new Set([it.name]));
+                    }}
                     onDoubleClick={() => (it.folder ? open(join(path, it.name)) : download([join(path, it.name)]))}
                     className={cx("h-11 cursor-pointer", on ? "bg-brand-50/60 dark:bg-brand-500/10" : "hover:bg-zinc-50/70 dark:hover:bg-white/[0.02]")}
                   >
@@ -680,7 +688,7 @@ function MoveDialog({ volumes, volume, start, items, onClose, onDone }: { volume
       open
       onClose={onClose}
       title={`Move ${items.length === 1 ? items[0].split("/").pop() : `${items.length} items`}`}
-      description="Click to select. Double-click a folder to open it."
+      description="Click to select; › or a double-click opens a folder."
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>
