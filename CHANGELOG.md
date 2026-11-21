@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.78
+- Documentation Contents on phones: bold group titles with a line between groups
+
 ## 1.0.77
 - Documentation on phones: a clear Contents button with all topics, grouped
 - A bar at the bottom while reading: previous topic, Contents, next topic

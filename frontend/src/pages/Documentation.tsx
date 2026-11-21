@@ -215,9 +215,10 @@ export default function DocumentationPage() {
 
       <Modal open={contents} onClose={() => setContents(false)} title="Contents">
         <div className="-mx-6 -my-5">
+          {/* like the list on a computer: bold group titles, a line between groups */}
           {GROUPS.map((g) => (
-            <div key={g}>
-              <div className="px-6 pt-4 pb-1 text-[11px] font-bold tracking-wider text-zinc-500 uppercase dark:text-zinc-400">{g}</div>
+            <div key={g} className="border-t border-zinc-200 pt-3 pb-2 first:border-t-0 dark:border-white/10">
+              <div className="px-6 pb-1 text-[15px] font-bold text-zinc-900 dark:text-zinc-100">{g}</div>
               {GUIDE.filter((t) => t.group === g).map((t) => (
                 <button
                   key={t.id}
@@ -227,8 +228,10 @@ export default function DocumentationPage() {
                     open(t.id);
                   }}
                   className={cx(
-                    "flex w-full items-center justify-between gap-3 px-6 py-2.5 text-left text-[15px]",
-                    t.id === topicId ? "bg-brand-50 font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-300" : "hover:bg-zinc-50 dark:hover:bg-white/[0.03]",
+                    "flex w-full items-center justify-between gap-3 px-6 py-2 text-left text-[15px]",
+                    t.id === topicId
+                      ? "bg-brand-50 font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-300"
+                      : "text-zinc-600 hover:bg-zinc-50 dark:text-zinc-400 dark:hover:bg-white/[0.03]",
                   )}
                 >
                   {t.title}
@@ -237,7 +240,6 @@ export default function DocumentationPage() {
               ))}
             </div>
           ))}
-          <div className="h-3" />
         </div>
       </Modal>
     </>
