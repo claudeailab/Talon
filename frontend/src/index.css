@@ -56,3 +56,9 @@
     overflow-wrap: anywhere;
   }
 }
+
+/* Dark theme: native form controls (the open list of a dropdown, date and time
+   pickers, scrollbars) follow the theme instead of staying white with light text */
+html.dark { color-scheme: dark; }
+html.dark select option,
+html.dark select optgroup { background-color: #18181b; color: #f4f4f5; }

@@ -81,7 +81,7 @@ function EmailTab() {
       <Card>
         <CardHeader
           icon={<BellRing className="size-4.5" />}
-          title="Email notifications"
+          title="Email Notifications"
           subtitle="Each alert is sent once, and again if it comes back"
           actions={
             <div className="flex gap-2">

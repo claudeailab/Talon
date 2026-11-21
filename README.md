@@ -53,8 +53,8 @@ https://<nas-ip>/
 - **Volumes:** ext4 or XFS on a RAID array or a single disk
 - **Disks:** S.M.A.R.T. health, temperatures, self-tests and wipe
 - **Files:** browse volumes, USB disks and OneDrive; restore deleted files and old versions
-- **Shared folders:** SMB, NFS and Time Machine with per-user permissions
-- **Users & groups:** accounts for shared folders and the web interface
+- **Shared Folders:** SMB, NFS and Time Machine with per-user permissions
+- **Users & Groups:** accounts for shared folders and the web interface
 - **Discovery:** appears in Windows Network and macOS Finder
 - **OneDrive:** back up or two-way sync, set up in a short wizard, verified after each run
 - **Networking:** DHCP or static IP, HTTPS on or off

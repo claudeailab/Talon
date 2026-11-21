@@ -68,8 +68,8 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
   {
     section: "Sharing",
     items: [
-      { to: "/shares", label: "Shared folders", icon: FolderOpen, page: SharesPage },
-      { to: "/users", label: "Users & groups", icon: UsersIcon, page: UsersPage },
+      { to: "/shares", label: "Shared Folders", icon: FolderOpen, page: SharesPage },
+      { to: "/users", label: "Users & Groups", icon: UsersIcon, page: UsersPage },
     ],
   },
   {

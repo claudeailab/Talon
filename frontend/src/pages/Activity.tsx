@@ -28,7 +28,7 @@ export default function ActivityPage() {
       <PageHeader title="Activity" description="Administrative actions and background tasks." />
       <div className="grid gap-5 xl:grid-cols-3">
         <Card className="xl:col-span-2">
-          <CardHeader title="Activity log" subtitle={`${act.data.total} event${act.data.total === 1 ? "" : "s"}`} />
+          <CardHeader title="Activity Log" subtitle={`${act.data.total} event${act.data.total === 1 ? "" : "s"}`} />
           {act.data.total === 0 ? (
             <Empty icon={<Info className="size-6" />} title="Nothing yet" />
           ) : (

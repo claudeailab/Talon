@@ -214,7 +214,7 @@ export default function DashboardPage() {
                   );
                 })}
                 <Tile to="/shares">
-                  <TileHead name="Shared folders" badge={String(shares.length)} />
+                  <TileHead name="Shared Folders" badge={String(shares.length)} />
                   <TileLine
                     left={shares.length ? count(shares, "smb", "SMB", "nfs", "NFS") : "No shared folders yet"}
                     right={shares.some((x) => x.time_machine) ? "Time Machine" : ""}

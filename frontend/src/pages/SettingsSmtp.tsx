@@ -37,7 +37,7 @@ export default function SmtpTab() {
         icon={<Mail className="size-4.5" />}
         title={
           <span className="flex items-center gap-2">
-            SMTP server {d.configured ? <Badge tone="green" dot>Configured</Badge> : <Badge dot>Not configured</Badge>}
+            SMTP Server {d.configured ? <Badge tone="green" dot>Configured</Badge> : <Badge dot>Not configured</Badge>}
           </span>
         }
         subtitle="Used to send email notifications"

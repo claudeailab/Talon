@@ -43,7 +43,7 @@ export default function UsersPage() {
   return (
     <>
       <PageHeader
-        title="Users & groups"
+        title="Users & Groups"
         description="Accounts for shared folders and this web interface."
         actions={
           tab === "users" ? (

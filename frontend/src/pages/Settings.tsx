@@ -62,7 +62,7 @@ function GeneralTab() {
     <Card>
       <CardHeader
         icon={<Server className="size-4.5" />}
-        title="General & file sharing"
+        title="General & Sharing"
         subtitle="Name, time zone and Windows/macOS sharing"
         actions={
           <Button
@@ -173,7 +173,7 @@ function SoftwareUpdate() {
     <Card>
       <CardHeader
         icon={<Sparkles className="size-4.5" />}
-        title="Software update"
+        title="Software Update"
         subtitle={
           data.checked_at ? `Last checked ${ago(data.checked_at)} · checks automatically every 6 hours` : "Checks automatically every 6 hours"
         }

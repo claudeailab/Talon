@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.61
+- Dark theme: dropdown lists are readable (dark list, light text)
+- Menu and card titles capitalised: Shared Folders, Users & Groups, Activity Log, General & Sharing, …
+
 ## 1.0.60
 - New OneDrive task wizard: what, folders, when, checks, done; editing opens a summary
 - Files: Previous versions and a Recycle bin to restore replaced or deleted files

@@ -82,7 +82,7 @@ export default function EntraTab() {
         icon={<KeyRound className="size-4.5" />}
         title={
           <span className="flex items-center gap-2">
-            EntraID app {q.data.configured ? <Badge tone="green" dot>Configured</Badge> : <Badge dot>Not configured</Badge>}
+            EntraID App {q.data.configured ? <Badge tone="green" dot>Configured</Badge> : <Badge dot>Not configured</Badge>}
           </span>
         }
         subtitle="Microsoft sign-in used by OneDrive"

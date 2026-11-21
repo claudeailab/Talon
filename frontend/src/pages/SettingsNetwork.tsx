@@ -247,7 +247,7 @@ function WebCard() {
         icon={<Lock className="size-4.5" />}
         title={
           <span className="flex items-center gap-2">
-            Web interface {on ? <Badge tone="green" dot>HTTPS</Badge> : <Badge tone="amber" dot>HTTP</Badge>}
+            Web Interface {on ? <Badge tone="green" dot>HTTPS</Badge> : <Badge tone="amber" dot>HTTP</Badge>}
           </span>
         }
         subtitle={on ? `https:// on port ${q.data.port}, with Talon's own certificate` : `Plain http:// on port ${q.data.port}`}

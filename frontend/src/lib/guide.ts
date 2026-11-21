@@ -55,8 +55,8 @@ export const GUIDE: Topic[] = [
               "Check your disks on the [Disks](/disks) page. See [Disks and health](" + t("disks") + ").",
               "Optional: combine two or more disks into a RAID array on the [RAID](/raid) page, so a failed disk loses no data. See [RAID](" + t("raid") + ").",
               "Create a volume on the RAID array or on a single disk on the [Volumes](/volumes) page. See [Volumes](" + t("volumes") + ").",
-              "Add an account for each person on the [Users & groups](/users) page. See [Users and groups](" + t("users") + ").",
-              "Create shared folders and choose who may use them on the [Shared folders](/shares) page. See [Shared folders](" + t("shares") + ").",
+              "Add an account for each person on the [Users & Groups](/users) page. See [Users & Groups](" + t("users") + ").",
+              "Create shared folders and choose who may use them on the [Shared Folders](/shares) page. See [Shared Folders](" + t("shares") + ").",
               "Connect from your computers and phones. See [Connect from your devices](" + t("connect") + ").",
             ],
           },
@@ -71,11 +71,11 @@ export const GUIDE: Topic[] = [
           { p: "The installer shows how to sign in when it finishes:" },
           {
             list: [
-              "Installed as **root**: it creates the administrator **nasadmin** with a random password and shows both, for example `Administrator login: nasadmin / Xy7…`. Change this password in [Users & groups](/users) after signing in.",
+              "Installed as **root**: it creates the administrator **nasadmin** with a random password and shows both, for example `Administrator login: nasadmin / Xy7…`. Change this password in [Users & Groups](/users) after signing in.",
               "Installed from your own account (asked for your password to get root access): that account is the administrator; sign in with its user name and Linux password.",
             ],
           },
-          { p: "Other people can sign in once they are marked as **Administrator** on the [Users & groups](/users) page." },
+          { p: "Other people can sign in once they are marked as **Administrator** on the [Users & Groups](/users) page." },
           { p: "The first time, the browser warns that the connection is not private. This is expected: Talon uses its own certificate. Choose **Advanced** and continue to the site. (With HTTPS turned off in [Settings → Networking](/settings?tab=network), the address starts with http:// and there is no warning.)" },
         ],
       },
@@ -266,7 +266,7 @@ export const GUIDE: Topic[] = [
               "**Delete volume** erases everything on it.",
             ],
           },
-          { p: "Next step: share folders on the volume. See [Shared folders](" + t("shares") + ")." },
+          { p: "Next step: share folders on the volume. See [Shared Folders](" + t("shares") + ")." },
         ],
       },
     ],
@@ -355,10 +355,10 @@ export const GUIDE: Topic[] = [
   // ------------------------------------------------------------ Sharing
   {
     id: "shares",
-    title: "Shared folders",
+    title: "Shared Folders",
     group: "Sharing",
     summary: "Make folders available on your network and choose who may use them.",
-    page: { to: "/shares", label: "Open Shared folders" },
+    page: { to: "/shares", label: "Open Shared Folders" },
     before: ["A volume. See [Volumes](" + t("volumes") + ")."],
     sections: [
       {
@@ -367,7 +367,7 @@ export const GUIDE: Topic[] = [
         blocks: [
           {
             steps: [
-              "On the [Shared folders](/shares) page, click **New share**.",
+              "On the [Shared Folders](/shares) page, click **New share**.",
               "**General**: enter the **Name** that people see on the network, pick the **Volume** and optionally a **Description**. A folder with this name is created on the volume.",
               "**Permissions**: give **All NAS users**, each group and each user **No access**, **Read** or **Read/Write**. **Guests** (anyone on the network, without a password) can get **Read** at most.",
               "**SMB**: for Windows, macOS, Linux, Android and iOS. On by default. Options below.",
@@ -419,7 +419,7 @@ export const GUIDE: Topic[] = [
     title: "Connect from your devices",
     group: "Sharing",
     summary: "Open shared folders from Windows, macOS, Linux, iPhone and Android.",
-    before: ["A shared folder and a user with access to it. See [Shared folders](" + t("shares") + ")."],
+    before: ["A shared folder and a user with access to it. See [Shared Folders](" + t("shares") + ")."],
     sections: [
       {
         id: "windows",
@@ -479,10 +479,10 @@ export const GUIDE: Topic[] = [
   },
   {
     id: "users",
-    title: "Users and groups",
+    title: "Users & Groups",
     group: "Sharing",
     summary: "Accounts for shared folders and for this web interface.",
-    page: { to: "/users", label: "Open Users & groups" },
+    page: { to: "/users", label: "Open Users & Groups" },
     sections: [
       {
         id: "users",
@@ -490,10 +490,10 @@ export const GUIDE: Topic[] = [
         blocks: [
           {
             steps: [
-              "On the [Users & groups](/users) page, click **Add user**.",
+              "On the [Users & Groups](/users) page, click **Add user**.",
               "Enter a **User name**, optionally a **Full name**, and a **Password** twice. This password is also used to open shared folders.",
               "Optionally add the user to **Groups**. Turn on **Administrator** only for people who should manage the NAS in this web interface.",
-              "Click **Create user**, then give the user access on the [Shared folders](/shares) page.",
+              "Click **Create user**, then give the user access on the [Shared Folders](/shares) page.",
             ],
           },
           { img: "users", alt: "Users and groups" },
@@ -504,7 +504,7 @@ export const GUIDE: Topic[] = [
         id: "groups",
         title: "Groups",
         blocks: [
-          { p: "Groups give several users the same access, for example a group family with Read/Write to Photos. Click **Add group**, enter a **Group name**, select its members and click **Create group**. Then give the group access on the [Shared folders](/shares) page." },
+          { p: "Groups give several users the same access, for example a group family with Read/Write to Photos. Click **Add group**, enter a **Group name**, select its members and click **Create group**. Then give the group access on the [Shared Folders](/shares) page." },
         ],
       },
     ],
@@ -718,7 +718,7 @@ export const GUIDE: Topic[] = [
         title: "Activity log and tasks",
         blocks: [
           { img: "activity", alt: "Activity" },
-          { p: "**Tasks** lists background jobs, such as creating a RAID array or installing an update, with their progress and result. The **Activity log** lists who changed what and when. Choose how many entries to show per page and use **Previous** and **Next**." },
+          { p: "**Tasks** lists background jobs, such as creating a RAID array or installing an update, with their progress and result. The **Activity Log** lists who changed what and when. Choose how many entries to show per page and use **Previous** and **Next**." },
         ],
       },
     ],
@@ -770,7 +770,7 @@ export const GUIDE: Topic[] = [
         id: "https",
         title: "HTTPS or plain HTTP",
         blocks: [
-          { p: "Talon uses HTTPS with its own certificate. When Cloudflare (for example a Cloudflare Tunnel) or another proxy already provides HTTPS, turn Talon's off: under **Settings → Networking → Web interface**, switch off **HTTPS** and confirm. Talon restarts and serves plain http:// on port 80; point the proxy at **http://<NAS IP address>:80**." },
+          { p: "Talon uses HTTPS with its own certificate. When Cloudflare (for example a Cloudflare Tunnel) or another proxy already provides HTTPS, turn Talon's off: under **Settings → Networking → Web Interface**, switch off **HTTPS** and confirm. Talon restarts and serves plain http:// on port 80; point the proxy at **http://<NAS IP address>:80**." },
           { warn: "Without HTTPS, passwords cross your network unencrypted unless the proxy adds HTTPS. Turn **HTTPS** on again to return to https:// on port 443." },
         ],
       },
@@ -894,7 +894,7 @@ export const GUIDE: Topic[] = [
         id: "signin",
         title: "I cannot sign in",
         blocks: [
-          { p: "Only administrators can sign in. Use the login the installer showed when it finished (see [Getting started](" + t("start") + ")), or ask an administrator to turn on **Administrator** for your account on the [Users & groups](/users) page." },
+          { p: "Only administrators can sign in. Use the login the installer showed when it finished (see [Getting started](" + t("start") + ")), or ask an administrator to turn on **Administrator** for your account on the [Users & Groups](/users) page." },
           { p: "If the sign-in page says your browser did not keep the sign-in, delete this site's cookies (or use a private window) and sign in again." },
         ],
       },
