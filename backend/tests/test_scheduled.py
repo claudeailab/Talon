@@ -146,3 +146,13 @@ def test_entra_secret_expiry_and_reminder(client):
     r = client.put("/api/settings/entra", json={**body, "secret_expires": later}).json()
     assert r["expiry"]["remind"] is False
     assert not any("client secret" in a["title"] for a in client.get("/api/dashboard").json()["alerts"])
+
+
+def test_output_lines_carry_their_time(client):
+    import re
+    t = client.post("/api/scheduled", json=task(name="Stamped")).json()
+    client.post(f"/api/scheduled/{t['id']}/run")
+    wait_idle(client, t["id"])
+    out = client.get(f"/api/scheduled/{t['id']}/runs").json()[0]["output"]
+    lines = [ln for ln in out.split("\n") if ln]
+    assert lines and all(re.match(r"^\d\d:\d\d:\d\d\t", ln) for ln in lines)

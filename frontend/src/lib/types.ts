@@ -398,4 +398,6 @@ export interface TaskRun {
   exit_code: number | null;
   trigger: string;
   output: string;
+  /** running: seconds since the script last printed something */
+  idle?: number;
 }

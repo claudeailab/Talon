@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.68
+- Scheduled output works like the OneDrive log: a time on every line, paths wrap at "/"
+- While a task runs: "Working", or how long the script has printed nothing
+
 ## 1.0.67
 - Phones: dialogs open in the middle of the screen and can use almost all of it
 

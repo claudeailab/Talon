@@ -426,7 +426,7 @@ function OutputDialog({ task, onClose }: { task: ScheduledTask; onClose: () => v
   const runs = q.data ?? [];
   const run = runs.find((r) => r.id === sel) ?? runs[0];
   // keep the newest output in view, unless the user scrolled up to read something
-  const out = useRef<HTMLPreElement>(null);
+  const out = useRef<HTMLUListElement>(null);
   const follow = useRef(true);
   useEffect(() => {
     if (out.current && follow.current) out.current.scrollTop = out.current.scrollHeight;
@@ -462,20 +462,69 @@ function OutputDialog({ task, onClose }: { task: ScheduledTask; onClose: () => v
                 {run.exit_code !== null && <span>Exit code {run.exit_code}</span>}
                 <span>{run.trigger === "manual" ? "Started by hand" : "Started by schedule"}</span>
               </div>
-              <pre
-                ref={out}
-                onScroll={(e) => {
-                  const el = e.currentTarget;
-                  follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-                }}
-                className="h-80 max-h-[45dvh] overflow-auto rounded-xl bg-zinc-950 px-4 py-3 font-mono text-[12px] leading-5 whitespace-pre-wrap text-zinc-300 [overflow-wrap:anywhere]">
-                {run.output || "No output"}
-              </pre>
+              {run.status === "running" && <Activity idle={run.idle ?? 0} />}
+              {run.output ? (
+                <ul
+                  ref={out}
+                  onScroll={(e) => {
+                    const el = e.currentTarget;
+                    follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+                  }}
+                  className="max-h-[50vh] max-h-[50dvh] divide-y divide-zinc-100 overflow-y-auto rounded-xl ring-1 ring-zinc-200 sm:max-h-[60vh] dark:divide-white/5 dark:ring-white/10"
+                >
+                  {run.output.replace(/\n$/, "").split("\n").map((line, i) => (
+                    <OutputLine key={i} line={line} />
+                  ))}
+                </ul>
+              ) : (
+                <div className="rounded-xl py-8 text-center text-sm text-zinc-500 ring-1 ring-zinc-200 dark:ring-white/10">No output yet</div>
+              )}
             </div>
           )}
         </div>
       )}
     </Modal>
+  );
+}
+
+const wait = (s: number) => (s < 120 ? `${s} s` : `${Math.round(s / 60)} min`);
+
+/** Whether the script is still printing, so a long wait never looks like a hang. */
+function Activity({ idle }: { idle: number }) {
+  const quiet = idle >= 60;
+  return (
+    <div className={cx("mb-2 flex items-center gap-1.5 text-xs", quiet ? "text-amber-600 dark:text-amber-400" : "text-zinc-500")}>
+      <span className={cx("size-1.5 shrink-0 rounded-full", quiet ? "bg-amber-500" : "animate-pulse bg-emerald-500")} />
+      <span>
+        {quiet
+          ? `No new output for ${wait(idle)} · the script is still running`
+          : `Working · ${idle <= 3 ? "new output just now" : `new output ${idle} s ago`}`}
+      </span>
+    </div>
+  );
+}
+
+/** One output line: "HH:MM:SS<TAB>text" (older runs: just the text). */
+function OutputLine({ line }: { line: string }) {
+  const m = /^(\d\d:\d\d:\d\d)\t(.*)$/.exec(line);
+  const [when, text] = m ? [m[1], m[2]] : ["", line];
+  return (
+    <li className="flex items-baseline gap-2 px-3 py-1.5">
+      {when && <span className="tabular shrink-0 text-xs text-zinc-400">{when}</span>}
+      <span className="min-w-0 font-mono text-[12px] whitespace-pre-wrap text-zinc-700 [overflow-wrap:anywhere] dark:text-zinc-300">
+        {/* allow line breaks after each "/" so long paths wrap between folders */}
+        {text.split("/").map((seg, j, all) => (
+          <span key={j}>
+            {seg}
+            {j < all.length - 1 && (
+              <>
+                /<wbr />
+              </>
+            )}
+          </span>
+        ))}
+      </span>
+    </li>
   );
 }
 

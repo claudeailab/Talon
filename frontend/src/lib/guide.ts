@@ -876,7 +876,7 @@ export const GUIDE: Topic[] = [
         blocks: [
           { img: "scheduled", alt: "Scheduled page" },
           { p: "Each task shows who it runs as, its schedule, its last run and its status: **Succeeded**, **Running**, **Failed** with the exit code, **Stopped** or **Paused**. **Run now** starts it at once and **Stop** ends a running task." },
-          { p: "The **⋯** menu has **Edit**, **View output** (the last 20 runs with their full output, start time, duration and exit code), **Pause** or **Resume**, **Duplicate** and **Delete**." },
+          { p: "The **⋯** menu has **Edit**, **View output** (the last 20 runs with their full output, start time, duration and exit code; each line shows when it was printed, and while a task runs it keeps the newest line in view and shows **Working**, or in amber how long the script has printed nothing), **Pause** or **Resume**, **Duplicate** and **Delete**." },
           { p: "Every change is recorded in [Activity](/activity)." },
         ],
       },

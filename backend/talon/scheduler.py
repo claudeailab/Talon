@@ -345,7 +345,8 @@ class Scheduler:
         if r:
             out.append({"id": "running", "started": r["started"], "finished": None,
                         "status": "running", "exit_code": None, "trigger": r["trigger"],
-                        "output": "".join(r["output"])})
+                        "output": "".join(r["output"]),
+                        "idle": int(time.time() - r.get("last_output", r["started"]))})
         d = os.path.join(self.dir, tid)
         try:
             names = sorted((n for n in os.listdir(d) if n.endswith(".json")), reverse=True)
@@ -414,12 +415,21 @@ class Scheduler:
     def _run(self, t: dict, trigger: str) -> None:
         r = self._running[t["id"]]
 
-        def out(line: str) -> None:
-            if r["size"] < MAX_OUTPUT:
+        def out(text: str) -> None:
+            # each line gets the time it was printed ("HH:MM:SS<TAB>line"), like the
+            # OneDrive log, so the output window can show when things happened
+            r["last_output"] = time.time()
+            when = time.strftime("%H:%M:%S")
+            for line in text.splitlines(keepends=True):
+                if r["size"] >= MAX_OUTPUT:
+                    return
+                if not line.strip():
+                    continue
+                line = f"{when}\t{line if line.endswith(chr(10)) else line + chr(10)}"
                 r["output"].append(line)
                 r["size"] += len(line)
                 if r["size"] >= MAX_OUTPUT:
-                    r["output"].append("\n[output truncated]\n")
+                    r["output"].append(f"{when}\t[output truncated]\n")
 
         def started(p):
             r["proc"] = p
