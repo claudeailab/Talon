@@ -16,6 +16,8 @@ import {
   Play,
   Plus,
   Power,
+  ScanSearch,
+  ShieldCheck,
   Square,
   Trash2,
 } from "lucide-react";
@@ -23,7 +25,7 @@ import { api } from "../lib/api";
 import { ago, bytes, cx, dateTime, sameValue } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import { navigate } from "../lib/router";
-import type { CloudTask, OneDriveStatus, Schedule, Volume } from "../lib/types";
+import type { CloudTask, FullCheck, OneDriveStatus, Schedule, VerifyResult, Volume } from "../lib/types";
 import {
   Badge,
   Button,
@@ -36,6 +38,7 @@ import {
   Input,
   Menu,
   MenuItem,
+  MenuSeparator,
   Modal,
   PageHeader,
   PageLoader,
@@ -94,6 +97,17 @@ function scheduleLabel(s: Schedule) {
     `Every ${s.minutes} min`
   );
 }
+
+/** "4 min", "1 h 10 min" */
+export function dur(secs: number | null | undefined): string {
+  if (secs == null) return "";
+  if (secs < 90) return `${Math.max(1, Math.round(secs))} s`;
+  const m = Math.round(secs / 60);
+  if (m < 60) return `${m} min`;
+  return m % 60 ? `${Math.floor(m / 60)} h ${m % 60} min` : `${m / 60} h`;
+}
+
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 const odPath = (p: string) => `OneDrive${p ? "/" + p : ""}`;
 const nasPath = (t: Pick<CloudTask, "volume" | "folder">) =>
@@ -159,6 +173,11 @@ export default function OneDrivePage() {
   const run = useAction((id: string) => api.post(`/onedrive/tasks/${id}/run`), {
     invalidate: ["onedrive"],
   });
+  const verify = useAction(
+    ({ id, mode }: { id: string; mode: "quick" | "full" }) =>
+      api.post(`/onedrive/tasks/${id}/verify`, { mode }),
+    { invalidate: ["onedrive"] },
+  );
   const stop = useAction(
     (id: string) => api.post(`/onedrive/tasks/${id}/stop`),
     { invalidate: ["onedrive"] },
@@ -394,6 +413,28 @@ export default function OneDrivePage() {
                             >
                               View log
                             </MenuItem>
+                            {!t.source_file && (
+                              <>
+                                <MenuSeparator />
+                                <MenuItem
+                                  icon={<ScanSearch />}
+                                  disabled={!!t.running || !d.rclone.installed}
+                                  hint={t.estimate?.quick_secs ? `~${dur(t.estimate.quick_secs)}` : undefined}
+                                  onClick={() => verify.mutate({ id: t.id, mode: "quick" })}
+                                >
+                                  Quick check now
+                                </MenuItem>
+                                <MenuItem
+                                  icon={<ShieldCheck />}
+                                  disabled={!!t.running || !d.rclone.installed}
+                                  hint={t.estimate?.full_secs ? `~${dur(t.estimate.full_secs)}` : undefined}
+                                  onClick={() => verify.mutate({ id: t.id, mode: "full" })}
+                                >
+                                  Full check now
+                                </MenuItem>
+                                <MenuSeparator />
+                              </>
+                            )}
                             <MenuItem
                               icon={<Trash2 />}
                               danger
@@ -448,10 +489,15 @@ const num = (n: number) => n.toLocaleString("en-GB");
 
 /** What a run is doing: comparing both sides first, then copying. */
 function runLabel(r: Run) {
-  return r.percent === null ? "Comparing" : `Copying ${r.percent.toFixed(0)}%`;
+  const p = `${(r.percent ?? 0).toFixed(0)}%`;
+  if (r.phase === "verifying") return `Verifying ${p}`;
+  if (r.phase === "fixing") return `Copying again ${p}`;
+  return r.percent === null ? "Comparing" : `Copying ${p}`;
 }
 
 function runDetail(r: Run) {
+  if (r.phase === "verifying")
+    return `${num(r.checks)} of ${num(r.total_checks)} files` + (r.eta != null ? ` · about ${dur(r.eta)} left` : "");
   if (r.percent === null) return `${num(r.listed)} found · ${num(r.checks)} compared`;
   const done = r.checks + r.files, total = Math.max(done, r.total_checks + r.total_files);
   return (
@@ -473,7 +519,8 @@ function RunActivity({ r }: { r: Run }) {
     ? ["amber", `OneDrive is throttling · trying again in ${wait(r.throttled)}`]
     : r.idle >= 60
       ? ["amber", `No change for ${wait(r.idle)} · waiting for OneDrive`]
-      : ["green", r.idle <= 3 ? "Working · updated just now" : `Working · updated ${r.idle} s ago`];
+      : ["green", (r.phase === "verifying" && r.read_speed ? `Working · disks reading ${bytes(r.read_speed)}/s · ` : "Working · ") +
+          (r.idle <= 3 ? "updated just now" : `updated ${r.idle} s ago`)];
   return (
     <div className={cx("mt-1.5 flex items-center gap-1.5 truncate text-xs",
       tone === "amber" ? "text-amber-600 dark:text-amber-400" : "text-zinc-500")}>
@@ -496,10 +543,23 @@ function TaskStatus({ t }: { t: CloudTask }) {
     );
   }
   if (!t.last) return <Badge dot>Not run yet</Badge>;
+  const v = t.last_verify;
+  if (v?.status === "failed")
+    return (
+      <Badge tone="amber" dot>
+        {num(v.unresolved_count)} file{v.unresolved_count === 1 ? "" : "s"} not verified
+      </Badge>
+    );
+  if (v?.status === "error")
+    return (
+      <Badge tone="amber" dot>
+        Check failed
+      </Badge>
+    );
   if (t.last.status === "success")
     return (
       <Badge tone="green" dot>
-        Up to date
+        {v && v.started >= t.last.started ? "Up to date · verified" : "Up to date"}
       </Badge>
     );
   if (t.last.status === "cancelled")
@@ -533,6 +593,11 @@ type Form = {
   max_delete: number;
   source_file: boolean;
   retries: number;
+  verify: "off" | "quick" | "full";
+  full_kind: FullCheck["kind"];
+  full_weekday: number;
+  full_day: number;
+  full_time: string;
 };
 
 const parentOf = (p: string) => p.split("/").slice(0, -1).join("/");
@@ -556,7 +621,18 @@ function toForm(t: CloudTask | null, volumes: Volume[]): Form {
     max_delete: t?.max_delete ?? 50,
     source_file: t?.source_file ?? false,
     retries: t?.retries ?? 2,
+    verify: t?.verify ?? "quick",
+    full_kind: t?.full_check?.kind ?? "never",
+    full_weekday: t?.full_check?.kind === "weekly" ? t.full_check.weekday : 6,
+    full_day: t?.full_check?.kind === "monthly" ? t.full_check.day : 1,
+    full_time: t?.full_check && t.full_check.kind !== "never" ? t.full_check.time : "03:00",
   };
+}
+
+function fullCheck(f: Form): FullCheck {
+  if (f.full_kind === "weekly") return { kind: "weekly", weekday: f.full_weekday, time: f.full_time };
+  if (f.full_kind === "monthly") return { kind: "monthly", day: f.full_day, time: f.full_time };
+  return { kind: "never" };
 }
 
 function TaskDialog({
@@ -598,6 +674,8 @@ function TaskDialog({
     max_delete: f.max_delete,
     source_file: f.source_file,
     retries: f.retries,
+    verify: f.verify,
+    full_check: fullCheck(f),
   };
   const save = useAction(
     () =>
@@ -805,6 +883,7 @@ function TaskDialog({
             />
           </div>
         )}
+        {!f.source_file && <VerifySection f={f} set={set} task={task} />}
       </div>
       {pick && (
         <FolderPicker
@@ -823,6 +902,95 @@ function TaskDialog({
         />
       )}
     </Modal>
+  );
+}
+
+/** Verify after each run (off / quick / full) and an optional scheduled full
+ * check, each with how long it takes for this task's own files. */
+function VerifySection({
+  f,
+  set,
+  task,
+}: {
+  f: Form;
+  set: <K extends keyof Form>(k: K, v: Form[K]) => void;
+  task: CloudTask | null;
+}) {
+  const e = task?.estimate;
+  const known = !!e?.files;
+  const est = (secs: number | null | undefined) =>
+    !known ? "after the first run" : secs ? `about ${dur(secs)}` : e?.measuring ? "measuring…" : "after the first run";
+  const options: { v: Form["verify"]; title: string; text: string; time?: string }[] = [
+    { v: "off", title: "Off", text: "No check" },
+    { v: "quick", title: "Quick", text: "Names and sizes", time: est(e?.quick_secs) },
+    { v: "full", title: "Full", text: "Contents (checksums)", time: est(e?.full_secs) },
+  ];
+  return (
+    <div>
+      <div className="mb-1.5 text-[13px] font-medium">Verify after each run</div>
+      <div className="grid gap-2 sm:grid-cols-3 sm:gap-3">
+        {options.map((o) => (
+          <button
+            key={o.v}
+            type="button"
+            aria-pressed={f.verify === o.v}
+            onClick={() => set("verify", o.v)}
+            className={cx(
+              "flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left ring-1 transition sm:block",
+              f.verify === o.v
+                ? "bg-brand-50 ring-2 ring-brand-500 dark:bg-brand-500/10"
+                : "ring-zinc-200 hover:bg-zinc-50 dark:ring-white/10 dark:hover:bg-white/[0.03]",
+            )}
+          >
+            <div className="w-12 shrink-0 truncate text-sm font-medium sm:w-auto">{o.title}</div>
+            <div className="min-w-0 flex-1 truncate text-xs text-zinc-500">{o.text}</div>
+            {o.time && <div className="shrink-0 truncate text-xs font-medium text-brand-600 sm:mt-1 dark:text-brand-300">{o.time}</div>}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 grid gap-3 md:grid-cols-2 [&>*]:min-w-0">
+        <Field label="Also run a full check">
+          <div className="grid grid-cols-[1fr_6rem] gap-2 sm:flex">
+            <Select
+              value={f.full_kind}
+              onChange={(ev) => set("full_kind", ev.target.value as Form["full_kind"])}
+              className="col-span-2 min-w-0 flex-1"
+            >
+              <option value="never">Never</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </Select>
+            {f.full_kind === "weekly" && (
+              <Select value={f.full_weekday} onChange={(ev) => set("full_weekday", Number(ev.target.value))} className="min-w-0 flex-1">
+                {WEEKDAYS.map((w, i) => (
+                  <option key={w} value={i}>{w}</option>
+                ))}
+              </Select>
+            )}
+            {f.full_kind === "monthly" && (
+              <Select value={f.full_day} onChange={(ev) => set("full_day", Number(ev.target.value))} className="min-w-0 flex-1">
+                {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+                  <option key={d} value={d}>Day {d}</option>
+                ))}
+              </Select>
+            )}
+            {f.full_kind !== "never" && (
+              <div className="w-[6rem] shrink-0">
+                <TimeInput value={f.full_time} onChange={(v) => set("full_time", v)} />
+              </div>
+            )}
+          </div>
+        </Field>
+        {known && (
+          <div className="flex items-end">
+            <div className="w-full truncate rounded-xl bg-zinc-50 px-3.5 py-2.5 text-xs text-zinc-500 dark:bg-white/[0.03]">
+              This task: <span className="text-zinc-800 dark:text-zinc-200">{num(e!.files!)} files · {bytes(e!.bytes)}</span>
+              {e!.speed ? <> · disks read <span className="text-zinc-800 dark:text-zinc-200">{bytes(e!.speed)}/s</span></> : null}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1084,8 +1252,10 @@ function LogDialog({
           {task.last.error}
         </Callout>
       )}
+      {!task.running && task.last_verify && <VerifyCallout v={task.last_verify} task={task} />}
       {task.running && (
         <div className="mb-3">
+          <Steps r={task.running} verify={task.verify ?? "off"} />
           <div className="flex items-center justify-between gap-3 text-sm">
             <span className="shrink-0 font-medium">{runLabel(task.running)}</span>
             <span className="truncate text-zinc-500">{runDetail(task.running)}</span>
@@ -1111,6 +1281,63 @@ function LogDialog({
         <div className="py-8 text-center text-sm text-zinc-500">No log yet.</div>
       )}
     </Modal>
+  );
+}
+
+/** Where a run with verification is: Compare › Copy › Verify. */
+function Steps({ r, verify }: { r: Run; verify: "off" | "quick" | "full" }) {
+  if (r.mode !== "run" || verify === "off") return null;      // a check on its own has one step
+  const at = r.phase === "comparing" ? 0 : r.phase === "copying" ? 1 : 2;
+  return (
+    <div className="mb-2 flex items-center gap-1.5 truncate text-xs">
+      {["Compare", "Copy", "Verify"].map((name, i) => (
+        <span key={name} className="flex items-center gap-1.5">
+          {i > 0 && <ChevronRight className="size-3 text-zinc-400" />}
+          <span className={cx(i === at ? "font-semibold text-sky-600 dark:text-sky-400" : "text-zinc-500")}>
+            {i < at ? "✓ " : ""}{name}
+          </span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** The last check's result: passed, fixed by copying again, or what is still wrong. */
+function VerifyCallout({ v, task }: { v: VerifyResult; task: CloudTask }) {
+  const kind = v.mode === "quick" ? "Quick check" : "Full check";
+  const when = dateTime(v.finished);
+  const where = task.direction === "pull" ? "on the NAS" : task.direction === "push" ? "in OneDrive" : "on one side";
+  if (v.status === "ok")
+    return (
+      <Callout tone="success" title={`${kind} on ${when}: all ${num(v.checked)} files match`} className="mb-3" />
+    );
+  if (v.status === "fixed")
+    return (
+      <Callout tone="success" title={`${kind} on ${when}: all ${num(v.checked)} files match`} className="mb-3">
+        {num(v.fixed)} file{v.fixed === 1 ? " was" : "s were"} missing or different {where} and
+        {v.fixed === 1 ? " was" : " were"} copied again automatically.
+      </Callout>
+    );
+  if (v.status === "error")
+    return (
+      <Callout tone="warning" title={`${kind} on ${when} could not finish`} className="mb-3">
+        {v.error}
+      </Callout>
+    );
+  return (
+    <Callout tone="warning" title={`${kind} on ${when}: ${num(v.unresolved_count)} of ${num(v.checked)} files not verified`} className="mb-3">
+      {v.fixed > 0 && <div>{num(v.fixed)} were copied again automatically; these still do not match:</div>}
+      <ul className="mt-2 space-y-1">
+        {v.unresolved.map((x) => (
+          <li key={x.kind + x.path} className="flex min-w-0 items-center gap-2">
+            <Badge tone={x.kind === "different" ? "red" : "amber"}>
+              {x.kind === "missing" ? "Missing" : x.kind === "different" ? "Different" : "Unreadable"}
+            </Badge>
+            <span className="min-w-0 [overflow-wrap:anywhere]">{x.path}</span>
+          </li>
+        ))}
+      </ul>
+    </Callout>
   );
 }
 

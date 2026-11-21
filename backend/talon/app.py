@@ -568,6 +568,14 @@ def create_app(cfg, platform) -> FastAPI:
         nas.cloud.run_task(tid, user)
         return {"ok": True}
 
+    @app.post("/api/onedrive/tasks/{tid}/verify")
+    def onedrive_task_verify(tid: str, body: dict = Body(...), user: str = Depends(current_user)):
+        mode = body.get("mode")
+        if mode not in ("quick", "full"):
+            raise UserError("Choose a quick or full check")
+        nas.cloud.run_task(tid, user, mode=mode)
+        return {"ok": True}
+
     @app.post("/api/onedrive/tasks/{tid}/stop")
     def onedrive_task_stop(tid: str, _u: str = Depends(current_user)):
         nas.cloud.stop_task(tid)

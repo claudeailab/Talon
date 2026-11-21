@@ -312,10 +312,46 @@ export interface CloudTask {
   max_delete: number;
   retries?: number;
   source_file?: boolean;
+  verify?: "off" | "quick" | "full";
+  full_check?: FullCheck;
+  next_full_check?: number | null;
+  last_verify?: VerifyResult | null;
+  estimate?: VerifyEstimate | null;
   created: number;
   next_run: number | null;
   last: { started: number; finished: number; status: "success" | "error" | "cancelled"; files: number; bytes: number; error: string | null } | null;
-  running: { started: number; files: number; total_files: number; bytes: number; total_bytes: number; speed: number; percent: number | null; comparing: boolean; checks: number; total_checks: number; listed: number; idle: number; throttled: number | null } | null;
+  running: { started: number; files: number; total_files: number; bytes: number; total_bytes: number; speed: number; percent: number | null; comparing: boolean; checks: number; total_checks: number; listed: number; idle: number; throttled: number | null;
+    phase: "comparing" | "copying" | "verifying" | "fixing"; mode: "run" | "quick" | "full"; eta: number | null; read_speed: number | null } | null;
+}
+
+export type FullCheck =
+  | { kind: "never" }
+  | { kind: "weekly"; weekday: number; time: string }
+  | { kind: "monthly"; day: number; time: string };
+
+export interface VerifyResult {
+  mode: "quick" | "full";
+  started: number;
+  finished: number;
+  status: "ok" | "fixed" | "failed" | "error";
+  checked: number;
+  missing: number;
+  different: number;
+  errors: number;
+  fixed: number;
+  unresolved: { kind: "missing" | "different" | "error"; path: string }[];
+  unresolved_count: number;
+  error: string | null;
+}
+
+export interface VerifyEstimate {
+  files: number | null;
+  bytes: number | null;
+  quick_secs: number | null;
+  full_secs: number | null;
+  speed: number | null;
+  speed_source?: "test" | "check" | null;
+  measuring: boolean;
 }
 
 export interface OneDriveStatus {

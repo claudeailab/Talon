@@ -985,18 +985,25 @@ export function Menu({
   );
 }
 
+export function MenuSeparator() {
+  return <div className="my-1 h-px bg-zinc-100 dark:bg-white/5" />;
+}
+
 export function MenuItem({
   icon,
   children,
   onClick,
   danger,
   disabled,
+  hint,
 }: {
   icon?: ReactNode;
   children: ReactNode;
   onClick?: () => void;
   danger?: boolean;
   disabled?: boolean;
+  /** muted text on the right, e.g. an estimate */
+  hint?: ReactNode;
 }) {
   return (
     <button
@@ -1011,7 +1018,8 @@ export function MenuItem({
       )}
     >
       {icon && <span className="[&>svg]:size-4">{icon}</span>}
-      {children}
+      <span className="min-w-0 flex-1 truncate">{children}</span>
+      {hint && <span className="shrink-0 pl-3 text-xs font-normal text-zinc-500">{hint}</span>}
     </button>
   );
 }

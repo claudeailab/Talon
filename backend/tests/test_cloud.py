@@ -302,3 +302,68 @@ def test_parse_keeps_throttling_and_drops_other_debug_lines():
     assert 25 < r["throttled_until"] - time.time() <= 30
     CloudSync._parse(_j.dumps({"level": "info", "stats": {"listed": 50, "checks": 10}}), r)
     assert r["listed"] == 50 and r["active"] >= r["started"]
+
+
+# ---------------------------------------------------------------- verification
+def test_check_command_and_report(tmp_path):
+    from talon.cloudsync import CloudSync
+    f = tmp_path / "c.txt"
+    f.write_text("= a.jpg\n+ b.jpg\n- extra.jpg\n* c.doc\n! d.bin\n")
+    got = CloudSync.read_combined(str(f))
+    assert got == {"same": 1, "+": ["b.jpg"], "-": ["extra.jpg"], "*": ["c.doc"], "!": ["d.bin"]}
+
+
+def test_verify_options_validated(client):
+    task = _connected_task(client)
+    assert task["verify"] == "quick" and task["full_check"] == {"kind": "never"}
+    body = {**task, "verify": "full", "full_check": {"kind": "weekly", "weekday": 6, "time": "03:00"}}
+    t = client.put(f"/api/onedrive/tasks/{task['id']}", json=body).json()
+    assert t["full_check"]["weekday"] == 6 and t["next_full_check"]
+    for bad in ({"verify": "maybe"}, {"full_check": {"kind": "weekly", "weekday": 9, "time": "03:00"}},
+                {"full_check": {"kind": "monthly", "day": 31, "time": "03:00"}}):
+        assert client.put(f"/api/onedrive/tasks/{task['id']}", json={**body, **bad}).status_code == 400
+
+
+def test_quick_check_after_run_and_estimates(client):
+    task = _connected_task(client)
+    client.post(f"/api/onedrive/tasks/{task['id']}/run")
+    t = _wait_done(client, task["id"], 40)
+    assert t["last_verify"]["status"] == "ok" and t["last_verify"]["mode"] == "quick"
+    est = t["estimate"]
+    assert est["files"] and est["bytes"] == int(1.02e12) and est["quick_secs"]
+    end = time.time() + 5                                   # demo read test: 240 MB/s
+    while not t["estimate"]["full_secs"] and time.time() < end:
+        time.sleep(0.2)
+        t = next(x for x in client.get("/api/onedrive").json()["tasks"] if x["id"] == task["id"])
+    assert 4450 < t["estimate"]["full_secs"] < 4550          # 1.02 TB at 240 MB/s + 4 min listing
+    assert client.post(f"/api/onedrive/tasks/{task['id']}/verify", json={"mode": "x"}).status_code == 400
+    assert client.post(f"/api/onedrive/tasks/{task['id']}/verify", json={"mode": "full"}).status_code == 200
+
+
+def test_missing_files_are_copied_again(client, monkeypatch, tmp_path):
+    cloud = client.app.state.nas.cloud
+    task = _connected_task(client)
+    t = cloud._task(task["id"])
+    calls = []
+
+    def fake(self, cmd, r, conf):
+        calls.append(cmd)
+        out = cmd[cmd.index("--combined") + 1] if "--combined" in cmd else None
+        if "check" in cmd and "--files-from" not in cmd:
+            open(out, "w").write("= a.jpg\n+ b.jpg\n* c.doc\n+ d.jpg\n- extra.jpg\n")
+        elif "check" in cmd:                                  # after copying: d.jpg still missing
+            open(out, "w").write("= b.jpg\n= c.doc\n+ d.jpg\n")
+        return 1 if "check" in cmd else 0
+    monkeypatch.setattr(cloud, "demo", False)
+    monkeypatch.setattr(type(cloud), "_rclone", fake)
+    monkeypatch.setattr(type(cloud), "_rclone_conf", lambda self, tid: str(tmp_path / "c.conf"))
+    monkeypatch.setattr(type(cloud), "access_token", lambda self: "x")
+    r = {"cancel": False, "log": [], "files": 0, "started": time.time()}
+    res = cloud._verify(t, r, r["log"], "quick")
+    assert (res["missing"], res["different"], res["fixed"]) == (2, 1, 2)
+    assert res["status"] == "failed" and res["unresolved"] == [{"kind": "missing", "path": "d.jpg"}]
+    first = calls[0]
+    assert "--one-way" in first and "--size-only" in first
+    copy = next(c for c in calls if "copy" in c)
+    assert "--ignore-times" in copy and "--files-from" in copy and "--filter" not in copy
+    assert "--filter" in first

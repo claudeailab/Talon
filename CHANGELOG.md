@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.58
+- OneDrive tasks verify every file after each run (quick or full), with time estimates for your files
+- Missing or different files are copied again automatically; only what still fails is reported
+- Weekly or monthly full checks, and Quick/Full check now in the task menu
+
 ## 1.0.57
 - Users: removed the duplicate Change password item; Edit changes the password
 

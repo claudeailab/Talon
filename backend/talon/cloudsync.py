@@ -58,7 +58,20 @@ INTERVALS = (15, 30, 60, 180, 360, 720, 1440)
 NAME_RE = re.compile(r"^[^\x00-\x1f/\\]{1,64}$")
 PATH_RE = re.compile(r"^[^\x00-\x1f\\]*$")
 VERSIONS = ".versions"
+VERIFY_MODES = ("off", "quick", "full")
+READ_TEST_SECONDS = 10
+UNRESOLVED_KEEP = 200            # files listed in the result of a failed check
 KEEP_VERSIONS_DAYS = 30
+
+
+def _duration(secs: float) -> str:
+    secs = int(secs)
+    if secs < 90:
+        return f"{max(secs, 1)} s"
+    if secs < 3600:
+        return f"{round(secs / 60)} min"
+    h, m = divmod(round(secs / 60), 60)
+    return f"{h} h {m} min" if m else f"{h} h"
 
 
 def _clean_rel(path: str) -> str:
@@ -84,6 +97,7 @@ def _vtuple(text: str) -> Optional[tuple]:
 
 class CloudSync:
     def __init__(self, cfg, state, nas, demo: bool = False):
+        self._measuring: set = set()
         self.cfg = cfg
         self.state = state
         self.nas = nas
@@ -496,11 +510,27 @@ class CloudSync:
             raise UserError("Two-way sync works with folders only")
         if source_file and not (remote if direction == "pull" else folder):
             raise UserError("Choose a file")
+        verify = data.get("verify", "quick")
+        if verify not in VERIFY_MODES:
+            raise UserError("Choose how to verify")
+        full = data.get("full_check") or {"kind": "never"}
+        fk = full.get("kind")
+        time_ok = re.match(r"^([01]\d|2[0-3]):[0-5]\d$", str(full.get("time", "")))
+        if fk == "never":
+            full = {"kind": "never"}
+        elif fk == "weekly" and time_ok and full.get("weekday") in range(7):
+            full = {"kind": "weekly", "weekday": full["weekday"], "time": full["time"]}
+        elif fk == "monthly" and time_ok and full.get("day") in range(1, 29):
+            full = {"kind": "monthly", "day": int(full["day"]), "time": full["time"]}
+        else:
+            raise UserError("Invalid full check schedule")
+        if source_file:
+            verify, full = "off", {"kind": "never"}
         return {"name": name, "direction": direction, "remote": remote, "volume": volume,
                 "folder": folder, "schedule": sched, "bwlimit": bw, "source_file": source_file,
                 "delete": bool(data.get("delete")) and direction != "bisync" and not source_file,
                 "versions": bool(data.get("versions")) and direction != "bisync",
-                "max_delete": max_delete, "retries": retries}
+                "max_delete": max_delete, "retries": retries, "verify": verify, "full_check": full}
 
     def _task(self, tid: str) -> dict:
         t = self._od().get("tasks", {}).get(tid)
@@ -548,9 +578,28 @@ class CloudSync:
             now = time.time()
             run["idle"] = int(now - (r.get("active") or r["started"]))
             run["throttled"] = max(0, int(r.get("throttled_until", 0) - now)) or None
+            run["phase"] = r.get("phase") or ("comparing" if run["comparing"] else "copying")
             run["percent"] = None if run["comparing"] else self.percent(r)
-        return {**{k: v for k, v in t.items() if k != "bisync_ready"},
-                "running": run, "next_run": self._next_run(t)}
+            run["read_speed"] = r.get("read_speed")
+            run["mode"] = r.get("mode") or "run"
+            run["eta"] = None
+            if run["phase"] == "verifying":
+                expected = (t.get("profile") or {}).get("files") or 0
+                done = r.get("checks", 0)
+                total = max(r.get("total_checks", 0), expected, done)
+                run["percent"] = round(min(99.0, done * 100 / total), 1) if total else 0.0
+                run["total_checks"] = total
+                spent = now - r.get("phase_started", now)
+                if run["percent"] >= 3 and spent >= 20:
+                    run["eta"] = int(spent * (100 - run["percent"]) / run["percent"])
+                elif r.get("estimate"):
+                    run["eta"] = max(0, int(min(r["estimate"] - spent,
+                                                r["estimate"] * (100 - run["percent"]) / 100)))
+            elif run["phase"] == "fixing":
+                run["percent"] = self.percent(r)
+        return {**{k: v for k, v in t.items() if k not in ("bisync_ready", "profile")},
+                "running": run, "next_run": self._next_run(t),
+                "next_full_check": self._next_full(t), "estimate": self.estimate(t)}
 
     @staticmethod
     def percent(r: dict) -> float:
@@ -587,6 +636,126 @@ class CloudSync:
             return today if time.time() < today else today + 86400
         return None
 
+    def _next_full(self, t: dict) -> Optional[float]:
+        full = t.get("full_check") or {"kind": "never"}
+        if full["kind"] == "never":
+            return None
+        from .scheduler import next_run
+        last = (t.get("last_verify") or {}).get("started") if (t.get("last_verify") or {}).get("mode") == "full" else 0
+        return next_run(full, max(last or 0, t.get("created", 0), time.time() - 1))
+
+    def _full_due(self, t: dict, now: float) -> bool:
+        full = t.get("full_check") or {"kind": "never"}
+        if full["kind"] == "never":
+            return False
+        from .scheduler import next_run
+        lv = t.get("last_verify") or {}
+        last = lv.get("started") if lv.get("mode") == "full" else 0
+        due = next_run(full, max(last or 0, t.get("created", 0)))
+        return due is not None and now >= due
+
+    def estimate(self, t: dict) -> Optional[dict]:
+        """How long a quick and a full check take for this task, from its own files:
+        the file count and size of its NAS folder (after each run), how long the last
+        comparison or quick check took, and the measured read speed of its volume."""
+        if t.get("source_file"):
+            return None
+        p = t.get("profile") or {}
+        if not p.get("files"):
+            return {"files": None, "bytes": None, "quick_secs": None, "full_secs": None,
+                    "speed": None, "measuring": False}
+        speed = (self._od().get("read_speed") or {}).get(t["volume"]) or {}
+        quick = p.get("quick_secs") or p.get("compare_secs")
+        full = None
+        if speed.get("bps"):
+            full = p["bytes"] / speed["bps"]
+            if speed.get("source") == "test":
+                full += p.get("compare_secs") or 0     # a full check also lists both sides
+        elif t["volume"] not in self._measuring:
+            self._measure_later(t)
+        return {"files": p["files"], "bytes": p["bytes"],
+                "quick_secs": int(quick) if quick else None, "full_secs": int(full) if full else None,
+                "speed": speed.get("bps"), "speed_source": speed.get("source"),
+                "measuring": t["volume"] in self._measuring}
+
+    def _measure_later(self, t: dict) -> None:
+        vol = t["volume"]
+        self._measuring.add(vol)
+        def work():
+            try:
+                bps = 240e6 if self.demo else self.read_test(
+                    os.path.join(self._volume_root(vol), t["folder"]))
+                if bps:
+                    self._update(lambda od: od.setdefault("read_speed", {}).__setitem__(
+                        vol, {"bps": bps, "source": "test", "at": time.time()}))
+            except Exception:   # noqa: BLE001 - only an estimate
+                pass
+            finally:
+                self._measuring.discard(vol)
+        threading.Thread(target=work, daemon=True, name="read-test").start()
+
+    @staticmethod
+    def read_test(folder: str, seconds: float = READ_TEST_SECONDS) -> Optional[float]:
+        """Read the task's own files for a few seconds, past the page cache, with 4
+        readers (like rclone's checkers), and return bytes per second. Reading real
+        files includes the slowdown of many small files."""
+        paths = []
+        for root, dirs, files in os.walk(folder):
+            dirs[:] = [d for d in dirs if d != VERSIONS]
+            paths += [os.path.join(root, f) for f in files]
+            if len(paths) >= 20000:
+                break
+        if not paths:
+            return None
+        lock, total, idx = threading.Lock(), [0], [0]
+        end = time.time() + seconds
+        def reader():
+            while time.time() < end:
+                with lock:
+                    if idx[0] >= len(paths):
+                        return
+                    path = paths[idx[0]]
+                    idx[0] += 1
+                try:
+                    fd = os.open(path, os.O_RDONLY)
+                except OSError:
+                    continue
+                try:
+                    os.posix_fadvise(fd, 0, 0, os.POSIX_FADV_DONTNEED)   # not from memory
+                    while time.time() < end:
+                        b = os.read(fd, 1 << 20)
+                        if not b:
+                            break
+                        with lock:
+                            total[0] += len(b)
+                except OSError:
+                    pass
+                finally:
+                    os.close(fd)
+        t0 = time.time()
+        threads = [threading.Thread(target=reader, daemon=True) for _ in range(4)]
+        for th in threads:
+            th.start()
+        for th in threads:
+            th.join()
+        spent = time.time() - t0
+        return total[0] / spent if total[0] and spent > 0 else None
+
+    @staticmethod
+    def folder_size(folder: str) -> tuple:
+        files = size = 0
+        if os.path.isfile(folder):
+            return 1, os.path.getsize(folder)
+        for root, dirs, names in os.walk(folder):
+            dirs[:] = [d for d in dirs if d != VERSIONS]
+            for n in names:
+                try:
+                    size += os.lstat(os.path.join(root, n)).st_size
+                    files += 1
+                except OSError:
+                    pass
+        return files, size
+
     def _due(self, t: dict, now: float) -> bool:
         s = t["schedule"]
         last = (t.get("last") or {}).get("started") or 0
@@ -618,7 +787,9 @@ class CloudSync:
         self._stop.wait(RESUME_DELAY)                 # let the network and rclone come up
         for t in interrupted:
             try:
-                self.run_task(t["id"], (t.get("interrupted") or {}).get("user") or "schedule", resumed=True)
+                intr = t.get("interrupted") or {}
+                self.run_task(t["id"], intr.get("user") or "schedule", resumed=True,
+                              mode=intr.get("mode") or "run")
             except UserError as e:
                 self._update(lambda od, tid=t["id"]: od["tasks"].get(tid, {}).pop("interrupted", None))
                 self.state.log_activity("talon", f"OneDrive task {t['name']} could not resume: {e}", "warning")
@@ -636,12 +807,17 @@ class CloudSync:
                 for t in od.get("tasks", {}).values():
                     if t["id"] not in self._running and self._due(t, now):
                         self.run_task(t["id"], "schedule")
+                    elif t["id"] not in self._running and self._full_due(t, now):
+                        self.run_task(t["id"], "schedule", mode="full")
             except Exception:   # noqa: BLE001 - the scheduler must keep running
                 pass
 
     # ------------------------------------------------------------ running
-    def run_task(self, tid: str, user: str, resumed: bool = False) -> None:
+    def run_task(self, tid: str, user: str, resumed: bool = False, mode: str = "run") -> None:
+        """mode "run": copy, then verify as the task says; "quick"/"full": verify only."""
         t = self._task(tid)
+        if mode in ("quick", "full") and t.get("source_file"):
+            raise UserError("Single-file tasks are not verified")
         od = self._od()
         if not od.get("enabled"):
             raise UserError("The OneDrive service is disabled")
@@ -654,10 +830,11 @@ class CloudSync:
                 raise UserError("The task is already running")
             self._running[tid] = {"started": time.time(), "files": 0, "total_files": 0, "bytes": 0,
                                   "total_bytes": 0, "checks": 0, "total_checks": 0, "comparing": False, "speed": 0, "proc": None, "cancel": False,
-                                  "log": collections.deque(maxlen=1000), "resumed": resumed}
+                                  "log": collections.deque(maxlen=1000), "resumed": resumed,
+                                  "mode": mode, "phase": None}
         # remembered in the state file until the run ends, so a restart can resume it
         self._update(lambda od: od["tasks"].get(tid) is not None and
-                     od["tasks"][tid].__setitem__("interrupted", {"user": user, "since": time.time()}))
+                     od["tasks"][tid].__setitem__("interrupted", {"user": user, "since": time.time(), "mode": mode}))
         threading.Thread(target=self._run, args=(t, user), daemon=True,
                          name=f"cloud-{tid}").start()
 
@@ -762,6 +939,7 @@ class CloudSync:
             r["proc"] = proc
             last_err = ""
             r["comparing"] = t["direction"] != "bisync"
+            r["attempt_started"] = time.time()
             for line in proc.stdout:
                 self._parse(line, r)
                 if self._is_error(line):
@@ -798,10 +976,13 @@ class CloudSync:
         status, error = "success", None
         log = r["log"]
         attempts = 1 + int(t.get("retries", 0))
-        log.append(self._line(time.strftime("Run started %d-%m-%Y %H:%M") + (
+        mode = r.get("mode") or "run"
+        what = {"run": "Run", "quick": "Quick check", "full": "Full check"}[mode]
+        log.append(self._line(time.strftime(f"{what} started %d-%m-%Y %H:%M") + (
             " (resumed after a restart)" if r.get("resumed") else "")))
+        verified = None
         try:
-            for attempt in range(1, attempts + 1):
+            for attempt in range(1, attempts + 1 if mode == "run" else 1):
                 status, error = self._attempt(t, r, log)
                 if status != "error" or r["cancel"] or attempt == attempts or self._stop.is_set():
                     break
@@ -816,6 +997,19 @@ class CloudSync:
                 r.update(files=0, bytes=0, total_files=0, total_bytes=0, speed=0,
                          checks=0, total_checks=0, listed=0, seen=None, active=time.time())
                 log.append(self._line(f"Attempt {attempt + 1} of {attempts}"))
+            if mode == "run" and status == "success":
+                self._record_profile(t, r)
+            r["copied"] = (r["files"], r["bytes"])         # verification resets the counters
+            check = mode if mode != "run" else t.get("verify", "off")
+            if status == "success" and check in ("quick", "full") and not t.get("source_file"):
+                verified = self._verify(t, r, log, check)
+                if verified["status"] == "interrupted" or (verified["status"] == "cancelled" and mode != "run"):
+                    status = verified["status"]
+                    error = "Stopped" if status == "cancelled" else "Interrupted by a restart"
+                    verified = None
+                elif verified["status"] == "cancelled":       # the copy itself finished
+                    log.append(self._line("Verification stopped", "NOTICE"))
+                    verified = None
             log.append(self._line("Finished" if status == "success" else
                                   "Stopped" if status == "cancelled" else f"Failed: {error}",
                                   "INFO" if status != "error" else "ERROR"))
@@ -830,10 +1024,14 @@ class CloudSync:
                     self._running.pop(tid, None)
                 return
             last = {"started": r["started"], "finished": time.time(), "status": status,
-                    "files": r["files"], "bytes": r["bytes"], "error": error}
+                    "files": r.get("copied", (r["files"], 0))[0],
+                    "bytes": r.get("copied", (0, r["bytes"]))[1], "error": error}
             def done(od):
                 if od["tasks"].get(tid) is not None:
-                    od["tasks"][tid]["last"] = last
+                    if mode == "run":
+                        od["tasks"][tid]["last"] = last
+                    if verified:
+                        od["tasks"][tid]["last_verify"] = verified
                     od["tasks"][tid].pop("interrupted", None)
             self._update(done)
             try:
@@ -845,11 +1043,249 @@ class CloudSync:
             with self._lock:
                 self._running.pop(tid, None)
             msg = f"OneDrive task {t['name']}: " + (
-                f"{r['files']} file(s) transferred" if status == "success" else error or status)
-            self.state.log_activity(user, msg, "info" if status != "error" else "error")
+                f"{last['files']} file(s) transferred" if status == "success" else error or status)
+            if mode == "run" or status != "success":
+                self.state.log_activity(user, msg, "info" if status != "error" else "error")
+            if verified:
+                self._report_verify(t, user, verified)
             if status == "error":
                 self.nas.notifier.send("cloud_failed", f"OneDrive task {t['name']} failed",
                                        f"The OneDrive task '{t['name']}' failed:\n{error}")
+
+    # ------------------------------------------------------------ verification
+    def _record_profile(self, t: dict, r: dict) -> None:
+        """File count and size of the task's NAS folder after a run, and how long
+        the comparison took: the basis of the time estimates."""
+        try:
+            if self.demo:
+                files, size = r.get("total_checks", 0) + r["total_files"], int(1.02e12)
+            else:
+                files, size = self.folder_size(os.path.join(self._volume_root(t["volume"]), t["folder"]))
+        except (OSError, UserError):
+            return
+        cmp = r.get("compare_secs") or (240 if self.demo else None)
+        def upd(od):
+            task = od["tasks"].get(t["id"])
+            if task is not None:
+                p = task.setdefault("profile", {})
+                p.update(files=files, bytes=size)
+                if cmp:
+                    p["compare_secs"] = cmp
+        self._update(upd)
+
+    def _sides(self, t: dict) -> tuple:
+        local = os.path.join(self._volume_root(t["volume"]), t["folder"])
+        remote = "onedrive:" + t["remote"]
+        if t["direction"] == "pull":
+            return remote, local, local
+        return local, remote, local
+
+    def _base_args(self, conf: str, skip_versions: bool = True) -> list:
+        # --files-from cannot be combined with --filter (rclone refuses to start)
+        return [self.rclone_path() or "rclone", "--config", conf, "--use-json-log",
+                "--log-level", "DEBUG", "--stats", "2s", "--checkers", "16",
+                "--onedrive-delta", "--fast-list"] + (
+                    ["--filter", f"- /{VERSIONS}/**"] if skip_versions else [])
+
+    def _rclone(self, cmd: list, r: dict, conf: str) -> int:
+        """Run rclone, feeding its log into the run; returns the exit code."""
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                text=True, bufsize=1)
+        r["proc"] = proc
+        io0 = self._disk_read()
+        t0 = time.time()
+        for line in proc.stdout:
+            self._parse(line, r)
+            if time.time() - t0 >= 2:                 # whole-system disk read speed
+                io1 = self._disk_read()
+                if io0 is not None and io1 is not None:
+                    r["read_speed"] = max(0, (io1 - io0) / (time.time() - t0))
+                io0, t0 = io1, time.time()
+        rc = proc.wait()
+        self._read_back_token(conf)
+        return rc
+
+    @staticmethod
+    def _disk_read() -> Optional[int]:
+        try:
+            import psutil
+            io = psutil.disk_io_counters()
+            return io.read_bytes if io else None
+        except Exception:   # noqa: BLE001
+            return None
+
+    def _check_cmd(self, t: dict, conf: str, mode: str, combined: str, files_from: str = "") -> list:
+        src, dst, _local = self._sides(t)
+        cmd = self._base_args(conf, not files_from) + ["check", src, dst, "--combined", combined]
+        if t["direction"] != "bisync":
+            cmd.append("--one-way")              # extra files at the destination are fine
+        if mode == "quick":
+            cmd.append("--size-only")
+        if files_from:
+            cmd += ["--files-from", files_from]
+        return cmd
+
+    @staticmethod
+    def read_combined(path: str) -> dict:
+        """rclone check --combined: "= same", "+ only in the source (missing at the
+        destination)", "- only in the destination", "* different", "! could not
+        be checked"."""
+        out = {"same": 0, "-": [], "+": [], "*": [], "!": []}
+        try:
+            with open(path, encoding="utf-8", errors="replace") as f:
+                for line in f:
+                    line = line.rstrip("\n")
+                    if len(line) < 3:
+                        continue
+                    if line[0] == "=":
+                        out["same"] += 1
+                    elif line[0] in "-+*!":
+                        out[line[0]].append(line[2:])
+        except OSError:
+            pass
+        return out
+
+    def _verify(self, t: dict, r: dict, log, mode: str) -> dict:
+        """Check that every file arrived (quick: names and sizes; full: contents by
+        checksum). Files that are missing or different are copied again at once,
+        then checked again; the result says what was found and fixed."""
+        est = self.estimate(t) or {}
+        r.update(phase="verifying", phase_started=time.time(), checks=0, total_checks=0,
+                 files=0, total_files=0, bytes=0, total_bytes=0, comparing=False,
+                 estimate=est.get("quick_secs" if mode == "quick" else "full_secs"))
+        label = "Quick check (names and sizes)" if mode == "quick" else "Full check (contents)"
+        if r["estimate"]:
+            log.append(self._line(f"{label}: about {_duration(r['estimate'])}"))
+        else:
+            log.append(self._line(label))
+        res = {"mode": mode, "started": time.time(), "finished": None, "status": "ok",
+               "checked": 0, "missing": 0, "different": 0, "errors": 0, "fixed": 0,
+               "unresolved": [], "unresolved_count": 0, "error": None}
+        try:
+            if self.demo:
+                found = self._simulate_check(r)
+                if r["cancel"]:
+                    return {**res, "status": "cancelled"}
+                if self._stop.is_set():
+                    return {**res, "status": "interrupted"}
+            else:
+                self.access_token()
+                conf = self._rclone_conf(t["id"])
+                os.makedirs(os.path.join(self.base, "verify"), exist_ok=True)
+                combined = os.path.join(self.base, "verify", f"{t['id']}.txt")
+                rc = self._rclone(self._check_cmd(t, conf, mode, combined), r, conf)
+                if r["cancel"]:
+                    return {**res, "status": "cancelled"}
+                if rc < 0 or rc in SIGNAL_EXIT or self._stop.is_set():
+                    return {**res, "status": "interrupted"}
+                found = self.read_combined(combined)
+                if rc not in (0, 1) or (rc == 1 and not any(found[k] for k in "-+*!")):
+                    raise UserError(RCLONE_EXIT.get(rc, f"rclone check exited with code {rc}"))
+            # "+": missing at the destination; for two-way sync "-" (missing on the
+            # NAS side) too. Extra files at a backup's destination are fine.
+            missing = [("missing", p) for p in found["+"]] + \
+                [("missing", p) for p in (found["-"] if t["direction"] == "bisync" else [])]
+            different = [("different", p) for p in found["*"]]
+            errors = [("error", p) for p in found["!"]]
+            res.update(checked=found["same"] + len(missing) + len(different) + len(errors),
+                       missing=len(missing), different=len(different), errors=len(errors))
+            todo = missing + (different if t["direction"] != "bisync" else [])
+            if todo:
+                log.append(self._line(f"{len(missing)} missing, {len(different)} different: "
+                                      "copying them again", "NOTICE"))
+                left = self._fix(t, r, log, mode, found) if not self.demo else []
+                if left is None:
+                    return {**res, "status": "cancelled" if r["cancel"] else "interrupted"}
+                res["fixed"] = len(todo) - len([x for x in left if x[0] != "error"])
+                unresolved = left + (different if t["direction"] == "bisync" else []) + errors
+            else:
+                unresolved = errors
+            res["unresolved"] = [{"kind": k, "path": p} for k, p in unresolved[:UNRESOLVED_KEEP]]
+            res["unresolved_count"] = len(unresolved)
+            res["status"] = "failed" if unresolved else ("fixed" if res["fixed"] else "ok")
+            for k, p in unresolved[:UNRESOLVED_KEEP]:
+                log.append("\t".join((time.strftime("%H:%M:%S"), "ERROR", p, f"Not verified: {k}")))
+            log.append(self._line(
+                f"Verified: all {res['checked']:,} files match" if res["status"] == "ok" else
+                f"Copied {res['fixed']} file(s) again · all {res['checked']:,} files match now"
+                if res["status"] == "fixed" else
+                f"Verification: {len(unresolved)} file(s) could not be verified",
+                "ERROR" if unresolved else "INFO"))
+        except UserError as e:
+            res.update(status="error", error=str(e))
+            log.append(self._line(f"Verification failed: {e}", "ERROR"))
+        except Exception as e:  # noqa: BLE001
+            res.update(status="error", error=f"{type(e).__name__}: {e}")
+            log.append(self._line(f"Verification failed: {res['error']}", "ERROR"))
+        res["finished"] = time.time()
+        if res["status"] in ("ok", "fixed") and not self.demo:
+            self._learn_speed(t, mode, res["finished"] - res["started"])
+        return res
+
+    def _fix(self, t: dict, r: dict, log, mode: str, found: dict) -> Optional[list]:
+        """Copy the missing and different files again, then check just those.
+        Returns what still does not match, or None when stopped."""
+        src, dst, _local = self._sides(t)
+        conf = self._rclone_conf(t["id"])
+        jobs = [(src, dst, found["+"] + found["*"])]
+        if t["direction"] == "bisync":                  # copy only; never overwrite either side
+            jobs = [(src, dst, found["+"]), (dst, src, found["-"])]
+        r.update(phase="fixing", files=0, total_files=0, checks=0, total_checks=0, bytes=0, total_bytes=0)
+        left = []
+        for i, (a, b, paths) in enumerate(jobs):
+            if not paths:
+                continue
+            lst = os.path.join(self.base, "verify", f"{t['id']}-fix{i}.txt")
+            write_atomic(lst, "\n".join(paths) + "\n", 0o600)
+            cmd = self._base_args(conf, False) + ["copy", a, b, "--files-from", lst, "--ignore-times",
+                                           "--no-traverse", "--transfers", "4"]
+            if t.get("bwlimit"):
+                cmd += ["--bwlimit", t["bwlimit"]]
+            if t.get("versions") and t["direction"] != "bisync":
+                base = b.rstrip("/") + "/" if b != "onedrive:" else b
+                cmd += ["--backup-dir", f"{base}{VERSIONS}/{time.strftime('%Y-%m-%d_%H%M%S')}"]
+            rc = self._rclone(cmd, r, conf)
+            if r["cancel"] or rc < 0 or rc in SIGNAL_EXIT or self._stop.is_set():
+                return None
+            # check those files again
+            again = os.path.join(self.base, "verify", f"{t['id']}-again{i}.txt")
+            tt = {**t, "direction": "pull" if a.startswith("onedrive:") else "push"}
+            r["phase"] = "verifying"
+            self._rclone(self._check_cmd(tt, conf, mode, again, lst), r, conf)
+            res = self.read_combined(again)
+            left += [("missing", p) for p in res["+"]] + [("different", p) for p in res["*"]] + \
+                [("error", p) for p in res["!"]]
+        return left
+
+    def _learn_speed(self, t: dict, mode: str, secs: float) -> None:
+        """Use how long this check really took for the next estimates."""
+        p = t.get("profile") or {}
+        def upd(od):
+            task = od["tasks"].get(t["id"])
+            if task is None:
+                return
+            if mode == "quick":
+                task.setdefault("profile", {})["quick_secs"] = secs
+            elif p.get("bytes") and secs > 5:
+                od.setdefault("read_speed", {})[t["volume"]] = {
+                    "bps": p["bytes"] / secs, "source": "check", "at": time.time()}
+        self._update(upd)
+
+    def _report_verify(self, t: dict, user: str, v: dict) -> None:
+        kind = "quick" if v["mode"] == "quick" else "full"
+        if v["status"] == "ok":
+            self.state.log_activity(user, f"OneDrive task {t['name']}: {kind} check passed, "
+                                          f"{v['checked']:,} files match")
+        elif v["status"] == "fixed":
+            self.state.log_activity(user, f"OneDrive task {t['name']}: {kind} check found "
+                                          f"{v['fixed']} missing or different file(s) and copied them again")
+        else:
+            what = v["error"] or f"{v['unresolved_count']} file(s) could not be verified"
+            self.state.log_activity(user, f"OneDrive task {t['name']}: {kind} check: {what}", "warning")
+            files = "\n".join(f"{x['kind']}: {x['path']}" for x in v["unresolved"][:50])
+            self.nas.notifier.send("cloud_failed", f"OneDrive task {t['name']}: verification found problems",
+                                   f"The {kind} check of OneDrive task '{t['name']}' found problems:\n"
+                                   f"{what}\n\n{files}")
 
     @staticmethod
     def _message(line: str) -> str:
@@ -881,8 +1317,9 @@ class CloudSync:
             return
         msg = str(d.get("msg", ""))
         level = str(d.get("level", "info")).lower()
-        if "Checks finished" in msg:
+        if "Checks finished" in msg and r.get("comparing"):
             r["comparing"] = False                 # --check-first: copying starts now
+            r["compare_secs"] = time.time() - r.get("attempt_started", r["started"])
         st = d.get("stats")
         if st:
             if st.get("transfers"):
@@ -925,6 +1362,19 @@ class CloudSync:
                             "--min-age", f"{KEEP_VERSIONS_DAYS}d", "--rmdirs",
                             f"onedrive:{t['remote']}/{VERSIONS}".replace(":/", ":")],
                            capture_output=True, timeout=3600)
+
+    def _simulate_check(self, r: dict) -> dict:
+        total = 3510
+        for i in range(1, 11):
+            if r["cancel"] or self._stop.is_set():
+                break
+            time.sleep(0.3)
+            r.update(checks=total * i // 10, total_checks=total * i // 10, active=time.time(),
+                     read_speed=236e6)
+        if r.get("mode") == "full":           # demo: a full check finds and fixes 3 files
+            return {"same": total - 3, "+": ["Pictures/2026/IMG_4101.HEIC", "Pictures/2026/IMG_4102.HEIC"],
+                    "-": [], "*": ["Documents/Notes/house.docx"], "!": []}
+        return {"same": total, "+": [], "-": [], "*": [], "!": []}
 
     def _simulate(self, r: dict):
         total = random.randint(20, 400)

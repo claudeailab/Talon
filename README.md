@@ -56,7 +56,7 @@ https://<nas-ip>/
 - **Shared folders:** SMB, NFS and Time Machine with per-user permissions
 - **Users & groups:** accounts for shared folders and the web interface
 - **Discovery:** appears in Windows Network and macOS Finder
-- **OneDrive:** back up to or from OneDrive, or two-way sync
+- **OneDrive:** back up to or from OneDrive, or two-way sync, verified after each run
 - **Networking:** DHCP or static IP, HTTPS on or off
 - **Scheduled:** run scripts on a schedule
 - **Notifications:** email alerts with adjustable thresholds
