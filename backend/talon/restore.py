@@ -109,8 +109,9 @@ class Restore:
         return list(out.items())
 
     def _recycle_roots(self, volume: str, root: str) -> List[Tuple[str, str]]:
-        """(shared folder, share name) for shares on this volume with a .recycle folder."""
-        out = []
+        """(folder, name) of each .recycle on this volume: the volume's own (files
+        deleted on the Files page) and each shared folder's (deleted from computers)."""
+        out = [(root, volume)] if os.path.isdir(os.path.join(root, RECYCLE)) else []
         for s in self.nas.state.get("shares").values():
             if s.get("volume") != volume:
                 continue

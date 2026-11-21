@@ -318,10 +318,11 @@ export const GUIDE: Topic[] = [
           {
             list: [
               "**Previous versions**: in a file's **⋯** menu. When a backup from OneDrive replaced the file, the old copies are listed with their date. **Download** one, or **Restore** it: the current file then becomes a previous version, so nothing is lost.",
-              "**Recycle bin**: the button above the file list of a volume. It lists files deleted from Windows or macOS (in shared folders with the recycle bin turned on) and files a backup from OneDrive deleted, with where they were, who deleted them and when. Select files and click **Restore**, or **Restore** one; a file whose name is taken again is restored as \"name (restored)\". **Empty recycle bin** deletes everything in it for good.",
+              "**Recycle bin**: the button above the file list of a volume. It lists files deleted on this page, from Windows or macOS (in shared folders with the recycle bin turned on) and by a OneDrive task (a backup from OneDrive or a two-way sync), with where they were, who deleted them and when. Select files and click **Restore**, or **Restore** one; a file whose name is taken again is restored as \"name (restored)\". **Empty recycle bin** deletes everything in it for good.",
             ],
           },
-          { p: "Both keep files for 30 days, then remove them for good. Files deleted on this page are not kept." },
+          { p: "Both keep files for 30 days, then remove them for good." },
+          { p: "Not kept by Talon: files deleted on USB and other disks outside a volume, over NFS, by scheduled scripts or on the NAS's command line. Files deleted in OneDrive go to the OneDrive recycle bin." },
         ],
       },
       {
@@ -347,7 +348,8 @@ export const GUIDE: Topic[] = [
             ],
           },
           { p: "**Move** works between your volumes and other disks; on OneDrive it moves within OneDrive." },
-          { warn: "Delete on volumes and disks is permanent. Folders are deleted with everything inside them." },
+          { p: "**Delete** on a volume moves the items to its **Recycle bin** for 30 days; folders go with everything inside them. On OneDrive they go to the OneDrive recycle bin." },
+          { warn: "USB and other disks outside a volume have no recycle bin: delete there is permanent." },
         ],
       },
     ],
@@ -385,7 +387,7 @@ export const GUIDE: Topic[] = [
           {
             list: [
               "**Visible in network browsing**: when off, people must type the share name to connect.",
-              "**Recycle bin**: files deleted from Windows or macOS are kept for 30 days. Restore them in [Files → Recycle bin](" + t("files") + ").",
+              "**Recycle bin**: on for new shared folders. Files deleted from Windows or macOS are kept for 30 days; restore them in [Files → Recycle bin](" + t("files") + "). Not available together with **Time Machine backups**, which removes old backups itself.",
               "**Time Machine backups**: advertises the share as a macOS Time Machine destination. Use a separate shared folder for it.",
             ],
           },
@@ -555,7 +557,7 @@ export const GUIDE: Topic[] = [
           {
             list: [
               "**Delete on Talon what I delete on OneDrive** (or **Delete on OneDrive what I delete on Talon** for a backup to OneDrive): when a file is deleted on one side it is also deleted on the other. Off means nothing is ever deleted (safer).",
-              "When a backup from OneDrive replaces or deletes a file on the NAS, the old copy is kept for 30 days. Restore it from **Previous versions** or the **Recycle bin** in [Files](" + t("files") + "). A backup to OneDrive needs no copy of its own: OneDrive keeps earlier versions of its files.",
+              "When a backup from OneDrive replaces or deletes a file on the NAS, the old copy is kept for 30 days. Restore it from **Previous versions** or the **Recycle bin** in [Files](" + t("files") + "). A two-way sync keeps them the same way. A backup to OneDrive needs no copy of its own: OneDrive keeps earlier versions of its files.",
               "**More options**: **If it fails** (try a failed run again up to 5 times, 2 minutes apart) and a **Speed limit**, so backups do not slow down your internet.",
             ],
           },

@@ -305,7 +305,10 @@ class FileBrowser:
             moved += 1
         return moved
 
-    def delete(self, volume: str, items: List[str]) -> int:
+    def delete(self, volume: str, items: List[str], user: str = "talon") -> int:
+        """Delete items. On a volume they go to its recycle bin (.recycle/<user>/ at
+        the volume's top, kept 30 days); on other disks they are deleted for good;
+        on OneDrive they go to the OneDrive recycle bin."""
         if self.is_remote(volume):
             od = self._od()
             for rel in items:
@@ -316,12 +319,44 @@ class FileBrowser:
             target, root = self.resolve(volume, rel)
             if target == root:
                 raise UserError("The volume itself cannot be deleted")
-            if os.path.isdir(target) and not os.path.islink(target):
+            if self.has_bin(volume):
+                self._to_bin(root, target, user)
+            elif os.path.isdir(target) and not os.path.islink(target):
                 shutil.rmtree(target)
             else:
                 os.unlink(target)
             n += 1
         return n
+
+    @staticmethod
+    def has_bin(volume: str) -> bool:
+        """Volumes have a recycle bin; USB and other disks and OneDrive do not."""
+        return volume != ONEDRIVE and not volume.startswith(EXTERNAL)
+
+    def _to_bin(self, root: str, target: str, user: str) -> None:
+        rel = os.path.relpath(target, root)
+        if rel.split(os.sep)[0] in (".recycle", ".versions"):
+            raise UserError("Not allowed")
+        dest = os.path.join(root, ".recycle", user or "talon", rel)
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        n = 2
+        while os.path.lexists(dest):                 # deleted before: "Copy #2 of name"
+            dest = os.path.join(os.path.dirname(dest), f"Copy #{n} of {os.path.basename(rel)}")
+            n += 1
+        os.rename(target, dest)
+        # mark when it was deleted: the recycle bin uses each file's change time.
+        # Setting the times to their own values updates the change time and keeps
+        # the modified date; files inside a deleted folder need it too.
+        paths = [dest]
+        if os.path.isdir(dest) and not os.path.islink(dest):
+            for dirpath, _dirs, files in os.walk(dest):
+                paths += [os.path.join(dirpath, f) for f in files]
+        for p in paths:
+            try:
+                st = os.lstat(p)
+                os.utime(p, ns=(st.st_atime_ns, st.st_mtime_ns), follow_symlinks=False)
+            except (OSError, NotImplementedError):
+                pass
 
     # ------------------------------------------------------------ upload / download
     def upload_remote(self, path: str, name: str, src: str, overwrite: bool) -> None:

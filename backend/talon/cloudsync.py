@@ -908,6 +908,9 @@ class CloudSync:
                      "--workdir", os.path.join(self.base, "bisync", t["id"])]
             if first_bisync:
                 args.append("--resync")
+            # what a sync deletes or replaces on the NAS is kept (Recycle bin, Previous
+            # versions); OneDrive keeps its own recycle bin and versions
+            args += ["--backup-dir1", os.path.join(local, VERSIONS, stamp)]
             return args
         src, dst = (remote, local) if t["direction"] == "pull" else (local, remote)
         # compare everything before copying, so progress is known from the start
@@ -959,7 +962,7 @@ class CloudSync:
                 error = self._message(last_err) or RCLONE_EXIT.get(rc, f"rclone exited with code {rc}")
             elif first:
                 self._update(lambda od: od["tasks"].get(tid, {}).__setitem__("bisync_ready", True))
-            if status == "success" and t["direction"] == "pull":
+            if status == "success" and t["direction"] in ("pull", "bisync"):
                 self._prune_versions(t, conf, local)
         except UserError as e:
             status, error = "error", str(e)
@@ -1352,7 +1355,7 @@ class CloudSync:
                                     str(d.get("object", "")), str(d.get("msg", "")).strip())))
 
     def _prune_versions(self, t: dict, conf: str, local: str) -> None:
-        if t["direction"] == "pull":
+        if t["direction"] in ("pull", "bisync"):
             root = os.path.join(local, VERSIONS)
             cutoff = time.time() - KEEP_VERSIONS_DAYS * 86400
             from .restore import _stamp_time

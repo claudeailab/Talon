@@ -677,7 +677,9 @@ class Nas:
             "users": perm_u, "groups": perm_g,
             "smb": {"enabled": bool(smb.get("enabled", True)),
                     "browseable": bool(smb.get("browseable", True)),
-                    "recycle_bin": bool(smb.get("recycle_bin", False)),
+                    # on unless asked otherwise; never for Time Machine (it would keep
+                    # every old backup Time Machine removes)
+                    "recycle_bin": bool(smb.get("recycle_bin", True)) and not smb.get("time_machine"),
                     "time_machine": bool(smb.get("time_machine", False))},
             "nfs": {"enabled": bool(nfs.get("enabled", False)), "clients": clients,
                     "squash": squash, "insecure": bool(nfs.get("insecure", False))},

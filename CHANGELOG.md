@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.64
+- Files deleted on the Files page go to the volume's recycle bin for 30 days
+- Recycle bin on by default for new shared folders (not with Time Machine)
+- Two-way sync keeps what it deletes or replaces on the NAS
+
 ## 1.0.63
 - Scheduled: the script box shows 10 lines
 

@@ -121,7 +121,8 @@ export default function FilesPage() {
   };
 
   const remove = useAction(() => api.post<{ deleted: number }>("/files/delete", { volume, items: target }), {
-    success: (r) => `${r.deleted} item${r.deleted === 1 ? "" : "s"} deleted`,
+    success: (r) =>
+      `${r.deleted} item${r.deleted === 1 ? "" : "s"} ` + (here?.kind === "volume" ? "moved to the recycle bin" : "deleted"),
     onSuccess: () => {
       setDialog(null);
       setSel(new Set());
@@ -437,7 +438,13 @@ export default function FilesPage() {
         danger
         title={target.length === 1 ? `Delete ${target[0].split("/").pop()}?` : `Delete ${target.length} items?`}
         confirmText="Delete"
-        message="Folders are deleted with everything inside them. This cannot be undone."
+        message={
+          here?.kind === "volume"
+            ? "They go to the recycle bin and are kept for 30 days. Folders go with everything inside them."
+            : here?.kind === "onedrive"
+              ? "They go to the OneDrive recycle bin."
+              : "Folders are deleted with everything inside them. Disks outside a volume have no recycle bin: this cannot be undone."
+        }
       />
       {versionsOf && <VersionsDialog volume={volume} path={versionsOf} onClose={() => setVersionsOf(null)} onDone={refresh} />}
       {showBin && <RecycleBin volume={volume} name={here?.name ?? volume} onClose={() => setShowBin(false)} onDone={refresh} />}
@@ -507,7 +514,7 @@ function VersionsDialog({ volume, path, onClose, onDone }: { volume: string; pat
 
 type BinItem = { id: string; name: string; was_in: string; by: string; deleted: number; size: number };
 
-/** Files deleted from a computer (shared folders with the recycle bin on) or by a OneDrive backup. */
+/** Files deleted on this page, from a computer (shared folders with the recycle bin on) or by a OneDrive task. */
 function RecycleBin({ volume, name, onClose, onDone }: { volume: string; name: string; onClose: () => void; onDone: () => void }) {
   const q = useQuery({
     queryKey: ["recycle-bin", volume],
@@ -561,7 +568,7 @@ function RecycleBin({ volume, name, onClose, onDone }: { volume: string; name: s
       {!q.data ? (
         <div className="py-8 text-center text-sm text-zinc-500">Loading…</div>
       ) : items.length === 0 ? (
-        <Empty icon={<Trash2 className="size-6" />} title="The recycle bin is empty" text="Files deleted from Windows or macOS, or by a OneDrive backup, appear here." />
+        <Empty icon={<Trash2 className="size-6" />} title="The recycle bin is empty" text="Files deleted on this page, from Windows or macOS, or by a OneDrive task appear here." />
       ) : (
         <ul className="divide-y divide-zinc-100 rounded-xl ring-1 ring-zinc-200 dark:divide-white/5 dark:ring-white/10">
           {items.map((it) => (

@@ -36,7 +36,7 @@ function blank(volume: string): Share {
     guest: "none",
     users: {},
     groups: { [USERS_GROUP]: "rw" },
-    smb: { enabled: true, browseable: true, recycle_bin: false, time_machine: false },
+    smb: { enabled: true, browseable: true, recycle_bin: true, time_machine: false },
     nfs: { enabled: false, clients: [], squash: "all", insecure: false },
     path: null,
   };
@@ -358,8 +358,8 @@ function ShareEditor({ initial, isNew, volumes, onClose }: { initial: Share; isN
           <ToggleRow
             title="Recycle bin"
             description="Files deleted from Windows or macOS are kept for 30 days. Restore them in Files → Recycle bin."
-            checked={s.smb.recycle_bin}
-            disabled={!s.smb.enabled}
+            checked={s.smb.recycle_bin && !s.smb.time_machine}
+            disabled={!s.smb.enabled || s.smb.time_machine}
             onChange={(v) => set("smb", { ...s.smb, recycle_bin: v })}
           />
           <ToggleRow
@@ -367,7 +367,7 @@ function ShareEditor({ initial, isNew, volumes, onClose }: { initial: Share; isN
             description="Advertise this share as a macOS Time Machine destination."
             checked={s.smb.time_machine}
             disabled={!s.smb.enabled}
-            onChange={(v) => set("smb", { ...s.smb, time_machine: v })}
+            onChange={(v) => set("smb", { ...s.smb, time_machine: v, recycle_bin: v ? false : s.smb.recycle_bin })}
           />
         </div>
       )}

@@ -456,7 +456,7 @@ def create_app(cfg, platform) -> FastAPI:
     @app.post("/api/files/delete")
     def files_delete(body: dict = Body(...), user: str = Depends(current_user)):
         items = list(body.get("items") or [])
-        n = nas.files.delete(body.get("volume", ""), items)
+        n = nas.files.delete(body.get("volume", ""), items, user)
         nas.state.log_activity(user, f"Deleted {n} item(s) in {body.get('volume')}: "
                                      + ", ".join(items[:5]) + (" …" if len(items) > 5 else ""),
                                "warning")
