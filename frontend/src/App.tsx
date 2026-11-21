@@ -58,9 +58,9 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
   {
     section: "Storage",
     items: [
+      { to: "/disks", label: "Disks", icon: HardDrive, page: DisksPage },
       { to: "/raid", label: "RAID", icon: Layers, page: RaidPage },
       { to: "/volumes", label: "Volumes", icon: Database, page: VolumesPage },
-      { to: "/disks", label: "Disks", icon: HardDrive, page: DisksPage },
       { to: "/files", label: "Files", icon: FolderTree, page: FilesPage },
       { to: "/onedrive", label: "OneDrive", icon: Cloud, page: OneDrivePage },
     ],

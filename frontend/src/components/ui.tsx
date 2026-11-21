@@ -222,7 +222,8 @@ export function Progress({
   className,
   striped,
 }: {
-  value: number;
+  /** null: busy, amount unknown (a sliding bar) */
+  value: number | null;
   tone?: "brand" | "green" | "amber" | "red" | "blue";
   className?: string;
   striped?: boolean;
@@ -247,7 +248,9 @@ export function Progress({
           c,
           striped && "animate-pulse",
         )}
-        style={{ width: `${Math.max(0, Math.min(100, value))}%` }}
+        style={value === null
+          ? { width: "30%", animation: "indeterminate 1.4s ease-in-out infinite" }
+          : { width: `${Math.max(0, Math.min(100, value))}%` }}
       />
     </div>
   );

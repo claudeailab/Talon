@@ -117,6 +117,41 @@ export const GUIDE: Topic[] = [
 
   // ------------------------------------------------------------ Storage
   {
+    id: "disks",
+    title: "Disks and health",
+    group: "Storage",
+    summary: "Disk health (S.M.A.R.T.), temperature, self-tests and wiping.",
+    page: { to: "/disks", label: "Open Disks" },
+    sections: [
+      {
+        id: "health",
+        title: "Disk health",
+        blocks: [
+          { img: "disks", alt: "Disks page" },
+          { p: "Every disk shows its type (HDD, SSD, NVMe, USB), size, what it is used for, health and temperature. Choose **S.M.A.R.T. details** in a disk's **⋯** menu for its power-on time, bad sectors, wear and every attribute." },
+          { p: "Virtual disks and some USB enclosures do not report health; they show what they are used for instead." },
+        ],
+      },
+      {
+        id: "tests",
+        title: "Self-tests",
+        blocks: [
+          { p: "In **S.M.A.R.T. details**, click **Run short test** (a few minutes) or **Run extended test** (several hours). The result appears in the **Self-test log**." },
+        ],
+      },
+      {
+        id: "wipe",
+        title: "Wipe a disk",
+        blocks: [
+          { p: "**Wipe disk** in a disk's **⋯** menu removes old partitions and RAID information, so the disk can be used for a new RAID array or volume." },
+          { warn: "Everything on the disk is lost. Disks that belong to one of Talon's RAID arrays or volumes cannot be wiped." },
+          { p: "**Foreign RAID** means the disk belongs to a RAID array from another system. Wipe it, or select it directly when you create a RAID array or volume: Talon stops the old array first, then erases the disk. Its other disks then show **Has data** and can be used the same way. A foreign array that is mounted or in use is left alone." },
+          { tip: "USB disks work, but can disconnect under load. For RAID, use SATA or NVMe disks, or a powered USB hub." },
+        ],
+      },
+    ],
+  },
+  {
     id: "raid",
     title: "RAID",
     group: "Storage",
@@ -232,41 +267,6 @@ export const GUIDE: Topic[] = [
             ],
           },
           { p: "Next step: share folders on the volume. See [Shared folders](" + t("shares") + ")." },
-        ],
-      },
-    ],
-  },
-  {
-    id: "disks",
-    title: "Disks and health",
-    group: "Storage",
-    summary: "Disk health (S.M.A.R.T.), temperature, self-tests and wiping.",
-    page: { to: "/disks", label: "Open Disks" },
-    sections: [
-      {
-        id: "health",
-        title: "Disk health",
-        blocks: [
-          { img: "disks", alt: "Disks page" },
-          { p: "Every disk shows its type (HDD, SSD, NVMe, USB), size, what it is used for, health and temperature. Choose **S.M.A.R.T. details** in a disk's **⋯** menu for its power-on time, bad sectors, wear and every attribute." },
-          { p: "Virtual disks and some USB enclosures do not report health; they show what they are used for instead." },
-        ],
-      },
-      {
-        id: "tests",
-        title: "Self-tests",
-        blocks: [
-          { p: "In **S.M.A.R.T. details**, click **Run short test** (a few minutes) or **Run extended test** (several hours). The result appears in the **Self-test log**." },
-        ],
-      },
-      {
-        id: "wipe",
-        title: "Wipe a disk",
-        blocks: [
-          { p: "**Wipe disk** in a disk's **⋯** menu removes old partitions and RAID information, so the disk can be used for a new RAID array or volume." },
-          { warn: "Everything on the disk is lost. Disks that belong to one of Talon's RAID arrays or volumes cannot be wiped." },
-          { p: "**Foreign RAID** means the disk belongs to a RAID array from another system. Wipe it, or select it directly when you create a RAID array or volume: Talon stops the old array first, then erases the disk. Its other disks then show **Has data** and can be used the same way. A foreign array that is mounted or in use is left alone." },
-          { tip: "USB disks work, but can disconnect under load. For RAID, use SATA or NVMe disks, or a powered USB hub." },
         ],
       },
     ],
@@ -559,7 +559,8 @@ export const GUIDE: Topic[] = [
         title: "Run and check tasks",
         blocks: [
           { p: "Each task shows its schedule, last run and status. Use **Run now** to start it, **Stop** to cancel it, and the **⋯** menu to edit it, view its log or delete it. Deleting a task does not touch any files." },
-          { p: "**View log** shows each step with its time and keeps the newest line in view while the task runs; scroll up to read earlier lines." },
+          { p: "A running task first shows **Comparing** while it checks which files OneDrive and the NAS already have in common, then **Copying** with the share of files that are done. Files already up to date count as done." },
+          { p: "**View log** shows the same progress bar, plus each step with its time and keeps the newest line in view while the task runs; scroll up to read earlier lines." },
           { p: "If Talon or the NAS restarts while a task runs, the task continues by itself shortly after Talon starts again; files already copied are skipped." },
           { p: "**Disconnect** signs out of Microsoft. Tasks stop running until you sign in again; no files are deleted." },
           { tip: "With [Email notifications](" + t("email") + ") you get an email when a OneDrive task fails." },

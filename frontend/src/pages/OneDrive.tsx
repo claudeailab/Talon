@@ -443,17 +443,34 @@ export default function OneDrivePage() {
   );
 }
 
+type Run = NonNullable<CloudTask["running"]>;
+const num = (n: number) => n.toLocaleString("en-GB");
+
+/** What a run is doing: comparing both sides first, then copying. */
+function runLabel(r: Run) {
+  return r.percent === null ? "Comparing" : `Copying ${r.percent.toFixed(0)}%`;
+}
+
+function runDetail(r: Run) {
+  if (r.percent === null) return `${num(r.checks)} files compared`;
+  const done = r.checks + r.files, total = Math.max(done, r.total_checks + r.total_files);
+  return (
+    <>
+      {num(done)} of {num(total)} files
+      {/* size and speed only where they fit on one line */}
+      <span className="hidden sm:inline"> · {bytes(r.bytes)} copied{r.speed ? ` · ${bytes(r.speed)}/s` : ""}</span>
+    </>
+  );
+}
+
 function TaskStatus({ t }: { t: CloudTask }) {
   if (t.running) {
-    const p = t.running.total_bytes
-      ? (t.running.bytes / t.running.total_bytes) * 100
-      : 0;
     return (
       <div className="w-28">
         <Badge tone="blue" dot>
-          Running {p.toFixed(0)}%
+          {runLabel(t.running)}
         </Badge>
-        <Progress value={p} tone="blue" className="mt-1.5 h-1" />
+        <Progress value={t.running.percent} tone="blue" className="mt-1.5 h-1" />
       </div>
     );
   }
@@ -1045,6 +1062,15 @@ function LogDialog({
         <Callout tone="danger" title={`Last run failed on ${dateTime(task.last.finished)}`} className="mb-3">
           {task.last.error}
         </Callout>
+      )}
+      {task.running && (
+        <div className="mb-3">
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="shrink-0 font-medium">{runLabel(task.running)}</span>
+            <span className="truncate text-zinc-500">{runDetail(task.running)}</span>
+          </div>
+          <Progress value={task.running.percent} tone="blue" className="mt-1.5 h-1.5" />
+        </div>
       )}
       {q.data?.length ? (
         <ul

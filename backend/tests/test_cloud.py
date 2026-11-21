@@ -270,3 +270,21 @@ def test_run_stopped_with_sigterm_counts_as_interrupted(client, monkeypatch):
     cloud._resume()
     assert _wait_done(client, task["id"])["last"]["status"] == "success"
     assert 143 in cloudsync.SIGNAL_EXIT
+
+
+def test_progress_counts_files_already_up_to_date():
+    from talon.cloudsync import CloudSync
+    r = {"files": 0, "total_files": 0, "checks": 0, "total_checks": 0}
+    assert CloudSync.percent(r) == 0
+    # resumed run: compare found 900 files up to date and 100 to copy; 10 copied
+    r.update(checks=900, total_checks=900, files=10, total_files=100)
+    assert CloudSync.percent(r) == 91.0
+    r.update(files=100)
+    assert CloudSync.percent(r) == 99.0                # never 100% while running
+
+
+def test_copy_compares_first(client):
+    from talon.cloudsync import CloudSync
+    t = {"remote": "Pictures", "direction": "pull", "delete": False, "versions": False, "bwlimit": ""}
+    cmd = CloudSync.command(client.app.state.nas.cloud, t, "c.conf", "/srv/x", False)
+    assert "--check-first" in cmd

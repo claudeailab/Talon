@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.55
+- OneDrive compares both sides first, then shows the real progress: Comparing, then Copying %
+- Progress bar in the OneDrive log window
+- Disks now sits above RAID in the menu
+
 ## 1.0.54
 - OneDrive runs stopped by a restart (exit 143) resume instead of failing
 - Log window hides the last error while a run is going, and shows its date

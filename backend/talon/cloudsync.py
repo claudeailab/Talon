@@ -541,8 +541,23 @@ class CloudSync:
         if r:
             run = {k: r[k] for k in ("started", "files", "total_files", "bytes", "total_bytes",
                                      "speed")}
+            run["comparing"] = r.get("comparing", False)
+            run["checks"] = r.get("checks", 0)
+            run["total_checks"] = r.get("total_checks", 0)
+            run["percent"] = None if run["comparing"] else self.percent(r)
         return {**{k: v for k, v in t.items() if k != "bisync_ready"},
                 "running": run, "next_run": self._next_run(t)}
+
+    @staticmethod
+    def percent(r: dict) -> float:
+        """Progress by files. rclone first compares both sides (--check-first), so
+        the totals are final when copying starts; files that are already up to
+        date count as done, so a run resumed after a restart starts where it was."""
+        done = r.get("checks", 0) + r["files"]
+        total = max(r.get("total_checks", 0) + r["total_files"], done)
+        if not total:
+            return 0.0
+        return round(min(99.0, done * 100 / total), 1)
 
     def task_log(self, tid: str) -> list:
         self._task(tid)
@@ -634,7 +649,7 @@ class CloudSync:
             if tid in self._running:
                 raise UserError("The task is already running")
             self._running[tid] = {"started": time.time(), "files": 0, "total_files": 0, "bytes": 0,
-                                  "total_bytes": 0, "speed": 0, "proc": None, "cancel": False,
+                                  "total_bytes": 0, "checks": 0, "total_checks": 0, "comparing": False, "speed": 0, "proc": None, "cancel": False,
                                   "log": collections.deque(maxlen=1000), "resumed": resumed}
         # remembered in the state file until the run ends, so a restart can resume it
         self._update(lambda od: od["tasks"].get(tid) is not None and
@@ -707,7 +722,8 @@ class CloudSync:
                 args.append("--resync")
             return args
         src, dst = (remote, local) if t["direction"] == "pull" else (local, remote)
-        args += ["sync" if t["delete"] else "copy", src, dst]
+        # compare everything before copying, so progress is known from the start
+        args += ["--check-first", "sync" if t["delete"] else "copy", src, dst]
         if t["versions"]:
             base = dst.rstrip("/") + "/" if dst != "onedrive:" else dst
             args += ["--backup-dir", f"{base}{VERSIONS}/{stamp}"]
@@ -736,6 +752,7 @@ class CloudSync:
                                     text=True, bufsize=1)
             r["proc"] = proc
             last_err = ""
+            r["comparing"] = t["direction"] != "bisync"
             for line in proc.stdout:
                 self._parse(line, r)
                 if self._is_error(line):
@@ -787,7 +804,8 @@ class CloudSync:
                 if r["cancel"]:
                     status, error = "cancelled", "Stopped"
                     break
-                r.update(files=0, bytes=0, total_files=0, total_bytes=0, speed=0)
+                r.update(files=0, bytes=0, total_files=0, total_bytes=0, speed=0,
+                         checks=0, total_checks=0)
                 log.append(self._line(f"Attempt {attempt + 1} of {attempts}"))
             log.append(self._line("Finished" if status == "success" else
                                   "Stopped" if status == "cancelled" else f"Failed: {error}",
@@ -852,11 +870,16 @@ class CloudSync:
             if line.strip():
                 r["log"].append("\t".join((time.strftime("%H:%M:%S"), "INFO", "", line.strip())))
             return
+        if "Checks finished" in str(d.get("msg", "")):
+            r["comparing"] = False                 # --check-first: copying starts now
         st = d.get("stats")
         if st:
+            if st.get("transfers"):
+                r["comparing"] = False
             r.update(files=st.get("transfers", 0), total_files=st.get("totalTransfers", 0),
                      bytes=st.get("bytes", 0), total_bytes=st.get("totalBytes", 0),
-                     speed=st.get("speed", 0))
+                     speed=st.get("speed", 0), checks=st.get("checks", 0),
+                     total_checks=st.get("totalChecks", 0))
             return
         # "time<TAB>LEVEL<TAB>file<TAB>message": the web interface shows each part
         # on its own (time, highlighted level, wrapped path), so it reads on a phone
@@ -881,7 +904,14 @@ class CloudSync:
     def _simulate(self, r: dict):
         total = random.randint(20, 400)
         size = total * random.randint(200_000, 4_000_000)
-        r.update(total_files=total, total_bytes=size)
+        same = total * 9                           # files already up to date
+        r["comparing"] = True
+        for i in range(1, 7):                      # compare both sides first
+            if r["cancel"]:
+                return "cancelled", "Stopped"
+            time.sleep(0.5)
+            r.update(checks=same * i // 6, total_checks=same * i // 6)
+        r.update(comparing=False, total_files=total, total_bytes=size)
         for i in range(1, 21):
             if r["cancel"]:
                 return "cancelled", "Stopped"
