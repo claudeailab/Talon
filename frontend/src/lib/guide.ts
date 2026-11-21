@@ -289,7 +289,7 @@ export const GUIDE: Topic[] = [
               "Choose where to browse with the button at the top left: your **Volumes**, **Other disks** (USB disks and other disks with a filesystem that are not part of a volume or RAID) and **OneDrive** when it is connected.",
               "Click once to select an item, double-click a folder to open it.",
               "Use the folder path next to the location to go back up (choose the location again to return to its top), and **Filter this folder** to find a name.",
-              "Hidden items whose names start with a dot, like .recycle and .versions, are not shown.",
+              "Hidden items whose names start with a dot are not shown. Earlier copies and deleted files are under **Previous versions** and **Recycle bin**.",
             ],
           },
         ],
@@ -309,6 +309,19 @@ export const GUIDE: Topic[] = [
         blocks: [
           { p: "With [OneDrive](" + t("onedrive") + ") connected, **OneDrive** appears under **Cloud**. You can browse, upload, download, create folders, rename, move within OneDrive and delete. Deleted items go to the OneDrive recycle bin." },
           { p: "Moving files between OneDrive and the NAS is not possible on this page: download and upload them, or create a OneDrive task." },
+        ],
+      },
+      {
+        id: "restore",
+        title: "Previous versions and the recycle bin",
+        blocks: [
+          {
+            list: [
+              "**Previous versions**: in a file's **⋯** menu. When a backup from OneDrive replaced the file, the old copies are listed with their date. **Download** one, or **Restore** it: the current file then becomes a previous version, so nothing is lost.",
+              "**Recycle bin**: the button above the file list of a volume. It lists files deleted from Windows or macOS (in shared folders with the recycle bin turned on) and files a backup from OneDrive deleted, with where they were, who deleted them and when. Select files and click **Restore**, or **Restore** one; a file whose name is taken again is restored as \"name (restored)\". **Empty recycle bin** deletes everything in it for good.",
+            ],
+          },
+          { p: "Both keep files for 30 days, then remove them for good. Files deleted on this page are not kept." },
         ],
       },
       {
@@ -372,7 +385,7 @@ export const GUIDE: Topic[] = [
           {
             list: [
               "**Visible in network browsing**: when off, people must type the share name to connect.",
-              "**Recycle bin**: deleted files are moved to a hidden .recycle folder instead of being removed.",
+              "**Recycle bin**: files deleted from Windows or macOS are kept for 30 days. Restore them in [Files → Recycle bin](" + t("files") + ").",
               "**Time Machine backups**: advertises the share as a macOS Time Machine destination. Use a separate shared folder for it.",
             ],
           },
@@ -529,29 +542,24 @@ export const GUIDE: Topic[] = [
         title: "Create a task",
         blocks: [
           { img: "onedrive-task", alt: "New OneDrive task" },
-          {
-            list: [
-              "**Backup from OneDrive**: copies OneDrive files to the NAS.",
-              "**Backup to OneDrive**: copies NAS files to OneDrive.",
-              "**Two-way sync** (beta): changes go both ways. Folders only. A file changed on both sides is kept twice, one copy renamed.",
-            ],
-          },
+          { p: "Click **New task**. A short wizard asks one question per step:" },
           {
             steps: [
-              "Choose the **Direction**.",
-              "Click **Browse** to pick the OneDrive folder or file and the NAS folder. Click once to select, double-click to open a folder, or use **New folder**.",
-              "Enter a **Task name** and pick a **Schedule**: **Manually**, every 15 minutes up to every 12 hours, or **Daily** at a set time.",
-              "Optional: a **Speed limit**, so backups do not slow down your internet.",
-              "Choose **If it fails**: Talon tries a failed run again up to 5 times, 2 minutes apart.",
-              "Click **Create task**.",
+              "**What do you want to do?** **Back up OneDrive to the NAS**, **Back up the NAS to OneDrive**, or **Keep both the same** (beta: changes on either side go to the other; folders only; a file changed on both sides is kept twice, one copy renamed).",
+              "**Which folders?** Click **Change** to pick the OneDrive folder and the NAS folder. Click once to select, double-click to open a folder, or use **New folder**. A backup can also copy a single file.",
+              "**When should it run?** **Every day** at a set time, **Every few hours** (every 15 minutes up to every 12 hours), or **Only when I start it**.",
+              "**How carefully should Talon check?** **Don't check**, **Quick check** (recommended) or **Full check**, plus an optional full check every week or every month. See [Run and check tasks](" + t("onedrive") + ").",
+              "**Almost done**: check the summary and the **Name**, then click **Create task**.",
             ],
           },
           {
             list: [
-              "**Delete files removed from OneDrive / the NAS**: off means nothing is ever deleted (safer).",
-              "**Keep old versions**: replaced or deleted files are kept in a hidden .versions folder for 30 days.",
+              "**Delete on Talon what I delete on OneDrive** (or **Delete on OneDrive what I delete on Talon** for a backup to OneDrive): when a file is deleted on one side it is also deleted on the other. Off means nothing is ever deleted (safer).",
+              "When a backup from OneDrive replaces or deletes a file on the NAS, the old copy is kept for 30 days. Restore it from **Previous versions** or the **Recycle bin** in [Files](" + t("files") + "). A backup to OneDrive needs no copy of its own: OneDrive keeps earlier versions of its files.",
+              "**More options**: **If it fails** (try a failed run again up to 5 times, 2 minutes apart) and a **Speed limit**, so backups do not slow down your internet.",
             ],
           },
+          { p: "To change a task, choose **Edit** in its **⋯** menu. It opens a summary of the task; click **Change** next to a part, adjust it, click **Done**, then **Save**." },
         ],
       },
       {
@@ -561,8 +569,8 @@ export const GUIDE: Topic[] = [
           { p: "Each task shows its schedule, last run and status. Use **Run now** to start it, **Stop** to cancel it, and the **⋯** menu to edit it, view its log or delete it. Deleting a task does not touch any files." },
           { p: "A running task first shows **Comparing** while it checks which files OneDrive and the NAS already have in common, then **Copying** with the share of files that are done and the size left to copy. Files already up to date count as done." },
           { p: "Under the progress bar, **Working** shows rclone is making progress. It turns amber when OneDrive limits requests (throttling) or nothing has changed for a minute; rclone keeps trying by itself." },
-          { p: "**Verify after each run** checks that every file arrived. **Quick** compares names and sizes and takes about as long as the comparison. **Full** also compares the contents by checksum, reading every file on the NAS once; OneDrive's checksums are read without downloading anything. Each option shows how long it takes for this task, from its file count, its size and the measured read speed of your disks." },
-          { p: "Files that are missing or different are copied again automatically and checked once more. The log window shows the result; only files that still do not match are listed, and you get an email about them when notifications are on. **Also run a full check** adds a weekly or monthly full check, and **Quick check now** and **Full check now** in a task's **⋯** menu check at any time without copying." },
+          { p: "After each run Talon checks that every file arrived, as chosen in the wizard. **Quick check** compares names and sizes and takes about as long as the comparison. **Full check** also compares the contents by checksum, reading every file on the NAS once; OneDrive's checksums are read without downloading anything. Each option shows how long it takes for this task, from its file count, its size and the measured read speed of your disks." },
+          { p: "Files that are missing or different are copied again automatically and checked once more. The log window shows the result; only files that still do not match are listed, and you get an email about them when notifications are on. **Also a full check** adds a weekly or monthly full check, and **Quick check now** and **Full check now** in a task's **⋯** menu check at any time without copying." },
           { p: "**View log** shows the same progress bar, plus each step with its time and keeps the newest line in view while the task runs; scroll up to read earlier lines." },
           { p: "If Talon or the NAS restarts while a task runs, the task continues by itself shortly after Talon starts again; files already copied are skipped." },
           { p: "**Disconnect** signs out of Microsoft. Tasks stop running until you sign in again; no files are deleted." },

@@ -112,11 +112,14 @@ def test_rclone_commands(tmp_path):
     base = {"id": "t1", "remote": "Pictures", "bwlimit": "", "delete": False,
             "versions": False, "max_delete": 50}
     pull = cs.command({**base, "direction": "pull"}, "c.conf", "/srv/nas/tank/Photos", False)
-    assert pull[-3:] == ["copy", "onedrive:Pictures", "/srv/nas/tank/Photos"]
+    i = pull.index("copy")
+    assert pull[i:i + 3] == ["copy", "onedrive:Pictures", "/srv/nas/tank/Photos"]
+    # OneDrive -> NAS keeps what a run replaces or deletes (Files > Previous versions)
+    assert pull[pull.index("--backup-dir") + 1].startswith("/srv/nas/tank/Photos/.versions/")
     push = cs.command({**base, "direction": "push", "delete": True, "versions": True,
                        "bwlimit": "10M"}, "c.conf", "/srv/nas/tank/Docs", False)
     assert "sync" in push and push[push.index("sync") + 2] == "onedrive:Pictures"
-    assert push[push.index("--backup-dir") + 1].startswith("onedrive:Pictures/.versions/")
+    assert "--backup-dir" not in push                  # OneDrive keeps its own versions
     assert push[push.index("--bwlimit") + 1] == "10M"
     bi = cs.command({**base, "direction": "bisync"}, "c.conf", "/srv/nas/tank/Work", True)
     assert "bisync" in bi and "--resync" in bi and bi[bi.index("--max-delete") + 1] == "50"
@@ -171,7 +174,8 @@ def test_single_file_tasks(client, tmp_path):
     cmd = cs.command({"id": "x", "remote": "Documents/Passport scan.jpg", "bwlimit": "",
                       "delete": False, "versions": False, "max_delete": 50, "direction": "pull",
                       "source_file": True}, "c.conf", "/srv/nas/tank/Important", False)
-    assert cmd[-3:] == ["copy", "onedrive:Documents/Passport scan.jpg", "/srv/nas/tank/Important"]
+    i = cmd.index("copy")
+    assert cmd[i:i + 3] == ["copy", "onedrive:Documents/Passport scan.jpg", "/srv/nas/tank/Important"]
 
 
 def test_rclone_log_lines_keep_time_level_file_and_message():

@@ -489,6 +489,41 @@ def create_app(cfg, platform) -> FastAPI:
         nas.state.log_activity(user, f"Uploaded {volume}/{os.path.join(path, name)}")
         return {"size": size}
 
+    # previous versions and the recycle bin
+    @app.get("/api/files/versions")
+    def files_versions(volume: str, path: str, _u: str = Depends(current_user)):
+        return nas.restore.versions(volume, path)
+
+    @app.post("/api/files/versions/restore")
+    def files_version_restore(body: dict = Body(...), user: str = Depends(current_user)):
+        nas.restore.restore_version(body.get("volume", ""), body.get("path", ""), body.get("id", ""))
+        nas.state.log_activity(user, f"Restored a previous version of {body.get('volume')}/{body.get('path')}")
+        return {"ok": True}
+
+    @app.get("/api/files/versions/download")
+    def files_version_download(volume: str, id: str, _u: str = Depends(current_user)):
+        path = nas.restore.version_file(volume, id)
+        return FileResponse(path, media_type="application/octet-stream", headers={
+            "Content-Disposition": "attachment; filename*=UTF-8''" + urllib.parse.quote(
+                os.path.basename(path))})
+
+    @app.get("/api/files/bin")
+    def files_bin(volume: str, _u: str = Depends(current_user)):
+        return nas.restore.bin(volume)
+
+    @app.post("/api/files/bin/restore")
+    def files_bin_restore(body: dict = Body(...), user: str = Depends(current_user)):
+        n = nas.restore.restore_items(body.get("volume", ""), list(body.get("ids") or []))
+        nas.state.log_activity(user, f"Restored {n} item(s) from the recycle bin of {body.get('volume')}")
+        return {"restored": n}
+
+    @app.post("/api/files/bin/delete")
+    def files_bin_delete(body: dict = Body(...), user: str = Depends(current_user)):
+        ids = body.get("ids")
+        n = nas.restore.delete_items(body.get("volume", ""), None if ids is None else list(ids))
+        nas.state.log_activity(user, f"Deleted {n} item(s) for good from the recycle bin of {body.get('volume')}")
+        return {"deleted": n}
+
     @app.get("/api/files/download")
     def files_download(volume: str, item: List[str] = Query(...), _u: str = Depends(current_user)):
         if nas.files.is_remote(volume):

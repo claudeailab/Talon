@@ -2,7 +2,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeftRight,
-  ArrowRight,
   ChevronRight,
   Cloud,
   FileText,
@@ -594,7 +593,6 @@ type Form = {
   time: string;
   bwlimit: string;
   delete: boolean;
-  versions: boolean;
   max_delete: number;
   source_file: boolean;
   retries: number;
@@ -622,7 +620,6 @@ function toForm(t: CloudTask | null, volumes: Volume[]): Form {
     time: t?.schedule.kind === "daily" ? t.schedule.time : "02:00",
     bwlimit: t?.bwlimit ?? "",
     delete: t?.delete ?? false,
-    versions: t?.versions ?? true,
     max_delete: t?.max_delete ?? 50,
     source_file: t?.source_file ?? false,
     retries: t?.retries ?? 2,
@@ -640,6 +637,97 @@ function fullCheck(f: Form): FullCheck {
   return { kind: "never" };
 }
 
+type Step = "what" | "folders" | "when" | "checks" | "finish";
+const STEP_ORDER: Step[] = ["what", "folders", "when", "checks", "finish"];
+
+const INTERVALS = SCHEDULES.filter((x) => /^\d+$/.test(x.value));
+
+/** "Back up OneDrive/Pictures to tank/Photos every day at 23:00, with ..." */
+function summary(f: Form): string {
+  const od = odPath(f.remote);
+  const nas = nasPath(f);
+  const what =
+    f.direction === "pull" ? `Back up ${od} to ${nas}` : f.direction === "push" ? `Back up ${nas} to ${od}` : `Keep ${od} and ${nas} the same`;
+  const when =
+    f.schedule === "manual"
+      ? "when you start it"
+      : f.schedule === "daily"
+        ? `every day at ${f.time}`
+        : (INTERVALS.find((x) => x.value === f.schedule)?.label ?? "").toLowerCase();
+  const parts = [`${what} ${when}`];
+  if (!f.source_file) {
+    if (f.verify !== "off") parts.push(`a ${f.verify} check after each run`);
+    if (f.full_kind === "weekly") parts.push(`a full check every ${WEEKDAYS[f.full_weekday]} at ${f.full_time}`);
+    if (f.full_kind === "monthly") parts.push(`a full check on day ${f.full_day} of every month at ${f.full_time}`);
+  }
+  return parts.length === 1 ? `${parts[0]}.` : `${parts[0]}, with ${parts.slice(1).join(" and ")}.`;
+}
+
+/** One big choice in a wizard step. */
+function Choice({
+  on,
+  onClick,
+  title,
+  text,
+  icon,
+  right,
+  disabled,
+  badge,
+  note,
+}: {
+  on: boolean;
+  onClick: () => void;
+  title: string;
+  text: string;
+  icon?: React.ReactNode;
+  right?: React.ReactNode;
+  disabled?: boolean;
+  badge?: string;
+  /** a third line, e.g. how long it takes */
+  note?: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={on}
+      disabled={disabled}
+      onClick={onClick}
+      className={cx(
+        "flex w-full items-center gap-3.5 rounded-2xl px-4 py-3 text-left ring-1 transition disabled:cursor-not-allowed disabled:opacity-45",
+        on ? "bg-brand-50/60 ring-2 ring-brand-500 dark:bg-brand-500/10" : "ring-zinc-200 hover:bg-zinc-50 dark:ring-white/10 dark:hover:bg-white/[0.03]",
+      )}
+    >
+      {icon ?? (
+        <span className={cx("size-[18px] shrink-0 rounded-full ring-2", on ? "bg-white ring-[5px] ring-brand-500" : "ring-zinc-400 dark:ring-zinc-600")} />
+      )}
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium">
+          {title}
+          {badge && <span className="ml-1.5 align-middle text-[11px] font-semibold text-brand-600 uppercase dark:text-brand-300">{badge}</span>}
+        </span>
+        <span className="block text-[13px] text-zinc-500">{text}</span>
+        {note && <span className="mt-0.5 block text-xs font-medium text-brand-600 dark:text-brand-300">{note}</span>}
+      </span>
+      {right}
+    </button>
+  );
+}
+
+function DirIcon({ d }: { d: CloudTask["direction"] }) {
+  const c = {
+    pull: "bg-sky-100 text-sky-600 dark:bg-sky-500/15 dark:text-sky-400",
+    push: "bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300",
+    bisync: "bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400",
+  }[d];
+  return (
+    <span className={cx("flex size-10 shrink-0 items-center justify-center rounded-xl", c)}>
+      {d === "bisync" ? <ArrowLeftRight className="size-5" /> : d === "pull" ? <Cloud className="size-5" /> : <Folder className="size-5" />}
+    </span>
+  );
+}
+
+/** A new task is a wizard, one question per step; editing opens a summary
+ * where each part has "Change". */
 function TaskDialog({
   task,
   onClose,
@@ -654,6 +742,8 @@ function TaskDialog({
   const [f, setF] = useState<Form | null>(null);
   const [initial, setInitial] = useState<Form | null>(null);
   const [pick, setPick] = useState<"remote" | "local" | null>(null);
+  const [step, setStep] = useState<Step | "summary">(task ? "summary" : "what");
+  const [more, setMore] = useState(false);
   useEffect(() => {
     if (vols.data && !f) {
       const x = toForm(task, vols.data);
@@ -675,7 +765,6 @@ function TaskDialog({
           : { kind: "interval", minutes: Number(f.schedule) },
     bwlimit: f.bwlimit,
     delete: f.delete,
-    versions: f.versions,
     max_delete: f.max_delete,
     source_file: f.source_file,
     retries: f.retries,
@@ -704,276 +793,131 @@ function TaskDialog({
     // the chosen file is no longer on the source side: use its folder instead
     setF({ ...f, direction: d, source_file: false, ...(fileOn === "remote" ? { remote: parentOf(f.remote) } : { folder: parentOf(f.folder) }) });
   };
+  const steps = STEP_ORDER.filter((s) => s !== "checks" || !f.source_file);
+  const at = step === "summary" ? -1 : steps.indexOf(step);
+  const defaultName = () =>
+    f.name.trim() ||
+    (f.direction === "push" ? f.folder.split("/").pop() || f.volume : f.remote.split("/").pop() || "OneDrive") +
+      (f.direction === "bisync" ? " sync" : " backup");
+  const go = (s: Step | "summary") => {
+    if (s === "finish" || s === "summary") setF({ ...f, name: defaultName() });
+    setStep(s);
+  };
   const changed = !task || !sameValue(f, initial);
   const valid = !!f.name.trim() && !!f.volume;
-  const arrow =
-    f.direction === "bisync" ? (
-      <ArrowLeftRight className="size-4" />
-    ) : (
-      <ArrowRight
-        className={cx("size-4", f.direction === "push" && "rotate-180")}
-      />
-    );
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      size="xl"
-      title={task ? `Edit ${task.name}` : "New task"}
-      description="Copy files between OneDrive and this NAS"
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            disabled={!valid || !changed}
-            loading={save.isPending}
-            onClick={() => save.mutate()}
-          >
-            {task ? "Save" : "Create task"}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-5">
-        <div>
-          <div className="mb-1.5 text-[13px] font-medium">Direction</div>
-          <div className="grid gap-2 md:grid-cols-3">
-            {(Object.keys(DIR) as CloudTask["direction"][]).map((k) => (
-              <button
-                key={k}
-                type="button"
-                onClick={() => setDirection(k)}
-                disabled={k === "bisync" && f.source_file}
-                title={k === "bisync" && f.source_file ? "Two-way sync works with folders only" : undefined}
-                className={cx(
-                  "rounded-xl p-3 text-left ring-1 transition disabled:cursor-not-allowed disabled:opacity-45",
-                  f.direction === k
-                    ? "bg-brand-50/60 ring-2 ring-brand-500 dark:bg-brand-500/10"
-                    : "ring-zinc-200 hover:ring-zinc-300 dark:ring-white/10",
-                )}
-              >
-                <div className="truncate text-sm font-semibold">
-                  {DIR[k].label}
-                  {k === "bisync" && (
-                    <span className="ml-1.5 align-middle text-[11px] font-semibold text-amber-600 uppercase">
-                      Beta
-                    </span>
-                  )}
-                </div>
-                <div className="mt-0.5 truncate text-xs text-zinc-500">
-                  {DIR[k].text}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="grid items-end gap-3 md:grid-cols-[1fr_auto_1fr] [&>*]:min-w-0">
-          <Field label={f.direction === "pull" ? "OneDrive folder or file" : "OneDrive folder"}>
-            <PathButton
-              icon={fileOn === "remote" ? <FileText className="size-4 text-[#0364b8]" /> : <Cloud className="size-4 text-[#0364b8]" />}
-              text={odPath(f.remote)}
-              onClick={() => setPick("remote")}
-            />
-          </Field>
-          <div className="hidden pb-3 text-zinc-400 md:block">{arrow}</div>
-          <Field label={f.direction === "push" ? "NAS folder or file" : "NAS folder"}>
-            <PathButton
-              icon={fileOn === "local" ? <FileText className="size-4 text-brand-500" /> : <Folder className="size-4 text-brand-500" />}
-              text={f.volume ? nasPath(f) : "Choose a volume"}
-              onClick={() => setPick("local")}
-            />
-          </Field>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-4 [&>*]:min-w-0">
-          <Field label="Task name">
-            <Input
-              value={f.name}
-              onChange={(e) => set("name", e.target.value)}
-              placeholder="Photos backup"
-              maxLength={64}
-            />
-          </Field>
-          <Field label="Schedule">
-            <div className="flex gap-2">
-              <Select
-                value={f.schedule}
-                onChange={(e) => set("schedule", e.target.value)}
-                className="min-w-0 flex-1"
-              >
-                {SCHEDULES.map((s) => (
-                  <option key={s.value} value={s.value}>
-                    {s.label}
-                  </option>
-                ))}
-              </Select>
-              {f.schedule === "daily" && (
-                <div className="w-[6rem] shrink-0">
-                  <TimeInput value={f.time} onChange={(v) => set("time", v)} />
-                </div>
-              )}
-            </div>
-          </Field>
-          <Field label="Speed limit">
-            <Select
-              value={f.bwlimit}
-              onChange={(e) => set("bwlimit", e.target.value)}
-            >
-              <option value="">No limit</option>
-              <option value="1M">1 MB/s</option>
-              <option value="5M">5 MB/s</option>
-              <option value="10M">10 MB/s</option>
-              <option value="50M">50 MB/s</option>
-            </Select>
-          </Field>
-          <Field label="If it fails">
-            <Select value={f.retries} onChange={(e) => set("retries", Number(e.target.value))}>
-              <option value={0}>Don't retry</option>
-              <option value={1}>Retry once</option>
-              <option value={2}>Retry 2 times</option>
-              <option value={3}>Retry 3 times</option>
-              <option value={5}>Retry 5 times</option>
-            </Select>
-          </Field>
-        </div>
-
-        {f.direction === "bisync" ? (
-          <div className="grid gap-3 md:grid-cols-2">
-            <ToggleBox
-              title="Changed on both sides"
-              text="Both copies are kept, one renamed"
-            />
-            <div className="flex min-h-14 items-center py-2 justify-between gap-4 rounded-xl bg-zinc-50 px-3.5 dark:bg-white/[0.03]">
-              <div className="min-w-0">
-                <div className="truncate text-[13px] font-medium">
-                  Safety stop
-                </div>
-                <div className="truncate text-xs text-zinc-500">
-                  Stop if more files would be deleted
-                </div>
-              </div>
-              <Select
-                value={String(f.max_delete)}
-                onChange={(e) => set("max_delete", Number(e.target.value))}
-                className="w-24 shrink-0"
-              >
-                <option value="10">10%</option>
-                <option value="25">25%</option>
-                <option value="50">50%</option>
-              </Select>
-            </div>
-          </div>
-        ) : (
-          <div className="grid gap-3 md:grid-cols-2">
-            {f.source_file ? (
-              <ToggleBox title="Single file" text="Only this file is copied; nothing is deleted" />
-            ) : (
-              <ToggleBox
-                title={`Delete files removed from ${f.direction === "pull" ? "OneDrive" : "the NAS"}`}
-                text="Off: nothing is ever deleted (safer)"
-                checked={f.delete}
-                onChange={(v) => set("delete", v)}
-              />
-            )}
-            <ToggleBox
-              title="Keep old versions"
-              text="Replaced files kept in .versions for 30 days"
-              checked={f.versions}
-              onChange={(v) => set("versions", v)}
-            />
-          </div>
-        )}
-        {!f.source_file && <VerifySection f={f} set={set} task={task} />}
-      </div>
-      {pick && (
-        <FolderPicker
-          kind={pick}
-          allowFiles={(pick === "remote" && f.direction === "pull") || (pick === "local" && f.direction === "push")}
-          volumes={vols.data}
-          volume={f.volume}
-          start={pick === "remote" ? (fileOn === "remote" ? parentOf(f.remote) : f.remote) : fileOn === "local" ? parentOf(f.folder) : f.folder}
-          onClose={() => setPick(null)}
-          onPick={(p, isFile, vol) => {
-            const name = f.name || (p.split("/").pop() ?? "");
-            if (pick === "remote") setF({ ...f, remote: p, name, source_file: f.direction === "pull" ? isFile : f.source_file });
-            else setF({ ...f, volume: vol ?? f.volume, folder: p, name: f.direction === "push" ? name : f.name, source_file: f.direction === "push" ? isFile : f.source_file });
-            setPick(null);
-          }}
-        />
-      )}
-    </Modal>
-  );
-}
-
-/** Verify after each run (off / quick / full) and an optional scheduled full
- * check, each with how long it takes for this task's own files. */
-function VerifySection({
-  f,
-  set,
-  task,
-}: {
-  f: Form;
-  set: <K extends keyof Form>(k: K, v: Form[K]) => void;
-  task: CloudTask | null;
-}) {
   const e = task?.estimate;
   const known = !!e?.files;
   const est = (secs: number | null | undefined) =>
-    !known ? "after the first run" : secs ? `about ${dur(secs)}` : e?.measuring ? "measuring…" : "after the first run";
-  const options: { v: Form["verify"]; title: string; text: string; time?: string }[] = [
-    { v: "off", title: "Off", text: "No check" },
-    { v: "quick", title: "Quick", text: "Names and sizes", time: est(e?.quick_secs) },
-    { v: "full", title: "Full", text: "Contents (checksums)", time: est(e?.full_secs) },
-  ];
-  return (
-    <div>
-      <div className="mb-1.5 text-[13px] font-medium">Verify after each run</div>
-      <div className="grid gap-2 sm:grid-cols-3 sm:gap-3">
-        {options.map((o) => (
-          <button
-            key={o.v}
-            type="button"
-            aria-pressed={f.verify === o.v}
-            onClick={() => set("verify", o.v)}
-            className={cx(
-              "flex min-w-0 items-center gap-3 rounded-xl px-3 py-2.5 text-left ring-1 transition sm:block",
-              f.verify === o.v
-                ? "bg-brand-50 ring-2 ring-brand-500 dark:bg-brand-500/10"
-                : "ring-zinc-200 hover:bg-zinc-50 dark:ring-white/10 dark:hover:bg-white/[0.03]",
-            )}
-          >
-            <div className="w-12 shrink-0 truncate text-sm font-medium sm:w-auto">{o.title}</div>
-            <div className="min-w-0 flex-1 truncate text-xs text-zinc-500">{o.text}</div>
-            {o.time && <div className="shrink-0 truncate text-xs font-medium text-brand-600 sm:mt-1 dark:text-brand-300">{o.time}</div>}
-          </button>
-        ))}
-      </div>
-      <div className="mt-3 grid gap-3 md:grid-cols-2 [&>*]:min-w-0">
-        <Field label="Also run a full check">
-          <div className="grid grid-cols-[1fr_6rem] gap-2 sm:flex">
-            <Select
-              value={f.full_kind}
-              onChange={(ev) => set("full_kind", ev.target.value as Form["full_kind"])}
-              className="col-span-2 min-w-0 flex-1"
+    !known ? "Time shown after the first run" : secs ? `about ${dur(secs)}` : e?.measuring ? "Measuring the time…" : "Time shown after the first run";
+  const od = odPath(f.remote), nas = nasPath(f);
+  const deleteText =
+    f.direction === "pull"
+      ? ["Delete on Talon what I delete on OneDrive", "When a file is deleted on OneDrive it will also be deleted on Talon"]
+      : ["Delete on OneDrive what I delete on Talon", "When a file is deleted on Talon it will also be deleted on OneDrive"];
+
+  const content: Record<Step, React.ReactNode> = {
+    what: (
+      <>
+        <h3 className="text-lg font-semibold">What do you want to do?</h3>
+        <div className="mt-4 space-y-2.5">
+          <Choice on={f.direction === "pull"} onClick={() => setDirection("pull")} icon={<DirIcon d="pull" />} title="Back up OneDrive to the NAS" text="A copy of your OneDrive files on the NAS" />
+          <Choice on={f.direction === "push"} onClick={() => setDirection("push")} icon={<DirIcon d="push" />} title="Back up the NAS to OneDrive" text="A copy of NAS files in OneDrive" />
+          <Choice on={f.direction === "bisync"} onClick={() => setDirection("bisync")} disabled={f.source_file} icon={<DirIcon d="bisync" />} title="Keep both the same" badge="Beta" text="Changes on either side go to the other" />
+        </div>
+      </>
+    ),
+    folders: (
+      <>
+        <h3 className="text-lg font-semibold">Which folders?</h3>
+        <div className="mt-4 space-y-4">
+          {(f.direction === "push" ? (["local", "remote"] as const) : (["remote", "local"] as const)).map((side, i) => (
+            <Field
+              key={side}
+              label={
+                f.direction === "bisync"
+                  ? side === "remote" ? "OneDrive folder" : "NAS folder"
+                  : `${i === 0 ? "From" : "To"} ${side === "remote" ? "OneDrive" : "the NAS"}`
+              }
             >
+              <PathButton
+                icon={
+                  side === "remote"
+                    ? fileOn === "remote" ? <FileText className="size-4 text-[#0364b8]" /> : <Cloud className="size-4 text-[#0364b8]" />
+                    : fileOn === "local" ? <FileText className="size-4 text-brand-500" /> : <Folder className="size-4 text-brand-500" />
+                }
+                text={side === "remote" ? (f.remote ? od : "Everything in OneDrive") : f.volume ? nas : "Choose a volume"}
+                onClick={() => setPick(side)}
+              />
+            </Field>
+          ))}
+          {f.direction !== "bisync" && (
+            <p className="text-xs text-zinc-500">You can also choose a single file to copy.</p>
+          )}
+        </div>
+      </>
+    ),
+    when: (
+      <>
+        <h3 className="text-lg font-semibold">When should it run?</h3>
+        <div className="mt-4 space-y-2.5">
+          <Choice
+            on={f.schedule === "daily"}
+            onClick={() => set("schedule", "daily")}
+            title="Every day"
+            text="Best for most backups"
+            right={f.schedule === "daily" && (
+              <div className="w-[6rem] shrink-0" onClick={(ev) => ev.stopPropagation()}>
+                <TimeInput value={f.time} onChange={(v) => set("time", v)} />
+              </div>
+            )}
+          />
+          <Choice
+            on={/^\d+$/.test(f.schedule)}
+            onClick={() => !/^\d+$/.test(f.schedule) && set("schedule", "360")}
+            title="Every few hours"
+            text="For files that change often"
+            right={/^\d+$/.test(f.schedule) && (
+              <div className="shrink-0" onClick={(ev) => ev.stopPropagation()}>
+                <Select value={f.schedule} onChange={(ev) => set("schedule", ev.target.value)}>
+                  {INTERVALS.map((x) => (
+                    <option key={x.value} value={x.value}>{x.label}</option>
+                  ))}
+                </Select>
+              </div>
+            )}
+          />
+          <Choice on={f.schedule === "manual"} onClick={() => set("schedule", "manual")} title="Only when I start it" text="Run it from the task list" />
+        </div>
+      </>
+    ),
+    checks: (
+      <>
+        <h3 className="text-lg font-semibold">How carefully should Talon check?</h3>
+        <p className="mt-1 text-sm text-zinc-500">After each run, files that are missing or different are copied again.</p>
+        <div className="mt-4 space-y-2.5">
+          <Choice on={f.verify === "off"} onClick={() => set("verify", "off")} title="Don't check" text="Trust each run" />
+          <Choice on={f.verify === "quick"} onClick={() => set("verify", "quick")} title="Quick check" badge="Recommended" text="Every file is there, with the same size"
+            note={est(e?.quick_secs)} />
+          <Choice on={f.verify === "full"} onClick={() => set("verify", "full")} title="Full check" text="Every file's contents are identical"
+            note={est(e?.full_secs)} />
+        </div>
+        <div className="mt-5">
+          <div className="mb-1.5 text-[13px] font-medium">Also a full check</div>
+          <div className="grid grid-cols-[1fr_6rem] gap-2 sm:flex">
+            <Select value={f.full_kind} onChange={(ev) => set("full_kind", ev.target.value as Form["full_kind"])} className="col-span-2 min-w-0 sm:w-40 sm:flex-none">
               <option value="never">Never</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
+              <option value="weekly">Every week</option>
+              <option value="monthly">Every month</option>
             </Select>
             {f.full_kind === "weekly" && (
-              <Select value={f.full_weekday} onChange={(ev) => set("full_weekday", Number(ev.target.value))} className="min-w-0 flex-1">
+              <Select value={f.full_weekday} onChange={(ev) => set("full_weekday", Number(ev.target.value))} className="min-w-0 sm:w-40 sm:flex-none">
                 {WEEKDAYS.map((w, i) => (
                   <option key={w} value={i}>{w}</option>
                 ))}
               </Select>
             )}
             {f.full_kind === "monthly" && (
-              <Select value={f.full_day} onChange={(ev) => set("full_day", Number(ev.target.value))} className="min-w-0 flex-1">
+              <Select value={f.full_day} onChange={(ev) => set("full_day", Number(ev.target.value))} className="min-w-0 sm:w-40 sm:flex-none">
                 {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
                   <option key={d} value={d}>Day {d}</option>
                 ))}
@@ -985,17 +929,153 @@ function VerifySection({
               </div>
             )}
           </div>
-        </Field>
-        {known && (
-          <div className="flex items-end">
-            <div className="w-full truncate rounded-xl bg-zinc-50 px-3.5 py-2.5 text-xs text-zinc-500 dark:bg-white/[0.03]">
-              This task: <span className="text-zinc-800 dark:text-zinc-200">{num(e!.files!)} files · {bytes(e!.bytes)}</span>
-              {e!.speed ? <> · disks read <span className="text-zinc-800 dark:text-zinc-200">{bytes(e!.speed)}/s</span></> : null}
+          {known && (
+            <p className="mt-2 text-xs text-zinc-500">
+              Times are for this task's {num(e!.files!)} files ({bytes(e!.bytes)}).
+            </p>
+          )}
+        </div>
+      </>
+    ),
+    finish: (
+      <>
+        <h3 className="text-lg font-semibold">{task ? "Options" : "Almost done"}</h3>
+        <div className="mt-3 rounded-xl bg-zinc-50 px-4 py-3 text-sm leading-6 text-zinc-700 dark:bg-white/[0.03] dark:text-zinc-300">{summary(f)}</div>
+        <div className="mt-4 space-y-3">
+          <Field label="Name">
+            <Input value={f.name} onChange={(ev) => set("name", ev.target.value)} maxLength={64} />
+          </Field>
+          {f.direction !== "bisync" && !f.source_file && (
+            <ToggleBox title={deleteText[0]} text={deleteText[1]} checked={f.delete} onChange={(v) => set("delete", v)} />
+          )}
+          {f.direction === "pull" && (
+            <Callout tone="info">
+              When a file changes, the old copy is kept for 30 days. Find it under <b>Previous versions</b> in Files.
+            </Callout>
+          )}
+          <button type="button" className="flex items-center gap-1 text-sm font-medium text-brand-600 dark:text-brand-400" onClick={() => setMore(!more)}>
+            More options <ChevronRight className={cx("size-4 transition", more && "rotate-90")} />
+          </button>
+          {more && (
+            <div className="grid gap-3 sm:grid-cols-2 [&>*]:min-w-0">
+              <Field label="If it fails">
+                <Select value={f.retries} onChange={(ev) => set("retries", Number(ev.target.value))}>
+                  <option value={0}>Don't retry</option>
+                  <option value={1}>Retry once</option>
+                  <option value={2}>Retry 2 times</option>
+                  <option value={3}>Retry 3 times</option>
+                  <option value={5}>Retry 5 times</option>
+                </Select>
+              </Field>
+              <Field label="Speed limit">
+                <Select value={f.bwlimit} onChange={(ev) => set("bwlimit", ev.target.value)}>
+                  <option value="">No limit</option>
+                  <option value="1M">1 MB/s</option>
+                  <option value="5M">5 MB/s</option>
+                  <option value="10M">10 MB/s</option>
+                  <option value="50M">50 MB/s</option>
+                </Select>
+              </Field>
+              {f.direction === "bisync" && (
+                <Field label="Stop if more files would be deleted than">
+                  <Select value={String(f.max_delete)} onChange={(ev) => set("max_delete", Number(ev.target.value))}>
+                    <option value="10">10%</option>
+                    <option value="25">25%</option>
+                    <option value="50">50%</option>
+                  </Select>
+                </Field>
+              )}
             </div>
-          </div>
+          )}
+        </div>
+      </>
+    ),
+  };
+
+  const checksText = f.source_file
+    ? "Single files are not checked"
+    : [f.verify === "off" ? "No check after each run" : `${f.verify === "quick" ? "Quick" : "Full"} check after each run`,
+       f.full_kind === "weekly" ? `full check every ${WEEKDAYS[f.full_weekday]} at ${f.full_time}`
+         : f.full_kind === "monthly" ? `full check on day ${f.full_day} at ${f.full_time}` : ""].filter(Boolean).join(" · ");
+  const rows: { label: string; value: string; step: Step }[] = [
+    { label: "What", value: f.direction === "pull" ? "Back up OneDrive to the NAS" : f.direction === "push" ? "Back up the NAS to OneDrive" : "Keep both the same", step: "what" },
+    { label: "Folders", value: f.direction === "push" ? `${nas} → ${od}` : f.direction === "pull" ? `${od} → ${nas}` : `${od} ⇄ ${nas}`, step: "folders" },
+    { label: "When", value: scheduleLabel(body!.schedule as Schedule), step: "when" },
+    ...(f.source_file ? [] : [{ label: "Checks", value: checksText, step: "checks" as Step }]),
+    { label: "Options", value: [f.name, f.direction === "bisync" || f.source_file ? "" : f.delete ? "Deletes what you delete" : "Never deletes"].filter(Boolean).join(" · "), step: "finish" },
+  ];
+
+  const editing = !!task;
+  const footer =
+    step === "summary" ? (
+      <>
+        <Button variant="ghost" onClick={onClose}>Cancel</Button>
+        <Button variant="primary" disabled={!valid || !changed} loading={save.isPending} onClick={() => save.mutate()}>Save</Button>
+      </>
+    ) : editing ? (
+      <Button variant="primary" disabled={step === "folders" && !f.volume} onClick={() => go("summary")}>Done</Button>
+    ) : (
+      <>
+        {at > 0 && <Button variant="ghost" onClick={() => setStep(steps[at - 1])} className="mr-auto">Back</Button>}
+        {at < steps.length - 1 ? (
+          <Button variant="primary" disabled={step === "folders" && !f.volume} onClick={() => go(steps[at + 1])}>Next</Button>
+        ) : (
+          <Button variant="primary" disabled={!valid} loading={save.isPending} onClick={() => save.mutate()}>Create task</Button>
         )}
-      </div>
-    </div>
+      </>
+    );
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="md"
+      title={editing ? task.name : "New OneDrive task"}
+      description={step === "summary" || editing ? undefined : `Step ${at + 1} of ${steps.length}`}
+      footer={footer}
+    >
+      {step === "summary" ? (
+        <ul className="divide-y divide-zinc-100 dark:divide-white/5">
+          {rows.map((r) => (
+            <li key={r.label} className="flex items-center justify-between gap-4 py-3">
+              <div className="min-w-0">
+                <div className="text-xs text-zinc-500">{r.label}</div>
+                <div className="text-sm [overflow-wrap:anywhere]">{r.value}</div>
+              </div>
+              <button type="button" className="shrink-0 text-sm font-medium text-brand-600 dark:text-brand-400" onClick={() => go(r.step)}>
+                Change
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <>
+          {!editing && (
+            <div className="mb-5 flex gap-1.5" aria-hidden>
+              {steps.map((s, i) => (
+                <span key={s} className={cx("h-1 flex-1 rounded-full", i <= at ? "bg-brand-500" : "bg-zinc-200 dark:bg-white/10")} />
+              ))}
+            </div>
+          )}
+          {content[step]}
+        </>
+      )}
+      {pick && (
+        <FolderPicker
+          kind={pick}
+          allowFiles={(pick === "remote" && f.direction === "pull") || (pick === "local" && f.direction === "push")}
+          volumes={vols.data}
+          volume={f.volume}
+          start={pick === "remote" ? (fileOn === "remote" ? parentOf(f.remote) : f.remote) : fileOn === "local" ? parentOf(f.folder) : f.folder}
+          onClose={() => setPick(null)}
+          onPick={(p, isFile, vol) => {
+            if (pick === "remote") setF({ ...f, remote: p, source_file: f.direction === "pull" ? isFile : f.source_file });
+            else setF({ ...f, volume: vol ?? f.volume, folder: p, source_file: f.direction === "push" ? isFile : f.source_file });
+            setPick(null);
+          }}
+        />
+      )}
+    </Modal>
   );
 }
 
@@ -1017,7 +1097,7 @@ function PathButton({
       {icon}
       <span className="truncate">{text}</span>
       <span className="ml-auto shrink-0 text-[13px] font-medium text-brand-600 dark:text-brand-400">
-        Browse
+        Change
       </span>
     </button>
   );

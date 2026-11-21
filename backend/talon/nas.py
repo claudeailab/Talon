@@ -43,6 +43,9 @@ class Nas:
                                  demo)
         self.cloud = CloudSync(cfg, self.state, self, demo)
         self.files = FileBrowser(self, demo)
+        from .restore import Restore
+        self.restore = Restore(self)
+        self._purged = 0.0
         self.scheduler = Scheduler(cfg, self.state, self, demo)
         self.network = Network(platform, self.state, demo)
         self.history: collections.deque = collections.deque(maxlen=90)
@@ -91,6 +94,9 @@ class Nas:
             try:
                 self.notifier.check_alerts(self.alerts())
                 self.cloud.check_secret_expiry()
+                if time.time() - self._purged > 86400:         # recycle bins: 30 days
+                    self._purged = time.time()
+                    self.restore.purge()
                 upd = self.state.get("update_check") or {}
                 latest = upd.get("latest")
                 if latest and is_newer(latest, __version__) and \

@@ -529,7 +529,9 @@ class CloudSync:
         return {"name": name, "direction": direction, "remote": remote, "volume": volume,
                 "folder": folder, "schedule": sched, "bwlimit": bw, "source_file": source_file,
                 "delete": bool(data.get("delete")) and direction != "bisync" and not source_file,
-                "versions": bool(data.get("versions")) and direction != "bisync",
+                # replaced files are kept (Files > Previous versions) when backing up
+                # OneDrive to the NAS; OneDrive keeps its own version history
+                "versions": direction == "pull",
                 "max_delete": max_delete, "retries": retries, "verify": verify, "full_check": full}
 
     def _task(self, tid: str) -> dict:
@@ -910,7 +912,7 @@ class CloudSync:
         src, dst = (remote, local) if t["direction"] == "pull" else (local, remote)
         # compare everything before copying, so progress is known from the start
         args += ["--check-first", "sync" if t["delete"] else "copy", src, dst]
-        if t["versions"]:
+        if t["direction"] == "pull":                     # keep what a run replaces or deletes
             base = dst.rstrip("/") + "/" if dst != "onedrive:" else dst
             args += ["--backup-dir", f"{base}{VERSIONS}/{stamp}"]
         return args
@@ -957,7 +959,7 @@ class CloudSync:
                 error = self._message(last_err) or RCLONE_EXIT.get(rc, f"rclone exited with code {rc}")
             elif first:
                 self._update(lambda od: od["tasks"].get(tid, {}).__setitem__("bisync_ready", True))
-            if status == "success" and t["versions"]:
+            if status == "success" and t["direction"] == "pull":
                 self._prune_versions(t, conf, local)
         except UserError as e:
             status, error = "error", str(e)
@@ -1241,7 +1243,7 @@ class CloudSync:
                                            "--no-traverse", "--transfers", "4"]
             if t.get("bwlimit"):
                 cmd += ["--bwlimit", t["bwlimit"]]
-            if t.get("versions") and t["direction"] != "bisync":
+            if t["direction"] == "pull" and not b.startswith("onedrive:"):
                 base = b.rstrip("/") + "/" if b != "onedrive:" else b
                 cmd += ["--backup-dir", f"{base}{VERSIONS}/{time.strftime('%Y-%m-%d_%H%M%S')}"]
             rc = self._rclone(cmd, r, conf)
@@ -1353,9 +1355,11 @@ class CloudSync:
         if t["direction"] == "pull":
             root = os.path.join(local, VERSIONS)
             cutoff = time.time() - KEEP_VERSIONS_DAYS * 86400
+            from .restore import _stamp_time
             for name in os.listdir(root) if os.path.isdir(root) else []:
                 p = os.path.join(root, name)
-                if os.path.getmtime(p) < cutoff:
+                # the folder name is when its files were replaced (restoring changes its mtime)
+                if (_stamp_time(name) or os.path.getmtime(p)) < cutoff:
                     shutil.rmtree(p, ignore_errors=True)
         elif t["direction"] == "push":
             subprocess.run([self.rclone_path() or "rclone", "--config", conf, "delete",

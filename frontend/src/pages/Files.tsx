@@ -21,6 +21,7 @@ import {
   Move,
   Music,
   Pencil,
+  RotateCcw,
   Search,
   Trash2,
   Upload,
@@ -68,6 +69,8 @@ export default function FilesPage() {
   const [target, setTarget] = useState<string[]>([]); // items an action applies to
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [dragging, setDragging] = useState(false);
+  const [versionsOf, setVersionsOf] = useState<string | null>(null);   // a file's previous versions
+  const [showBin, setShowBin] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const places = locs.data ?? [];
@@ -290,6 +293,11 @@ export default function FilesPage() {
                 </span>
               ))}
             </div>
+            {here?.kind === "volume" && (
+              <Button size="sm" icon={<Trash2 className="size-3.5" />} onClick={() => setShowBin(true)}>
+                Recycle bin
+              </Button>
+            )}
             <div className="relative w-full sm:w-56">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-zinc-400" />
               <Input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Filter this folder" className="h-9 pl-9" />
@@ -366,6 +374,11 @@ export default function FilesPage() {
                         <MenuItem icon={<Pencil />} onClick={() => act([it.name], "rename")}>
                           Rename
                         </MenuItem>
+                        {!it.folder && here?.kind === "volume" && (
+                          <MenuItem icon={<RotateCcw />} onClick={() => setVersionsOf(join(path, it.name))}>
+                            Previous versions
+                          </MenuItem>
+                        )}
                         <MenuItem icon={<Move />} onClick={() => act([it.name], "move")}>
                           Move
                         </MenuItem>
@@ -426,12 +439,163 @@ export default function FilesPage() {
         confirmText="Delete"
         message="Folders are deleted with everything inside them. This cannot be undone."
       />
+      {versionsOf && <VersionsDialog volume={volume} path={versionsOf} onClose={() => setVersionsOf(null)} onDone={refresh} />}
+      {showBin && <RecycleBin volume={volume} name={here?.name ?? volume} onClose={() => setShowBin(false)} onDone={refresh} />}
       {uploads.length > 0 && <UploadPanel uploads={uploads} where={`${here?.name ?? volume}${path ? "/" + path : ""}`} onClose={() => setUploads((u) => u.filter((x) => x.status === "uploading" || x.status === "waiting"))} />}
     </>
   );
 }
 
 /* ====================================================================== dialogs */
+
+type Version = { id: string; time: number; size: number; expires: number };
+
+/** Earlier copies of a file kept when a OneDrive backup replaced it. */
+function VersionsDialog({ volume, path, onClose, onDone }: { volume: string; path: string; onClose: () => void; onDone: () => void }) {
+  const q = useQuery({
+    queryKey: ["versions", volume, path],
+    queryFn: () => api.get<Version[]>(`/files/versions?${new URLSearchParams({ volume, path })}`),
+  });
+  const restore = useAction(
+    (id: string) => api.post("/files/versions/restore", { volume, path, id }),
+    { success: "Version restored", invalidate: ["versions"], onSuccess: onDone },
+  );
+  const name = path.split("/").pop();
+  return (
+    <Modal open onClose={onClose} title="Previous versions" description={name} footer={<Button onClick={onClose}>Close</Button>}>
+      {!q.data ? (
+        <div className="py-8 text-center text-sm text-zinc-500">Loading…</div>
+      ) : q.data.length === 0 ? (
+        <div className="py-6 text-center text-sm text-zinc-500">
+          No previous versions. When a OneDrive backup replaces this file, the old copy is kept here for 30 days.
+        </div>
+      ) : (
+        <>
+          <ul className="divide-y divide-zinc-100 dark:divide-white/5">
+            {q.data.map((v) => (
+              <li key={v.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium">{dateTime(v.time)}</div>
+                  <div className="text-xs text-zinc-500">
+                    {bytes(v.size)} · kept until {dateTime(v.expires).split(" ")[0]}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const a = document.createElement("a");
+                      a.href = `/api/files/versions/download?${new URLSearchParams({ volume, id: v.id })}`;
+                      a.click();
+                    }}
+                  >
+                    Download
+                  </Button>
+                  <Button size="sm" variant="primary" loading={restore.isPending && restore.variables === v.id} onClick={() => restore.mutate(v.id)}>
+                    Restore
+                  </Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-3 text-xs text-zinc-500">Restore puts that version back; the current file becomes a previous version, so nothing is lost.</p>
+        </>
+      )}
+    </Modal>
+  );
+}
+
+type BinItem = { id: string; name: string; was_in: string; by: string; deleted: number; size: number };
+
+/** Files deleted from a computer (shared folders with the recycle bin on) or by a OneDrive backup. */
+function RecycleBin({ volume, name, onClose, onDone }: { volume: string; name: string; onClose: () => void; onDone: () => void }) {
+  const q = useQuery({
+    queryKey: ["recycle-bin", volume],
+    queryFn: () => api.get<{ items: BinItem[]; total: number; keep_days: number }>(`/files/bin?${new URLSearchParams({ volume })}`),
+  });
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const [confirmEmpty, setConfirmEmpty] = useState(false);
+  const restore = useAction(
+    (ids: string[]) => api.post<{ restored: number }>("/files/bin/restore", { volume, ids }),
+    {
+      success: (r) => `${r.restored} item${r.restored === 1 ? "" : "s"} restored`,
+      invalidate: ["recycle-bin"],
+      onSuccess: () => {
+        setSel(new Set());
+        onDone();
+      },
+    },
+  );
+  const empty = useAction(() => api.post<{ deleted: number }>("/files/bin/delete", { volume }), {
+    success: "Recycle bin emptied",
+    invalidate: ["recycle-bin"],
+    onSuccess: () => setConfirmEmpty(false),
+  });
+  const items = q.data?.items ?? [];
+  const toggle = (id: string) =>
+    setSel((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      title={`Recycle bin · ${name}`}
+      description={`Deleted files are kept for ${q.data?.keep_days ?? 30} days, then removed for good`}
+      footer={
+        <>
+          <Button variant="ghost" disabled={!items.length} onClick={() => setConfirmEmpty(true)} className="mr-auto text-rose-600 dark:text-rose-400">
+            Empty recycle bin
+          </Button>
+          <Button onClick={onClose}>Close</Button>
+          <Button variant="primary" disabled={!sel.size} loading={restore.isPending} onClick={() => restore.mutate([...sel])}>
+            Restore{sel.size ? ` ${sel.size}` : ""}
+          </Button>
+        </>
+      }
+    >
+      {!q.data ? (
+        <div className="py-8 text-center text-sm text-zinc-500">Loading…</div>
+      ) : items.length === 0 ? (
+        <Empty icon={<Trash2 className="size-6" />} title="The recycle bin is empty" text="Files deleted from Windows or macOS, or by a OneDrive backup, appear here." />
+      ) : (
+        <ul className="divide-y divide-zinc-100 rounded-xl ring-1 ring-zinc-200 dark:divide-white/5 dark:ring-white/10">
+          {items.map((it) => (
+            <li key={it.id} className="flex items-center gap-3 px-3 py-2.5">
+              <input type="checkbox" className="size-4 shrink-0 accent-brand-600" checked={sel.has(it.id)} onChange={() => toggle(it.id)} aria-label={`Select ${it.name}`} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">{it.name}</div>
+                <div className="truncate text-xs text-zinc-500">
+                  {it.was_in === "." ? name : it.was_in} · {it.by} · {dateTime(it.deleted)} · {bytes(it.size)}
+                </div>
+              </div>
+              <Button size="sm" loading={restore.isPending && restore.variables?.[0] === it.id && restore.variables.length === 1} onClick={() => restore.mutate([it.id])}>
+                Restore
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {q.data && q.data.total > items.length && (
+        <p className="mt-2 text-xs text-zinc-500">Showing the newest {items.length} of {q.data.total}.</p>
+      )}
+      <ConfirmDialog
+        open={confirmEmpty}
+        onClose={() => setConfirmEmpty(false)}
+        onConfirm={() => empty.mutate()}
+        loading={empty.isPending}
+        danger
+        title="Empty the recycle bin?"
+        confirmText="Empty"
+        message={`All ${q.data?.total ?? 0} items are deleted for good. This cannot be undone.`}
+      />
+    </Modal>
+  );
+}
 
 function NameDialog({
   title,

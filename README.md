@@ -52,11 +52,11 @@ https://<nas-ip>/
 - **RAID:** hot spares, expansion, disk replacement and data scrub
 - **Volumes:** ext4 or XFS on a RAID array or a single disk
 - **Disks:** S.M.A.R.T. health, temperatures, self-tests and wipe
-- **Files:** browse volumes, USB disks and OneDrive in the browser
+- **Files:** browse volumes, USB disks and OneDrive; restore deleted files and old versions
 - **Shared folders:** SMB, NFS and Time Machine with per-user permissions
 - **Users & groups:** accounts for shared folders and the web interface
 - **Discovery:** appears in Windows Network and macOS Finder
-- **OneDrive:** back up to or from OneDrive, or two-way sync, verified after each run
+- **OneDrive:** back up or two-way sync, set up in a short wizard, verified after each run
 - **Networking:** DHCP or static IP, HTTPS on or off
 - **Scheduled:** run scripts on a schedule
 - **Notifications:** email alerts with adjustable thresholds

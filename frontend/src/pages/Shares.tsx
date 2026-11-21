@@ -357,7 +357,7 @@ function ShareEditor({ initial, isNew, volumes, onClose }: { initial: Share; isN
           />
           <ToggleRow
             title="Recycle bin"
-            description="Deleted files are moved to a hidden .recycle folder instead of being removed."
+            description="Files deleted from Windows or macOS are kept for 30 days. Restore them in Files → Recycle bin."
             checked={s.smb.recycle_bin}
             disabled={!s.smb.enabled}
             onChange={(v) => set("smb", { ...s.smb, recycle_bin: v })}

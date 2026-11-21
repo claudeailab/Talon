@@ -11,6 +11,7 @@ import os
 import shutil
 import stat
 import threading
+import time
 import zipfile
 from typing import Iterator, List, Optional, Tuple
 
@@ -197,6 +198,16 @@ class FileBrowser:
                 "@onedrive/Work/Projects/Plan.docx": 52_000,
                 "@onedrive/Notes.txt": 2_000,
             }
+            # previous versions and the recycle bin (see restore.py)
+            def stamp(days):
+                return time.strftime("%Y-%m-%d_%H%M%S", time.localtime(time.time() - days * 86400))
+            samples.update({
+                f"tank/Media/Photos/.versions/{stamp(1)}/Album list.xlsx": 36_000,
+                f"tank/Media/Photos/.versions/{stamp(7)}/Album list.xlsx": 35_000,
+                f"tank/Media/Photos/.versions/{stamp(3)}/2024/Old harbour.jpg": 2_100_000,
+                "tank/Documents/.recycle/alice/Invoices/Invoice 2025-12.pdf": 170_000,
+                "tank/Documents/.recycle/admin/Old budget.xlsx": 88_000,
+            })
             for rel, size in samples.items():
                 p = os.path.join(self._demo_root, rel)
                 if not os.path.exists(p):
