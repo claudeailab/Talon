@@ -112,13 +112,13 @@ export default function ScheduledPage() {
                       {/* phones: status, schedule and last run under the name */}
                       <div className="mt-1.5 flex min-w-0 items-center gap-2 sm:hidden">
                         <TaskStatus t={t} />
-                        <span className="truncate text-xs text-zinc-500"><When t={t} /></span>
+                        <span className="truncate text-xs text-zinc-500">{t.schedule_label}</span>
                       </div>
                     </td>
                     <td className="hidden px-3 md:table-cell">
                       <Badge>{t.run_as}</Badge>
                     </td>
-                    <td className="hidden px-3 whitespace-nowrap text-zinc-600 lg:table-cell dark:text-zinc-400"><When t={t} /></td>
+                    <td className="hidden px-3 whitespace-nowrap text-zinc-600 lg:table-cell dark:text-zinc-400">{t.schedule_label}</td>
                     <td className="hidden px-3 whitespace-nowrap text-zinc-600 sm:table-cell dark:text-zinc-400">
                       {t.running
                         ? `Running · ${took(Date.now() / 1000 - t.running.started)}`
@@ -199,16 +199,6 @@ export default function ScheduledPage() {
   );
 }
 
-/** The schedule, or that it is paused (the task then only runs with Run now). */
-function When({ t }: { t: ScheduledTask }) {
-  if (t.enabled) return <>{t.schedule_label}</>;
-  return (
-    <span className="text-amber-600 dark:text-amber-400" title="Paused: runs only with Run now. Resume it in the ⋯ menu.">
-      Schedule paused
-    </span>
-  );
-}
-
 function TaskStatus({ t }: { t: ScheduledTask }) {
   if (t.running)
     return (
@@ -219,8 +209,8 @@ function TaskStatus({ t }: { t: ScheduledTask }) {
         <Progress value={t.running.percent} tone="blue" className="mt-1.5 h-1" />
       </div>
     );
-  // the result of the last run; whether the schedule is paused is shown with the schedule
-  if (!t.last) return <Badge dot>Idle</Badge>;
+  if (!t.enabled) return <Badge dot>Paused</Badge>;
+  if (!t.last) return <Badge dot>Not run yet</Badge>;
   if (t.last.status === "success") return <Badge tone="green" dot>Succeeded</Badge>;
   if (t.last.status === "cancelled") return <Badge tone="amber" dot>Stopped</Badge>;
   return <Badge tone="red" dot>Failed (exit {t.last.exit_code})</Badge>;

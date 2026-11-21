@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.76
+- Scheduled: a paused task shows "Paused" as its status again
+
 ## 1.0.75
 - Scheduled: the status shows the last result (Idle, Succeeded, Failed, Stopped); a paused schedule shows as "Schedule paused"
 
