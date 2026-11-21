@@ -16,6 +16,7 @@
 - `cd backend && python -m pytest -q tests`
 - `shellcheck -S warning install.sh uninstall.sh`
 - If anything in `frontend/` changed: `cd frontend && npm run build` and commit `backend/talon/web/`
+  and `site/guide.json` (the website's Documentation page, generated from the in-app guide)
   (the installer ships the pre-built UI; CI fails if it is stale).
 - Raise `__version__` in `backend/talon/__init__.py` (see above). On push to `main` the single
   CI workflow tests, then releases it and publishes the website, only if the tests pass.

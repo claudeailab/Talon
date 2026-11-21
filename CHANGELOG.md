@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.81
+- New website: home page, screenshots and the full documentation online
+- The online documentation is generated from the guide built into Talon
+
 ## 1.0.80
 - New screenshots in the gallery: OneDrive wizard, recycle bin and activity log
 - Updated features list

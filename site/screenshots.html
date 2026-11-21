@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Talon Screenshots</title>
+<meta name="description" content="Screenshots of Talon, self-hosted NAS software: dashboard, RAID, volumes, files, OneDrive backup, recycle bin and more.">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<style>
+  main { padding: 44px 0 64px; }
+  h1 { margin: 0; font-size: 36px; letter-spacing: -.02em; }
+  .intro { margin: 6px 0 28px; color: var(--muted); }
+  .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; } @media (max-width:960px) { .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media (max-width:700px) { .grid { grid-template-columns:1fr; } h1 { font-size:28px; } }
+  .shot { margin:0; padding:0; border:0; background:none; text-align:left; color:inherit; cursor:zoom-in; font:inherit; }
+  .shot img { display:block; width:100%; aspect-ratio:16/10; object-fit:cover; object-position:top left; border-radius:14px; border:1px solid var(--line); transition:transform .15s, box-shadow .15s; }
+  .shot:hover img, .shot:focus-visible img { transform:translateY(-2px); box-shadow:0 12px 32px -12px rgba(0,0,0,.35); }
+  .shot span { display:block; margin-top:8px; font-size:14px; font-weight:600; }
+  /* viewer */
+  .viewer { position:fixed; inset:0; z-index:40; display:none; flex-direction:column; background:var(--shade); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); color:#fff; }
+  .viewer.open { display:flex; }
+  .bar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px; font-size:14px; }
+  .bar .cap { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .stage { position:relative; flex:1; display:flex; align-items:center; justify-content:center; min-height:0; padding:0 72px 24px; }
+  .stage img { max-width:100%; max-height:100%; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.5); user-select:none; }
+  .nav, .close { border:0; cursor:pointer; color:#fff; background:rgba(255,255,255,.12); border-radius:999px; display:flex; align-items:center; justify-content:center; }
+  .nav:hover, .close:hover { background:rgba(255,255,255,.22); }
+  .nav { position:absolute; top:50%; transform:translateY(-50%); width:48px; height:48px; font-size:24px; }
+  .prev { left:14px; } .next { right:14px; }
+  .close { width:36px; height:36px; font-size:20px; flex-shrink:0; }
+  .count { color:rgba(255,255,255,.7); white-space:nowrap; }
+  @media (max-width:700px) { .stage { padding:0 8px 16px; } .nav { top:auto; bottom:22px; transform:none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="logo.svg" alt="">Talon</a>
+    <button class="menu-btn" aria-label="Menu" onclick="document.querySelector('.nav').classList.toggle('open')">☰</button>
+    <nav class="nav">
+      <a href="./#features">Features</a>
+      <a class="on" href="screenshots.html">Screenshots</a>
+      <a href="docs.html">Documentation</a>
+      <a href="https://github.com/claudeailab/Talon/releases">Releases</a>
+      <a class="gh" href="https://github.com/claudeailab/Talon">GitHub</a>
+    </nav>
+  </div>
+</header>
+<main class="wrap">
+  <h1>Screenshots</h1>
+  <p class="intro">Click a screenshot to see it full size. Use the arrow keys or swipe to go through them.</p>
+  <div class="grid" id="grid"></div>
+</main>
+<footer class="foot">
+  <div class="wrap">
+    <span>Talon · MIT licensed</span>
+    <nav><a href="./#features">Features</a><a href="screenshots.html">Screenshots</a><a href="docs.html">Documentation</a><a href="https://github.com/claudeailab/Talon/releases">Releases</a><a href="https://github.com/claudeailab/Talon">GitHub</a></nav>
+  </div>
+</footer>
+
+<div class="viewer" id="viewer" role="dialog" aria-modal="true" aria-label="Screenshot viewer">
+  <div class="bar">
+    <span class="cap" id="cap"></span>
+    <span style="display:flex;align-items:center;gap:14px"><span class="count" id="count"></span><button class="close" id="close" aria-label="Close">✕</button></span>
+  </div>
+  <div class="stage" id="stage">
+    <button class="nav prev" id="prev" aria-label="Previous">‹</button>
+    <img id="big" alt="">
+    <button class="nav next" id="next" aria-label="Next">›</button>
+  </div>
+</div>
+
+<script>
+  // id = file name in screenshots/ and the link anchor (e.g. #onedrive)
+  const SHOTS = [
+    ["dashboard", "Dashboard"],
+    ["volumes", "Volumes on RAID or single disks"],
+    ["raid-wizard", "RAID wizard"],
+    ["files", "Files on volumes, USB disks and OneDrive"],
+    ["recycle-bin", "Recycle bin"],
+    ["onedrive", "OneDrive backup and sync"],
+    ["onedrive-wizard", "OneDrive task wizard"],
+    ["share-permissions", "Shared folder permissions"],
+    ["users", "Users & Groups"],
+    ["activity", "Activity log"],
+    ["scheduled", "Scheduled scripts"],
+    ["notifications", "Thresholds"],
+    ["documentation", "Built-in documentation"],
+    ["dashboard-dark", "Dark mode"],
+  ];
+  const $ = (id) => document.getElementById(id);
+  const grid = $("grid"), viewer = $("viewer"), big = $("big");
+  SHOTS.forEach(([id, caption], i) => {
+    const b = document.createElement("button");
+    b.className = "shot";
+    b.innerHTML = `<img src="screenshots/${id}.png" alt="${caption}" loading="lazy"><span>${caption}</span>`;
+    b.onclick = () => { location.hash = id; };
+    grid.appendChild(b);
+  });
+  let current = -1;
+  function show(i) {
+    current = (i + SHOTS.length) % SHOTS.length;
+    const [id, caption] = SHOTS[current];
+    big.src = `screenshots/${id}.png`;
+    big.alt = caption;
+    $("cap").textContent = caption;
+    $("count").textContent = `${current + 1} / ${SHOTS.length}`;
+    viewer.classList.add("open");
+    document.body.style.overflow = "hidden";
+    new Image().src = `screenshots/${SHOTS[(current + 1) % SHOTS.length][0]}.png`; // preload next
+  }
+  // opened from a README link: closing returns to the README, like closing a modal
+  let fromGitHub = /^https:\/\/github\.com\//.test(document.referrer) && location.hash.length > 1;
+  function close() {
+    if (fromGitHub && history.length > 1) { history.back(); return; }
+    fromGitHub = false;
+    viewer.classList.remove("open");
+    document.body.style.overflow = "";
+    current = -1;
+    if (location.hash) history.replaceState(null, "", location.pathname);
+  }
+  // Previous / Next replace the address instead of adding history, so one Back (or Close) leaves the viewer
+  const go = (d) => { history.replaceState(null, "", "#" + SHOTS[(current + d + SHOTS.length) % SHOTS.length][0]); fromHash(); };
+  function fromHash() {
+    const i = SHOTS.findIndex(([id]) => id === location.hash.slice(1));
+    i >= 0 ? show(i) : (current >= 0 && close());
+  }
+  window.addEventListener("hashchange", fromHash);
+  $("prev").onclick = () => go(-1);
+  $("next").onclick = () => go(1);
+  $("close").onclick = close;
+  $("stage").onclick = (e) => { if (e.target.id === "stage") close(); };
+  document.addEventListener("keydown", (e) => {
+    if (current < 0) return;
+    if (e.key === "ArrowLeft") go(-1);
+    else if (e.key === "ArrowRight") go(1);
+    else if (e.key === "Escape") close();
+  });
+  let x0 = null;
+  viewer.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  viewer.addEventListener("touchend", (e) => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0;
+    if (Math.abs(dx) > 50) go(dx < 0 ? 1 : -1);
+    x0 = null;
+  });
+  fromHash();
+</script>
+</body>
+</html>

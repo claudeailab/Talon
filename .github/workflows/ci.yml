@@ -39,7 +39,7 @@ jobs:
           BEFORE: ${{ github.event_name == 'push' && github.event.before || '' }}
         run: |
           if [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null \
-             || git diff --name-only "$BEFORE" HEAD | grep -qE '^(site/|docs/screenshots/|docs/logo\.svg$|\.github/workflows/ci\.yml$)'; then
+             || git diff --name-only "$BEFORE" HEAD | grep -qE '^(site/|docs/screenshots/|docs/logo\.svg$|frontend/public/guide/|\.github/workflows/ci\.yml$)'; then
             echo "changed=1" >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/setup-python@v7
@@ -51,7 +51,7 @@ jobs:
       - run: shellcheck -S warning install.sh uninstall.sh
       - run: cd frontend && npm ci && npm run build
       - name: Committed web build is up to date
-        run: git diff --stat --exit-code -- backend/talon/web || (echo "Run 'npm run build' in frontend/ and commit" && exit 1)
+        run: git diff --stat --exit-code -- backend/talon/web site/guide.json || (echo "Run 'npm run build' in frontend/ and commit" && exit 1)
 
   release:
     needs: test
@@ -136,9 +136,10 @@ jobs:
       - uses: actions/configure-pages@v6
       - name: Build site
         run: |
-          mkdir -p _site/screenshots
-          cp site/index.html docs/logo.svg _site/
+          mkdir -p _site/screenshots _site/guide
+          cp site/*.html site/style.css site/guide.json docs/logo.svg _site/
           cp docs/screenshots/*.png _site/screenshots/
+          cp frontend/public/guide/*.webp _site/guide/
       - uses: actions/upload-pages-artifact@v5
         with:
           path: _site

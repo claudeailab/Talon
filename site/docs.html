@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Talon Documentation</title>
+<meta name="description" content="How Talon works and how to set up each feature: RAID, volumes, shared folders, users, OneDrive backup, alerts and more.">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<style>
+  .layout { display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: 32px; padding: 32px 0 72px; }
+  .side { position: sticky; top: 88px; align-self: start; max-height: calc(100vh - 110px); overflow-y: auto; }
+  .search { width: 100%; height: 42px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--card); color: var(--fg); font: inherit; font-size: 15px; }
+  .group { padding: 12px 0 10px; border-top: 1px solid var(--line); }
+  .group:first-of-type { border-top: 0; }
+  .group b { display: block; padding: 0 10px 4px; font-size: 14px; }
+  .group a { display: block; padding: 5px 10px; border-radius: 8px; color: var(--muted); font-size: 14px; font-weight: 500; }
+  .group a:hover { color: var(--fg); background: var(--brand-soft); text-decoration: none; }
+  .group a.on { color: var(--link); background: var(--brand-soft); }
+  article { min-width: 0; padding: 32px 36px; border-radius: 18px; border: 1px solid var(--line); background: var(--card); }
+  article h1 { margin: 0; font-size: 32px; letter-spacing: -.02em; }
+  .summary { margin: 6px 0 0; color: var(--muted); font-size: 17px; }
+  .before { margin: 22px 0 0; padding: 14px 18px; border-radius: 12px; background: var(--brand-soft); font-size: 15px; }
+  .before > b { display: block; margin-bottom: 4px; }
+  .before ul { margin: 0; padding-left: 20px; }
+  article h2 { margin: 34px 0 10px; font-size: 21px; text-align: left; }
+  article p, article li { font-size: 15.5px; line-height: 1.7; }
+  article code { padding: 1px 6px; border-radius: 6px; background: var(--code); border: 1px solid var(--line); overflow-wrap: anywhere; }
+  article ol { counter-reset: s; list-style: none; padding: 0; }
+  article ol li { counter-increment: s; position: relative; padding-left: 40px; margin: 10px 0; }
+  article ol li::before { content: counter(s); position: absolute; left: 0; top: 2px; width: 26px; height: 26px; border-radius: 999px; background: var(--brand); color: #fff; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  article img { display: block; margin: 16px 0; border-radius: 12px; border: 1px solid var(--line); }
+  .tip, .warn { margin: 14px 0; padding: 12px 16px; border-radius: 12px; font-size: 15px; }
+  .tip { background: rgba(14,165,233,.1); border: 1px solid rgba(14,165,233,.3); }
+  .warn { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.35); }
+  .pager { display: flex; justify-content: space-between; gap: 12px; margin-top: 36px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .pager a { font-weight: 600; }
+  .results a { display: block; padding: 12px 0; border-bottom: 1px solid var(--line); color: var(--fg); }
+  .results a:hover { text-decoration: none; color: var(--link); }
+  .results small { display: block; color: var(--muted); font-size: 14px; }
+  .contents-btn, .bar, .sheet { display: none; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; gap: 16px; padding-top: 20px; }
+    .side .groups { display: none; }
+    .side { position: static; max-height: none; }
+    article { padding: 22px 18px; }
+    article h1 { font-size: 26px; }
+    .contents-btn { display: flex; align-items: center; gap: 12px; width: 100%; margin-top: 12px; padding: 12px 16px; border: 0; border-radius: 14px; background: var(--brand); color: #fff; text-align: left; font: inherit; cursor: pointer; }
+    .contents-btn small { display: block; font-size: 12px; opacity: .85; }
+    .contents-btn b { display: block; font-size: 16px; }
+    .bar { display: flex; position: fixed; left: 12px; right: 12px; bottom: max(12px, env(safe-area-inset-bottom)); z-index: 25; gap: 8px; padding: 8px; border-radius: 16px; background: color-mix(in srgb, var(--card) 94%, transparent); border: 1px solid var(--line); box-shadow: 0 16px 40px -12px rgba(0,0,0,.5); backdrop-filter: blur(8px); }
+    .bar button { height: 44px; border: 0; border-radius: 12px; font: inherit; font-weight: 600; cursor: pointer; }
+    .bar .nav-b { width: 48px; background: var(--brand-soft); color: var(--fg); font-size: 20px; }
+    .bar .nav-b:disabled { opacity: .35; }
+    .bar .mid { flex: 1; background: var(--brand); color: #fff; }
+    .sheet.open { display: flex; position: fixed; inset: 0; z-index: 50; align-items: center; justify-content: center; padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); background: rgba(0,0,0,.55); }
+    .sheet .panel { width: 100%; max-height: 100%; overflow-y: auto; border-radius: 18px; background: var(--card); border: 1px solid var(--line); }
+    .sheet .head { position: sticky; top: 0; display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; background: var(--card); border-bottom: 1px solid var(--line); font-weight: 700; }
+    .sheet .head button { border: 0; background: none; color: var(--muted); font-size: 22px; cursor: pointer; }
+    .sheet .group { padding: 12px 8px 8px; }
+    .sheet .group b { font-size: 16px; }
+    .sheet .group a { font-size: 16px; padding: 9px 10px; }
+    main { padding-bottom: 80px; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="./"><img src="logo.svg" alt="">Talon</a>
+    <button class="menu-btn" aria-label="Menu" onclick="document.querySelector('.nav').classList.toggle('open')">☰</button>
+    <nav class="nav">
+      <a href="./#features">Features</a>
+      <a href="screenshots.html">Screenshots</a>
+      <a class="on" href="docs.html">Documentation</a>
+      <a href="https://github.com/claudeailab/Talon/releases">Releases</a>
+      <a class="gh" href="https://github.com/claudeailab/Talon">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap layout">
+  <aside class="side">
+    <input class="search" id="q" type="search" placeholder="Search the guide" aria-label="Search the guide">
+    <button class="contents-btn" id="contentsBtn"><span style="font-size:20px">☰</span><span style="flex:1"><small id="pos"></small><b id="cur"></b></span><span>▾</span></button>
+    <div class="groups" id="groups" style="margin-top:16px"></div>
+  </aside>
+  <article id="doc"><p>Loading…</p></article>
+</main>
+
+<div class="bar" id="bar">
+  <button class="nav-b" id="prev" aria-label="Previous topic">‹</button>
+  <button class="mid" id="barContents">☰ Contents</button>
+  <button class="nav-b" id="next" aria-label="Next topic">›</button>
+</div>
+<div class="sheet" id="sheet"><div class="panel"><div class="head">Contents <button id="sheetClose" aria-label="Close">✕</button></div><div id="sheetGroups"></div></div></div>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>Talon · MIT licensed</span>
+    <nav><a href="./#features">Features</a><a href="screenshots.html">Screenshots</a><a href="docs.html">Documentation</a><a href="https://github.com/claudeailab/Talon/releases">Releases</a><a href="https://github.com/claudeailab/Talon">GitHub</a></nav>
+  </div>
+</footer>
+
+<script>
+  const GROUPS = ["Basics", "Storage", "Sharing", "Cloud and alerts", "System"];
+  const $ = (id) => document.getElementById(id);
+  let GUIDE = [];
+
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  // **bold**, `code` and [text](link): links to other topics stay on this page;
+  // links to pages inside Talon are shown in bold (they only exist on your NAS)
+  function inline(s) {
+    return esc(s)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, href) => {
+        const m = /^\/documentation\?topic=([a-z-]+)/.exec(href.replace(/&amp;/g, "&"));
+        if (m) return `<a href="#${m[1]}">${text}</a>`;
+        if (/^https?:/.test(href)) return `<a href="${href}" rel="noopener">${text}</a>`;
+        return `<b>${text}</b>`;
+      });
+  }
+  const plain = (s) => s.replace(/\*\*/g, "").replace(/`/g, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+  const blockText = (b) => plain(b.p || (b.steps || b.list || []).join(" ") || b.tip || b.warn || b.alt || "");
+
+  function block(b) {
+    if (b.p) return `<p>${inline(b.p)}</p>`;
+    if (b.steps) return `<ol>${b.steps.map((x) => `<li>${inline(x)}</li>`).join("")}</ol>`;
+    if (b.list) return `<ul>${b.list.map((x) => `<li>${inline(x)}</li>`).join("")}</ul>`;
+    if (b.img) return `<img src="guide/${b.img}.webp" alt="${esc(b.alt)}" loading="lazy">`;
+    if (b.tip) return `<div class="tip">${inline(b.tip)}</div>`;
+    if (b.warn) return `<div class="warn">${inline(b.warn)}</div>`;
+    return "";
+  }
+
+  function groupsHtml(current) {
+    return GROUPS.map((g) => `<div class="group"><b>${g}</b>${GUIDE.filter((t) => t.group === g)
+      .map((t) => `<a href="#${t.id}" class="${t.id === current ? "on" : ""}">${esc(t.title)}</a>`).join("")}</div>`).join("");
+  }
+
+  function show() {
+    const [id, sec] = location.hash.slice(1).split("/");
+    const topic = GUIDE.find((t) => t.id === id) || GUIDE[0];
+    const i = GUIDE.indexOf(topic);
+    $("groups").innerHTML = groupsHtml(topic.id);
+    $("sheetGroups").innerHTML = groupsHtml(topic.id);
+    $("pos").textContent = `Contents · topic ${i + 1} of ${GUIDE.length}`;
+    $("cur").textContent = topic.title;
+    $("prev").disabled = i === 0;
+    $("next").disabled = i === GUIDE.length - 1;
+    document.title = `${topic.title} · Talon Documentation`;
+    const prev = GUIDE[i - 1], next = GUIDE[i + 1];
+    $("doc").innerHTML =
+      `<h1>${esc(topic.title)}</h1><p class="summary">${inline(topic.summary)}</p>` +
+      (topic.before && topic.before.length ? `<div class="before"><b>Before you start</b><ul>${topic.before.map((x) => `<li>${inline(x)}</li>`).join("")}</ul></div>` : "") +
+      topic.sections.map((s) => `<h2 id="${topic.id}-${s.id}">${esc(s.title)}</h2>${s.blocks.map(block).join("")}`).join("") +
+      `<div class="pager"><span>${prev ? `<a href="#${prev.id}">← ${esc(prev.title)}</a>` : ""}</span><span>${next ? `<a href="#${next.id}">${esc(next.title)} →</a>` : ""}</span></div>`;
+    $("bar").style.visibility = "visible";
+    if (sec) document.getElementById(`${topic.id}-${sec}`)?.scrollIntoView();
+    else window.scrollTo(0, 0);
+  }
+
+  function search(q) {
+    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    if (!words.length) return show();
+    const hits = [];
+    for (const t of GUIDE) for (const s of t.sections) {
+      const text = `${t.title} ${s.title} ${s.blocks.map(blockText).join(" ")}`.toLowerCase();
+      if (words.every((w) => text.includes(w))) {
+        const body = s.blocks.map(blockText).join(" ");
+        const at = Math.max(0, body.toLowerCase().indexOf(words[0]) - 60);
+        hits.push(`<a href="#${t.id}/${s.id}">${esc(s.title)} <small>${esc(t.title)} · ${esc((at ? "…" : "") + body.slice(at, at + 160))}…</small></a>`);
+      }
+    }
+    $("bar").style.visibility = "hidden";
+    $("doc").innerHTML = `<h1>Search</h1><p class="summary">${hits.length} result${hits.length === 1 ? "" : "s"} for “${esc(q)}”</p><div class="results">${hits.join("") || "<p>Nothing found. Try other words.</p>"}</div>`;
+  }
+
+  const go = (d) => {
+    const [id] = location.hash.slice(1).split("/");
+    const i = Math.max(0, GUIDE.findIndex((t) => t.id === id));
+    const t = GUIDE[i + d];
+    if (t) location.hash = t.id;
+  };
+  $("prev").onclick = () => go(-1);
+  $("next").onclick = () => go(1);
+  const openSheet = () => $("sheet").classList.add("open");
+  $("contentsBtn").onclick = openSheet;
+  $("barContents").onclick = openSheet;
+  $("sheetClose").onclick = () => $("sheet").classList.remove("open");
+  $("sheet").onclick = (e) => { if (e.target.id === "sheet" || e.target.closest("a")) $("sheet").classList.remove("open"); };
+  let timer;
+  $("q").oninput = (e) => { clearTimeout(timer); timer = setTimeout(() => search(e.target.value), 200); };
+  window.addEventListener("hashchange", () => { $("q").value = ""; show(); });
+
+  fetch("guide.json").then((r) => r.json()).then((g) => { GUIDE = g; show(); })
+    .catch(() => { $("doc").innerHTML = "<p>The guide could not be loaded.</p>"; });
+</script>
+</body>
+</html>
