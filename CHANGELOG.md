@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.56
+- Much faster OneDrive comparison on large drives (whole-drive listing)
+- Live activity line: working, throttled by OneDrive, or waiting
+- Size left to copy in the OneDrive log window
+
 ## 1.0.55
 - OneDrive compares both sides first, then shows the real progress: Comparing, then Copying %
 - Progress bar in the OneDrive log window

@@ -288,3 +288,17 @@ def test_copy_compares_first(client):
     t = {"remote": "Pictures", "direction": "pull", "delete": False, "versions": False, "bwlimit": ""}
     cmd = CloudSync.command(client.app.state.nas.cloud, t, "c.conf", "/srv/x", False)
     assert "--check-first" in cmd
+    assert {"--onedrive-delta", "--fast-list"} <= set(cmd)
+
+
+def test_parse_keeps_throttling_and_drops_other_debug_lines():
+    import json as _j
+    from talon.cloudsync import CloudSync
+    r = {"log": [], "files": 0, "started": time.time()}
+    CloudSync._parse(_j.dumps({"level": "debug", "msg": "Unchanged skipping", "object": "a.jpg"}), r)
+    assert r["log"] == []
+    CloudSync._parse(_j.dumps({"level": "debug", "msg": "Too many requests. Trying again in 30 seconds."}), r)
+    assert "throttling" in r["log"][-1] and r["log"][-1].split("\t")[1] == "NOTICE"
+    assert 25 < r["throttled_until"] - time.time() <= 30
+    CloudSync._parse(_j.dumps({"level": "info", "stats": {"listed": 50, "checks": 10}}), r)
+    assert r["listed"] == 50 and r["active"] >= r["started"]

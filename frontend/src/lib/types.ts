@@ -315,7 +315,7 @@ export interface CloudTask {
   created: number;
   next_run: number | null;
   last: { started: number; finished: number; status: "success" | "error" | "cancelled"; files: number; bytes: number; error: string | null } | null;
-  running: { started: number; files: number; total_files: number; bytes: number; total_bytes: number; speed: number; percent: number | null; comparing: boolean; checks: number; total_checks: number } | null;
+  running: { started: number; files: number; total_files: number; bytes: number; total_bytes: number; speed: number; percent: number | null; comparing: boolean; checks: number; total_checks: number; listed: number; idle: number; throttled: number | null } | null;
 }
 
 export interface OneDriveStatus {

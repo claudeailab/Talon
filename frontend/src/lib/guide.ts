@@ -559,7 +559,8 @@ export const GUIDE: Topic[] = [
         title: "Run and check tasks",
         blocks: [
           { p: "Each task shows its schedule, last run and status. Use **Run now** to start it, **Stop** to cancel it, and the **⋯** menu to edit it, view its log or delete it. Deleting a task does not touch any files." },
-          { p: "A running task first shows **Comparing** while it checks which files OneDrive and the NAS already have in common, then **Copying** with the share of files that are done. Files already up to date count as done." },
+          { p: "A running task first shows **Comparing** while it checks which files OneDrive and the NAS already have in common, then **Copying** with the share of files that are done and the size left to copy. Files already up to date count as done." },
+          { p: "Under the progress bar, **Working** shows rclone is making progress. It turns amber when OneDrive limits requests (throttling) or nothing has changed for a minute; rclone keeps trying by itself." },
           { p: "**View log** shows the same progress bar, plus each step with its time and keeps the newest line in view while the task runs; scroll up to read earlier lines." },
           { p: "If Talon or the NAS restarts while a task runs, the task continues by itself shortly after Talon starts again; files already copied are skipped." },
           { p: "**Disconnect** signs out of Microsoft. Tasks stop running until you sign in again; no files are deleted." },

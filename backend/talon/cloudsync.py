@@ -544,6 +544,10 @@ class CloudSync:
             run["comparing"] = r.get("comparing", False)
             run["checks"] = r.get("checks", 0)
             run["total_checks"] = r.get("total_checks", 0)
+            run["listed"] = r.get("listed", 0)
+            now = time.time()
+            run["idle"] = int(now - (r.get("active") or r["started"]))
+            run["throttled"] = max(0, int(r.get("throttled_until", 0) - now)) or None
             run["percent"] = None if run["comparing"] else self.percent(r)
         return {**{k: v for k, v in t.items() if k != "bisync_ready"},
                 "running": run, "next_run": self._next_run(t)}
@@ -708,8 +712,13 @@ class CloudSync:
     def command(self, t: dict, conf: str, local: str, first_bisync: bool) -> list:
         remote = "onedrive:" + t["remote"]
         stamp = time.strftime("%Y-%m-%d_%H%M%S")
+        # --onedrive-delta + --fast-list: list the whole OneDrive in a few big
+        # requests instead of one request per folder (much faster on large drives).
+        # DEBUG: rclone reports OneDrive throttling only at this level; _parse keeps
+        # those lines and drops the other debug lines.
         args = [self.rclone_path() or "rclone", "--config", conf, "--use-json-log",
-                "--log-level", "INFO", "--stats", "2s", "--transfers", "4",
+                "--log-level", "DEBUG", "--stats", "2s", "--transfers", "4", "--checkers", "16",
+                "--onedrive-delta", "--fast-list",
                 "--filter", f"- /{VERSIONS}/**"]
         if t["bwlimit"]:
             args += ["--bwlimit", t["bwlimit"]]
@@ -747,7 +756,7 @@ class CloudSync:
             conf = self._rclone_conf(tid)
             first = t["direction"] == "bisync" and not t.get("bisync_ready")
             cmd = self.command(t, conf, local, first)
-            log.append(self._line("$ " + " ".join(a if "conf" not in a else "<config>" for a in cmd)))
+            log.append(self._line("$ " + " ".join("<config>" if a == conf else a for a in cmd)))
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                     text=True, bufsize=1)
             r["proc"] = proc
@@ -805,7 +814,7 @@ class CloudSync:
                     status, error = "cancelled", "Stopped"
                     break
                 r.update(files=0, bytes=0, total_files=0, total_bytes=0, speed=0,
-                         checks=0, total_checks=0)
+                         checks=0, total_checks=0, listed=0, seen=None, active=time.time())
                 log.append(self._line(f"Attempt {attempt + 1} of {attempts}"))
             log.append(self._line("Finished" if status == "success" else
                                   "Stopped" if status == "cancelled" else f"Failed: {error}",
@@ -870,17 +879,33 @@ class CloudSync:
             if line.strip():
                 r["log"].append("\t".join((time.strftime("%H:%M:%S"), "INFO", "", line.strip())))
             return
-        if "Checks finished" in str(d.get("msg", "")):
+        msg = str(d.get("msg", ""))
+        level = str(d.get("level", "info")).lower()
+        if "Checks finished" in msg:
             r["comparing"] = False                 # --check-first: copying starts now
         st = d.get("stats")
         if st:
             if st.get("transfers"):
                 r["comparing"] = False
+            seen = (st.get("listed", 0), st.get("checks", 0), st.get("transfers", 0), st.get("bytes", 0))
+            if seen != r.get("seen"):
+                r["seen"], r["active"] = seen, time.time()
+            r["listed"] = st.get("listed", 0)
             r.update(files=st.get("transfers", 0), total_files=st.get("totalTransfers", 0),
                      bytes=st.get("bytes", 0), total_bytes=st.get("totalBytes", 0),
                      speed=st.get("speed", 0), checks=st.get("checks", 0),
                      total_checks=st.get("totalChecks", 0))
             return
+        if level == "debug":
+            # OneDrive throttling: "Too many requests. Trying again in 30 seconds."
+            m = re.search(r"Too many requests\. Trying again in (\d+) seconds", msg)
+            if m:
+                wait = int(m.group(1))
+                r["throttled_until"] = time.time() + wait
+                d = {**d, "level": "notice", "object": "",
+                     "msg": f"OneDrive is limiting requests (throttling); trying again in {wait} s"}
+            else:
+                return
         # "time<TAB>LEVEL<TAB>file<TAB>message": the web interface shows each part
         # on its own (time, highlighted level, wrapped path), so it reads on a phone
         when = str(d.get("time", ""))[11:19]
@@ -910,13 +935,14 @@ class CloudSync:
             if r["cancel"]:
                 return "cancelled", "Stopped"
             time.sleep(0.5)
-            r.update(checks=same * i // 6, total_checks=same * i // 6)
+            r.update(checks=same * i // 6, total_checks=same * i // 6, listed=total * 10 * i // 6,
+                     active=time.time())
         r.update(comparing=False, total_files=total, total_bytes=size)
         for i in range(1, 21):
             if r["cancel"]:
                 return "cancelled", "Stopped"
             time.sleep(0.5)
-            r.update(files=total * i // 20, bytes=size * i // 20, speed=size / 10)
+            r.update(files=total * i // 20, bytes=size * i // 20, speed=size / 10, active=time.time())
             when = time.strftime("%H:%M:%S")
             r["log"].append(f"{when}\tINFO\tPictures/2026/Holiday in Paphos/IMG_{4000 + i}.HEIC\tCopied (new)")
             if i == 12:

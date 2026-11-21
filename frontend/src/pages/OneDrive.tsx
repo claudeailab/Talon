@@ -313,7 +313,7 @@ export default function OneDrivePage() {
                 <thead>
                   <tr className="border-b border-zinc-100 text-left text-xs font-medium text-zinc-500 dark:border-white/5">
                     <th className="px-5 py-3">Task</th>
-                    <th className="hidden px-3 py-3 md:table-cell">
+                    <th className="hidden px-3 py-3 xl:table-cell">
                       Direction
                     </th>
                     <th className="hidden px-3 py-3 lg:table-cell">Schedule</th>
@@ -340,7 +340,7 @@ export default function OneDrivePage() {
                           <span className="truncate text-xs text-zinc-500">{scheduleLabel(t.schedule)}</span>
                         </div>
                       </td>
-                      <td className="hidden px-3 md:table-cell">
+                      <td className="hidden px-3 xl:table-cell">
                         <Badge tone={DIR[t.direction].tone}>
                           {DIR[t.direction].short}
                         </Badge>
@@ -452,14 +452,35 @@ function runLabel(r: Run) {
 }
 
 function runDetail(r: Run) {
-  if (r.percent === null) return `${num(r.checks)} files compared`;
+  if (r.percent === null) return `${num(r.listed)} found · ${num(r.checks)} compared`;
   const done = r.checks + r.files, total = Math.max(done, r.total_checks + r.total_files);
   return (
     <>
       {num(done)} of {num(total)} files
-      {/* size and speed only where they fit on one line */}
-      <span className="hidden sm:inline"> · {bytes(r.bytes)} copied{r.speed ? ` · ${bytes(r.speed)}/s` : ""}</span>
+      {/* copied and speed only where they fit on one line */}
+      <span className="hidden sm:inline"> · {bytes(r.bytes)} copied</span>
+      {" · "}{bytes(Math.max(0, r.total_bytes - r.bytes))} left
+      <span className="hidden sm:inline">{r.speed ? ` · ${bytes(r.speed)}/s` : ""}</span>
     </>
+  );
+}
+
+const wait = (s: number) => (s < 120 ? `${s} s` : `${Math.round(s / 60)} min`);
+
+/** Whether rclone is still making progress, so a long wait never looks like a hang. */
+function RunActivity({ r }: { r: Run }) {
+  const [tone, text] = r.throttled
+    ? ["amber", `OneDrive is throttling · trying again in ${wait(r.throttled)}`]
+    : r.idle >= 60
+      ? ["amber", `No change for ${wait(r.idle)} · waiting for OneDrive`]
+      : ["green", r.idle <= 3 ? "Working · updated just now" : `Working · updated ${r.idle} s ago`];
+  return (
+    <div className={cx("mt-1.5 flex items-center gap-1.5 truncate text-xs",
+      tone === "amber" ? "text-amber-600 dark:text-amber-400" : "text-zinc-500")}>
+      <span className={cx("size-1.5 shrink-0 rounded-full",
+        tone === "amber" ? "bg-amber-500" : "animate-pulse bg-emerald-500")} />
+      <span className="truncate">{text}</span>
+    </div>
   );
 }
 
@@ -1070,6 +1091,7 @@ function LogDialog({
             <span className="truncate text-zinc-500">{runDetail(task.running)}</span>
           </div>
           <Progress value={task.running.percent} tone="blue" className="mt-1.5 h-1.5" />
+          <RunActivity r={task.running} />
         </div>
       )}
       {q.data?.length ? (
