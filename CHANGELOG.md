@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.54
+- OneDrive runs stopped by a restart (exit 143) resume instead of failing
+- Log window hides the last error while a run is going, and shows its date
+
 ## 1.0.53
 - OneDrive tasks: retry when they fail, and resume after a restart
 - Logs show the time of every line and follow the newest one

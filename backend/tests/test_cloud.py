@@ -255,3 +255,18 @@ def test_interrupted_run_resumes_after_restart(client, monkeypatch):
     assert t["last"]["status"] == "success" and "interrupted" not in cloud._od()["tasks"][task["id"]]
     log = client.get(f"/api/onedrive/tasks/{task['id']}/log").json()
     assert "resumed after a restart" in log[0]
+
+
+def test_run_stopped_with_sigterm_counts_as_interrupted(client, monkeypatch):
+    from talon import cloudsync
+    task = _connected_task(client, retries=0)
+    cloud = client.app.state.nas.cloud
+    # an older version recorded a restart as "rclone exited with code 143"
+    cloud._update(lambda od: od["tasks"][task["id"]].__setitem__("last", {
+        "started": time.time() - 60, "finished": time.time() - 50, "status": "error",
+        "files": 0, "bytes": 0, "error": "rclone exited with code 143"}))
+    monkeypatch.setattr(cloudsync, "RESUME_DELAY", 0)
+    monkeypatch.setattr(cloudsync.CloudSync, "_attempt", lambda self, t, r, log: ("success", None))
+    cloud._resume()
+    assert _wait_done(client, task["id"])["last"]["status"] == "success"
+    assert 143 in cloudsync.SIGNAL_EXIT

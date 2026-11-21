@@ -43,6 +43,7 @@ RCLONE_EXIT = {
     10: "rclone: time limit reached",
 }
 
+SIGNAL_EXIT = (130, 137, 143)    # 128 + SIGINT / SIGKILL / SIGTERM
 RETRY_CHOICES = (0, 1, 2, 3, 5)
 RETRY_DELAY = 120                # seconds between attempts
 RESUME_DELAY = 30                # seconds after start-up before interrupted runs resume
@@ -586,13 +587,19 @@ class CloudSync:
     def _resume(self) -> None:
         """Restart runs that were interrupted by a restart of Talon or the NAS.
         rclone skips what was already copied, so the run carries on."""
-        interrupted = [t for t in (self._od().get("tasks") or {}).values() if t.get("interrupted")]
+        def stopped_by_restart(t):
+            # runs before 1.0.54 recorded a restart as a failure ("exited with code 143")
+            last = t.get("last") or {}
+            return (last.get("status") == "error" and time.time() - (last.get("finished") or 0) < 86400
+                    and any(f"exited with code {c}" in (last.get("error") or "") for c in SIGNAL_EXIT))
+        interrupted = [t for t in (self._od().get("tasks") or {}).values()
+                       if t.get("interrupted") or stopped_by_restart(t)]
         if not interrupted:
             return
         self._stop.wait(RESUME_DELAY)                 # let the network and rclone come up
         for t in interrupted:
             try:
-                self.run_task(t["id"], t["interrupted"].get("user") or "schedule", resumed=True)
+                self.run_task(t["id"], (t.get("interrupted") or {}).get("user") or "schedule", resumed=True)
             except UserError as e:
                 self._update(lambda od, tid=t["id"]: od["tasks"].get(tid, {}).pop("interrupted", None))
                 self.state.log_activity("talon", f"OneDrive task {t['name']} could not resume: {e}", "warning")
@@ -737,8 +744,9 @@ class CloudSync:
             self._read_back_token(conf)
             if r["cancel"]:
                 status, error = "cancelled", "Stopped"
-            elif rc < 0 or self._stop.is_set():
-                # killed by a signal (Talon or the NAS is shutting down): resume later
+            elif rc < 0 or rc in SIGNAL_EXIT or self._stop.is_set():
+                # stopped by a signal because Talon or the NAS is shutting down (rclone
+                # catches SIGTERM and exits with 143 = 128 + 15): resume later
                 status, error = "interrupted", "Interrupted by a restart"
             elif rc != 0:
                 status = "error"

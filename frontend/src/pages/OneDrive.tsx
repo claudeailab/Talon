@@ -20,7 +20,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { api } from "../lib/api";
-import { ago, bytes, cx, sameValue } from "../lib/format";
+import { ago, bytes, cx, dateTime, sameValue } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import { navigate } from "../lib/router";
 import type { CloudTask, OneDriveStatus, Schedule, Volume } from "../lib/types";
@@ -418,7 +418,7 @@ export default function OneDrivePage() {
           onClose={() => setEdit(null)}
         />
       )}
-      {logOf && <LogDialog task={logOf} onClose={() => setLogOf(null)} />}
+      {logOf && <LogDialog task={d.tasks.find((t) => t.id === logOf.id) ?? logOf} onClose={() => setLogOf(null)} />}
       <ConfirmDialog
         open={!!del}
         onClose={() => setDel(null)}
@@ -1040,8 +1040,9 @@ function LogDialog({
       title={`Log: ${task.name}`}
       footer={<Button onClick={onClose}>Close</Button>}
     >
-      {task.last?.error && (
-        <Callout tone="danger" className="mb-3">
+      {/* the last run's error, until the task runs again */}
+      {!task.running && task.last?.status === "error" && task.last.error && (
+        <Callout tone="danger" title={`Last run failed on ${dateTime(task.last.finished)}`} className="mb-3">
           {task.last.error}
         </Callout>
       )}
