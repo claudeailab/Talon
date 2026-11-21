@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.67
+- Phones: dialogs open in the middle of the screen and can use almost all of it
+
 ## 1.0.66
 - Disks: removed the "sold as" size
 
