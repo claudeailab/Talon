@@ -876,7 +876,7 @@ export const GUIDE: Topic[] = [
         title: "Run, pause and check tasks",
         blocks: [
           { img: "scheduled", alt: "Scheduled page" },
-          { p: "Each task shows who it runs as, its schedule, its last run and its status: **Succeeded**, **Running**, **Failed** with the exit code, **Stopped** or **Paused**. **Run now** starts it at once and **Stop** ends a running task." },
+          { p: "Each task shows who it runs as, its schedule, its last run and its status: **Idle** (not run yet), **Running**, **Succeeded**, **Failed** with the exit code, or **Stopped**. A paused task shows **Schedule paused** instead of its schedule: it then only runs with **Run now**. **Run now** starts it at once and **Stop** ends a running task." },
           { p: "The **⋯** menu has **Edit**, **View output** (the latest run with its full output, start time, duration and exit code; earlier runs are in the [Activity](/activity) log; each line shows when it was printed, and while a task runs it keeps the newest line in view and shows **Working**, or in amber how long the script has printed nothing), **Pause** or **Resume**, **Duplicate** and **Delete**." },
           { p: "A progress bar shows how far a running task is when the script reports it: rsync with **--info=progress2** (add **--no-inc-recursive** so the percentage covers the whole job from the start), or any script that prints a line such as **PROGRESS 45**. Those lines move the bar and are not shown in the output. Otherwise the bar moves without a percentage and shows how long the task has been running and how long the last run took." },
           { p: "Every change is recorded in [Activity](/activity)." },

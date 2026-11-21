@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.75
+- Scheduled: the status shows the last result (Idle, Succeeded, Failed, Stopped); a paused schedule shows as "Schedule paused"
+
 ## 1.0.74
 - GitHub About section is filled in by the release workflow once a token is added
 
