@@ -446,29 +446,26 @@ function OutputDialog({ task, onClose }: { task: ScheduledTask; onClose: () => v
       ) : runs.length === 0 ? (
         <div className="py-10 text-center text-sm text-zinc-500">This task has not run yet.</div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-[13rem_minmax(0,1fr)]">
-          <div className="space-y-1">
-            {runs.map((r) => (
-              <button
-                key={r.id}
-                onClick={() => setSel(r.id)}
-                className={cx(
-                  "flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-[13px] whitespace-nowrap",
-                  r.id === run?.id ? "bg-brand-50 font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-300" : "hover:bg-zinc-50 dark:hover:bg-white/[0.03]",
-                )}
-              >
-                <span className="tabular">{dateTime(r.started)}</span>
-                <RunBadge r={r} />
-              </button>
-            ))}
-          </div>
+        <div>
           {run && (
             <div className="min-w-0">
-              <div className="mb-2 flex flex-wrap gap-x-4 text-[13px] text-zinc-500">
-                <span>Started {dateTime(run.started)}</span>
-                <span>{run.finished ? `Took ${took(run.finished - run.started)}` : "Running"}</span>
-                {run.exit_code !== null && <span>Exit code {run.exit_code}</span>}
-                <span>{run.trigger === "manual" ? "Started by hand" : "Started by schedule"}</span>
+              {/* the newest run is shown; earlier runs are one choice away, not a list */}
+              <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-zinc-500">
+                {runs.length > 1 ? (
+                  <Select value={run.id} onChange={(e) => setSel(e.target.value)} className="w-full sm:w-auto" aria-label="Run">
+                    {runs.map((r) => (
+                      <option key={r.id} value={r.id}>
+                        {dateTime(r.started)} · {runLabel(r)}
+                      </option>
+                    ))}
+                  </Select>
+                ) : (
+                  <span>Started {dateTime(run.started)}</span>
+                )}
+                <span>
+                  {run.finished ? `Took ${took(run.finished - run.started)} · ` : ""}
+                  {run.trigger === "manual" ? "Started by hand" : "Started by schedule"}
+                </span>
               </div>
               {run.status === "running" && <RunProgress run={run} />}
               {run.status === "running" && <Activity idle={run.idle ?? 0} />}
@@ -558,6 +555,10 @@ function OutputLine({ line }: { line: string }) {
       </span>
     </li>
   );
+}
+
+function runLabel(r: TaskRun) {
+  return r.status === "running" ? "Running" : r.status === "success" ? "OK" : r.status === "cancelled" ? "Stopped" : `Exit ${r.exit_code}`;
 }
 
 function RunBadge({ r }: { r: TaskRun }) {
