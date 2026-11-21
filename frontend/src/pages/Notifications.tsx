@@ -102,7 +102,7 @@ function EmailTab() {
             <div className="mb-1.5 text-[13px] font-medium">Send an email when</div>
             <div className="grid gap-2 md:grid-cols-2">
               {Object.entries(q.data.labels).map(([id, label]) => (
-                <div key={id} className="flex h-11 items-center justify-between gap-4 rounded-xl bg-zinc-50 px-3.5 dark:bg-white/[0.03]">
+                <div key={id} className="flex min-h-11 items-center py-2 justify-between gap-4 rounded-xl bg-zinc-50 px-3.5 dark:bg-white/[0.03]">
                   <span className="truncate text-[13px] font-medium">{label}</span>
                   <Switch checked={!!events[id]} onChange={(v) => setEvents({ ...events, [id]: v })} label={label} />
                 </div>

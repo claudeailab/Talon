@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.59
+- Phones: text is never cut off with "…"; it wraps onto the next line instead
+- Disks on phones: health and usage under the name, full disk model shown
+- OneDrive on phones: account email and details on separate lines
+
 ## 1.0.58
 - OneDrive tasks verify every file after each run (quick or full), with time estimates for your files
 - Missing or different files are copied again automatically; only what still fails is reported

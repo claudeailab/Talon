@@ -280,9 +280,14 @@ export default function OneDrivePage() {
               )}
             </div>
             <div className="truncate text-[13px] text-zinc-500">
-              {d.connected && d.account
-                ? `${d.account.email} · ${d.account.drive_type === "personal" ? "Personal" : "Work or school"} · ${bytes(d.account.used)} of ${bytes(d.account.total)} used`
-                : waiting
+              {d.connected && d.account ? (
+                <>
+                  {/* phones: the email on its own line, the details below */}
+                  <span className="block sm:inline">{d.account.email}</span>
+                  <span className="hidden sm:inline"> · </span>
+                  {`${d.account.drive_type === "personal" ? "Personal" : "Work or school"} · ${bytes(d.account.used)} of ${bytes(d.account.total)} used`}
+                </>
+              ) : waiting
                   ? "Waiting for you to sign in with Microsoft…"
                   : "Sign in with Microsoft and allow access to your files."}
             </div>
@@ -843,7 +848,7 @@ function TaskDialog({
               title="Changed on both sides"
               text="Both copies are kept, one renamed"
             />
-            <div className="flex h-14 items-center justify-between gap-4 rounded-xl bg-zinc-50 px-3.5 dark:bg-white/[0.03]">
+            <div className="flex min-h-14 items-center py-2 justify-between gap-4 rounded-xl bg-zinc-50 px-3.5 dark:bg-white/[0.03]">
               <div className="min-w-0">
                 <div className="truncate text-[13px] font-medium">
                   Safety stop
@@ -1030,7 +1035,7 @@ export function ToggleBox({
   onChange?: (v: boolean) => void;
 }) {
   return (
-    <div className="flex h-14 items-center justify-between gap-4 rounded-xl bg-zinc-50 px-3.5 dark:bg-white/[0.03]">
+    <div className="flex min-h-14 items-center py-2 justify-between gap-4 rounded-xl bg-zinc-50 px-3.5 dark:bg-white/[0.03]">
       <div className="min-w-0">
         <div className="truncate text-[13px] font-medium">{title}</div>
         <div className="truncate text-xs text-zinc-500">{text}</div>
@@ -1169,7 +1174,7 @@ function FolderPicker({
                 onDoubleClick={() => (it.folder ? open(join(it.name)) : onPick(join(it.name), true, vol))}
                 onKeyDown={(e) => e.key === "Enter" && (it.folder ? open(join(it.name)) : setSelected(it))}
                 className={cx(
-                  "flex h-11 w-full cursor-pointer items-center gap-2.5 px-3.5 text-left text-sm",
+                  "flex min-h-11 py-2 w-full cursor-pointer items-center gap-2.5 px-3.5 text-left text-sm",
                   on ? "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "hover:bg-zinc-50 dark:hover:bg-white/[0.03]",
                 )}
               >

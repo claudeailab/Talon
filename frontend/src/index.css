@@ -45,3 +45,14 @@
 @utility card {
   @apply min-w-0 rounded-2xl border border-zinc-200/80 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] dark:border-white/[0.07] dark:bg-zinc-900/70;
 }
+
+/* Phones: never cut text off with "…". Text that does not fit on one line wraps
+   onto the next one instead (unlayered, so it wins over the .truncate utility). */
+@media (max-width: 767px) {
+  .truncate {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

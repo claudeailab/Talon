@@ -566,7 +566,7 @@ function MoveDialog({ volumes, volume, start, items, onClose, onDone }: { volume
                 onDoubleClick={() => openDir(join(path, f.name))}
                 onKeyDown={(e) => e.key === "Enter" && openDir(join(path, f.name))}
                 className={cx(
-                  "flex h-11 w-full cursor-pointer items-center gap-2.5 px-3.5 text-left text-sm",
+                  "flex min-h-11 py-2 w-full cursor-pointer items-center gap-2.5 px-3.5 text-left text-sm",
                   on ? "bg-brand-50 text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" : "hover:bg-zinc-50 dark:hover:bg-white/[0.03]",
                 )}
               >

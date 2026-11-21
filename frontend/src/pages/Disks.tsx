@@ -53,7 +53,7 @@ export default function DisksPage() {
                   <th className="hidden px-3 py-3 md:table-cell">Type</th>
                   <th className="hidden px-3 py-3 sm:table-cell">Health</th>
                   <th className="hidden px-3 py-3 sm:table-cell">Temp</th>
-                  <th className="px-3 py-3">Usage</th>
+                  <th className="hidden px-3 py-3 sm:table-cell">Usage</th>
                   <th className="w-12 px-3 py-3" />
                 </tr>
               </thead>
@@ -70,10 +70,12 @@ export default function DisksPage() {
                             {d.name}
                             <span className="ml-1.5 font-sans font-medium text-zinc-500 sm:hidden">{bytes(d.size)}</span>
                           </div>
-                          <div className="max-w-[8rem] truncate text-xs text-zinc-500 sm:max-w-[16rem]">{d.model}</div>
+                          <div className="truncate text-xs text-zinc-500 sm:max-w-[16rem]">{d.model}</div>
                           {d.serial && <div className="hidden font-mono text-[11px] text-zinc-400 sm:block">{d.serial}</div>}
-                          <div className="mt-1 sm:hidden">
+                          {/* phones: health and usage under the name, so the model has the full width */}
+                          <div className="mt-1 flex flex-wrap gap-1.5 sm:hidden">
                             <HealthBadge health={d.health} />
+                            <DiskStatusBadge d={d} />
                           </div>
                         </div>
                       </div>
@@ -88,7 +90,7 @@ export default function DisksPage() {
                     <td className="tabular hidden px-3 py-3.5 text-zinc-600 sm:table-cell dark:text-zinc-400">
                       {d.temperature != null ? `${d.temperature}°C` : "—"}
                     </td>
-                    <td className="px-3 py-3.5">
+                    <td className="hidden px-3 py-3.5 sm:table-cell">
                       <div className="flex flex-col items-start gap-0.5">
                         <DiskStatusBadge d={d} />
                         <span className="hidden max-w-[14rem] truncate text-xs text-zinc-500 sm:block">{d.status_detail}</span>
