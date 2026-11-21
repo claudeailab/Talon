@@ -484,7 +484,7 @@ export const GUIDE: Topic[] = [
             ],
           },
           { img: "users", alt: "Users and groups" },
-          { p: "In a user's **⋯** menu you can **Edit** them, **Change password**, **Disable** or **Enable** them and **Delete** them. Files a deleted user created stay on the volumes." },
+          { p: "In a user's **⋯** menu you can **Edit** them (name, password, groups), **Disable** or **Enable** them and **Delete** them. Files a deleted user created stay on the volumes." },
         ],
       },
       {

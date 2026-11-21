@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { KeyRound, MoreHorizontal, Pencil, Plus, ShieldCheck, Trash2, UserPlus, Users as UsersIcon, UserX } from "lucide-react";
+import { MoreHorizontal, Pencil, Plus, ShieldCheck, Trash2, UserPlus, Users as UsersIcon, UserX } from "lucide-react";
 import { api } from "../lib/api";
 import { cx, sameSet } from "../lib/format";
 import { useAction } from "../lib/hooks";
@@ -143,9 +143,6 @@ export default function UsersPage() {
                       >
                         <MenuItem icon={<Pencil />} onClick={() => setUserDlg({ user: u })}>
                           Edit
-                        </MenuItem>
-                        <MenuItem icon={<KeyRound />} onClick={() => setUserDlg({ user: u })}>
-                          Change password
                         </MenuItem>
                         <MenuItem icon={<UserX />} disabled={u.name === me.data?.user} onClick={() => toggle.mutate(u)}>
                           {u.disabled ? "Enable" : "Disable"}

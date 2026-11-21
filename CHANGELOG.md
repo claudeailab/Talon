@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.57
+- Users: removed the duplicate Change password item; Edit changes the password
+
 ## 1.0.56
 - Much faster OneDrive comparison on large drives (whole-drive listing)
 - Live activity line: working, throttled by OneDrive, or waiting
