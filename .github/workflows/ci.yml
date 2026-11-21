@@ -106,14 +106,18 @@ jobs:
             echo "::notice::No ADMIN_TOKEN secret: the About section was not updated"
             exit 0
           fi
-          gh api -X PATCH "repos/$REPO" \
-            -f description="Self-hosted NAS software for Debian, Ubuntu and Raspberry Pi OS: RAID, shared folders, users, OneDrive backup and alerts, managed from your browser." \
-            -f homepage="https://claudeailab.github.io/Talon/" >/dev/null
-          gh api -X PUT "repos/$REPO/topics" \
-            -f "names[]=nas" -f "names[]=self-hosted" -f "names[]=home-server" -f "names[]=file-server" \
-            -f "names[]=raid" -f "names[]=mdadm" -f "names[]=samba" -f "names[]=nfs" \
-            -f "names[]=debian" -f "names[]=ubuntu" -f "names[]=raspberry-pi" -f "names[]=onedrive" >/dev/null
-          echo "About section updated"
+          # an expired or revoked token only skips this; it never fails the release
+          if gh api -X PATCH "repos/$REPO" \
+               -f description="Self-hosted NAS software for Debian, Ubuntu and Raspberry Pi OS: RAID, shared folders, users, OneDrive backup and alerts, managed from your browser." \
+               -f homepage="https://claudeailab.github.io/Talon/" >/dev/null &&
+             gh api -X PUT "repos/$REPO/topics" \
+               -f "names[]=nas" -f "names[]=self-hosted" -f "names[]=home-server" -f "names[]=file-server" \
+               -f "names[]=raid" -f "names[]=mdadm" -f "names[]=samba" -f "names[]=nfs" \
+               -f "names[]=debian" -f "names[]=ubuntu" -f "names[]=raspberry-pi" -f "names[]=onedrive" >/dev/null; then
+            echo "About section updated"
+          else
+            echo "::warning::ADMIN_TOKEN could not update the About section (expired or missing permission)"
+          fi
 
   pages:
     needs: test
