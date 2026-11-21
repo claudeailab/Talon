@@ -561,9 +561,3 @@ function runLabel(r: TaskRun) {
   return r.status === "running" ? "Running" : r.status === "success" ? "OK" : r.status === "cancelled" ? "Stopped" : `Exit ${r.exit_code}`;
 }
 
-function RunBadge({ r }: { r: TaskRun }) {
-  if (r.status === "running") return <Badge tone="blue">Running</Badge>;
-  if (r.status === "success") return <Badge tone="green">OK</Badge>;
-  if (r.status === "cancelled") return <Badge tone="amber">Stopped</Badge>;
-  return <Badge tone="red">exit {r.exit_code}</Badge>;
-}

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.71
+- Scheduled output: earlier runs are in a dropdown instead of a list above the output
+
 ## 1.0.70
 - Scheduled output: earlier runs are in a dropdown instead of a list above the output
 
