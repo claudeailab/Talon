@@ -319,7 +319,7 @@ function TaskDialog({ task, copy, runAs, onClose }: { task: ScheduledTask | null
             value={f.script}
             onChange={(e) => set("script", e.target.value)}
             spellCheck={false}
-            rows={4}
+            rows={10}
             placeholder={"find /srv/nas/tank/Downloads -mtime +30 -delete"}
             className="block w-full resize-y rounded-xl border-0 bg-zinc-950 px-4 py-3 font-mono text-[13px] leading-6 text-zinc-100 placeholder:text-zinc-500 focus:ring-2 focus:ring-brand-500 focus:outline-none"
           />

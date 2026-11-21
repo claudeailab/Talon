@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.63
+- Scheduled: the script box shows 10 lines
+
 ## 1.0.62
 - Settings → Update: choose how often to check for updates (hourly to weekly, or never)
 
