@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.77
+- Documentation on phones: a clear Contents button with all topics, grouped
+- A bar at the bottom while reading: previous topic, Contents, next topic
+
 ## 1.0.76
 - Scheduled: a paused task shows "Paused" as its status again
 

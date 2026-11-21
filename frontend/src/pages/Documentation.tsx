@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, ArrowRight, ChevronRight, ExternalLink, Search, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ChevronDown, ChevronLeft, ChevronRight, ExternalLink, List, Search, X } from "lucide-react";
 import { GUIDE, blockText, plain, type Block, type Topic } from "../lib/guide";
 import { cx } from "../lib/format";
 import { Link, navigate } from "../lib/router";
-import { Callout, Card, Input, PageHeader, Select } from "../components/ui";
+import { Callout, Card, Input, Modal, PageHeader } from "../components/ui";
 
 const GROUPS = ["Basics", "Storage", "Sharing", "Cloud and alerts", "System"] as const;
 
@@ -16,6 +16,7 @@ export default function DocumentationPage() {
   const [topicId, setTopicId] = useState(topicFromUrl);
   const [query, setQuery] = useState("");
   const [section, setSection] = useState<string | null>(null);
+  const [contents, setContents] = useState(false);       // phones: the list of topics
   const searchRef = useRef<HTMLInputElement>(null);
   const topic = GUIDE.find((t) => t.id === topicId)!;
 
@@ -112,19 +113,21 @@ export default function DocumentationPage() {
             ))}
           </Card>
         </nav>
-        <div className="lg:hidden">
-          <Select value={topicId} onChange={(e) => open(e.target.value)} aria-label="Topic">
-            {GROUPS.map((g) => (
-              <optgroup key={g} label={g}>
-                {GUIDE.filter((t) => t.group === g).map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </Select>
-        </div>
+        {/* phones and tablets: a clear Contents button instead of the side list */}
+        <button
+          type="button"
+          onClick={() => setContents(true)}
+          className="flex w-full items-center gap-3 rounded-2xl bg-brand-600 px-4 py-3 text-left text-white shadow-sm lg:hidden"
+        >
+          <List className="size-5 shrink-0" />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[11px] font-medium text-brand-100">
+              Contents · topic {index + 1} of {GUIDE.length}
+            </span>
+            <span className="block font-semibold">{topic.title}</span>
+          </span>
+          <ChevronDown className="size-5 shrink-0" />
+        </button>
 
         {/* search results or the topic */}
         {terms.length ? (
@@ -177,6 +180,66 @@ export default function DocumentationPage() {
           </Card>
         )}
       </div>
+      {/* phones: previous topic, Contents and next topic, always in reach while reading */}
+      {!terms.length && (
+        <div className="fixed inset-x-3 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-30 flex items-center gap-2 rounded-2xl bg-white/95 p-2 shadow-2xl ring-1 ring-zinc-900/10 backdrop-blur lg:hidden dark:bg-zinc-800/95 dark:ring-white/10">
+          <button
+            type="button"
+            aria-label="Previous topic"
+            disabled={index === 0}
+            onClick={() => open(GUIDE[index - 1].id)}
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 disabled:opacity-35 dark:bg-white/5"
+          >
+            <ChevronLeft className="size-5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setContents(true)}
+            className="flex h-10 flex-1 items-center justify-center gap-2 rounded-xl bg-brand-600 text-sm font-semibold text-white"
+          >
+            <List className="size-4" /> Contents
+          </button>
+          <button
+            type="button"
+            aria-label="Next topic"
+            disabled={index === GUIDE.length - 1}
+            onClick={() => open(GUIDE[index + 1].id)}
+            className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 disabled:opacity-35 dark:bg-white/5"
+          >
+            <ChevronRight className="size-5" />
+          </button>
+        </div>
+      )}
+      {/* room under the article for the bar */}
+      <div className="h-16 lg:hidden" aria-hidden />
+
+      <Modal open={contents} onClose={() => setContents(false)} title="Contents">
+        <div className="-mx-6 -my-5">
+          {GROUPS.map((g) => (
+            <div key={g}>
+              <div className="px-6 pt-4 pb-1 text-[11px] font-bold tracking-wider text-zinc-500 uppercase dark:text-zinc-400">{g}</div>
+              {GUIDE.filter((t) => t.group === g).map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => {
+                    setContents(false);
+                    open(t.id);
+                  }}
+                  className={cx(
+                    "flex w-full items-center justify-between gap-3 px-6 py-2.5 text-left text-[15px]",
+                    t.id === topicId ? "bg-brand-50 font-semibold text-brand-700 dark:bg-brand-500/10 dark:text-brand-300" : "hover:bg-zinc-50 dark:hover:bg-white/[0.03]",
+                  )}
+                >
+                  {t.title}
+                  {t.id === topicId && <Check className="size-4 shrink-0" />}
+                </button>
+              ))}
+            </div>
+          ))}
+          <div className="h-3" />
+        </div>
+      </Modal>
     </>
   );
 }
