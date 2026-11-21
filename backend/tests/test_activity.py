@@ -42,3 +42,21 @@ def test_every_change_is_logged(client):
     # a request that fails is not logged
     client.post("/api/files/folder", json={"volume": "tank", "path": "", "name": ".hidden"})
     assert client.get("/api/activity").json()["total"] == before + 2
+
+
+def test_background_tasks_link_their_details_and_keep_them(client):
+    import time
+    nas = client.app.state.nas
+    job = nas.jobs.submit("Test job", "admin", lambda log: log("step one"))
+    for _ in range(50):
+        if job.status in ("success", "error"):
+            break
+        time.sleep(0.1)
+    time.sleep(0.2)
+    items = client.get("/api/activity", params={"q": "Test job"}).json()["items"]
+    assert [i["message"] for i in items] == ["Test job completed", "Test job started"]
+    assert all(i["job"] == job.id for i in items)
+    nas.jobs.jobs.clear()                              # as after a restart: read from disk
+    details = client.get(f"/api/jobs/{job.id}").json()
+    assert details["status"] == "success" and "step one" in details["log"]
+    assert client.get("/api/jobs/zzzzzzzzzzzz").status_code == 404

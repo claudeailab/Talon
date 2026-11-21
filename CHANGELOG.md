@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.73
+- Activity: the Tasks card is gone; the log uses the full width
+- Background tasks in the log have Details with every step, kept after a restart
+
 ## 1.0.72
 - Activity log records everything that happens in Talon, kept up to 20,000 entries
 - Activity log: filter by operation and level, and search

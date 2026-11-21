@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Info, ListChecks, Loader2, Search, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Info, Search, XCircle } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, cx, dateTime } from "../lib/format";
-import type { Activity, Job } from "../lib/types";
+import type { Activity } from "../lib/types";
 import { JobDialog } from "../components/jobs";
 import { Button, Card, CardHeader, Empty, Input, PageHeader, PageLoader, Select } from "../components/ui";
 
@@ -31,14 +31,13 @@ export default function ActivityPage() {
     placeholderData: (prev) => prev,
   });
   const filtered = !!(category || level || q);
-  const jobs = useQuery({ queryKey: ["jobs"], queryFn: () => api.get<Job[]>("/jobs"), refetchInterval: 3000 });
   const [job, setJob] = useState<string | null>(null);
-  if (!act.data || !jobs.data) return <PageLoader />;
+  if (!act.data) return <PageLoader />;
   return (
     <>
       <PageHeader title="Activity" description="Everything that happens in Talon." />
-      <div className="grid gap-5 xl:grid-cols-3">
-        <Card className="xl:col-span-2">
+      <div>
+        <Card>
           <CardHeader title="Activity Log" subtitle={`${act.data.total} event${act.data.total === 1 ? "" : "s"}${filtered ? " found" : ""}`} />
           {/* filters: which kind of operation, how serious, and a text search */}
           <div className="grid gap-2 px-5 pb-3 sm:grid-cols-[1fr_1fr_1.4fr]">
@@ -87,6 +86,20 @@ export default function ActivityPage() {
                     <div className="text-xs text-zinc-500">
                       {a.user} · {act.data.categories.find((c) => c.id === a.category)?.label ?? a.category} ·{" "}
                       <span title={dateTime(a.ts)}>{ago(a.ts)}</span>
+                      {a.job && (
+                        <>
+                          {" · "}
+                          <button
+                            className="font-medium text-brand-600 hover:underline dark:text-brand-400"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setJob(a.job!);
+                            }}
+                          >
+                            Details
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 </li>
@@ -124,32 +137,6 @@ export default function ActivityPage() {
                 </Button>
               </div>
             </div>
-          )}
-        </Card>
-        <Card>
-          <CardHeader icon={<ListChecks className="size-4.5" />} title="Tasks" subtitle="Since the service started" />
-          {jobs.data.length === 0 ? (
-            <p className="px-5 pb-5 text-[13px] text-zinc-500">No tasks have run.</p>
-          ) : (
-            <ul className="space-y-1 px-3 pb-3">
-              {jobs.data.map((j) => (
-                <li key={j.id}>
-                  <button onClick={() => setJob(j.id)} className="flex w-full items-start gap-3 rounded-xl px-2 py-2.5 text-left hover:bg-zinc-50 dark:hover:bg-white/[0.03]">
-                    {j.status === "success" ? (
-                      <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" />
-                    ) : j.status === "error" ? (
-                      <XCircle className="mt-0.5 size-4 shrink-0 text-rose-500" />
-                    ) : (
-                      <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-brand-500" />
-                    )}
-                    <div className="min-w-0">
-                      <div className="truncate text-[13px] font-medium">{j.title}</div>
-                      <div className="text-xs text-zinc-500">{ago(j.started)}</div>
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
           )}
         </Card>
       </div>

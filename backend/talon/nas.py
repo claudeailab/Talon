@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import collections
+import json
 import os
 import re
 import threading
@@ -17,7 +18,7 @@ from .notify import Notifier
 from .scheduler import Scheduler
 from .state import State
 from .util import (NFS_CLIENT_RE, RESERVED_SHARES, SHARE_NAME_RE, USER_NAME_RE,
-                   VOLUME_NAME_RE, UserError, require, unique)
+                   VOLUME_NAME_RE, UserError, require, unique, write_atomic)
 
 SYSTEM_MOUNTS = {"/", "/boot", "/boot/efi", "/boot/firmware", "/usr", "/var", "/home",
                  "[SWAP]", "/var/log", "/tmp", "/opt", "/srv"}
@@ -41,7 +42,8 @@ class Nas:
             platform.seed_state(self.state)
         self._migrate()
         self.jobs = JobRunner(on_done=self._job_done,
-                              on_start=lambda job: self.state.log_activity(job.user, f"{job.title} started"))
+                              on_start=lambda job: self.state.log_activity(job.user, f"{job.title} started",
+                                                                           job=job.id))
         demo = bool(getattr(platform, "demo", False))
         self.notifier = Notifier(self.state, lambda: self.p.system_info().get("hostname", "nas"),
                                  demo)
@@ -142,12 +144,41 @@ class Nas:
                 pass
             self._stop.wait(300)
 
+    JOBS_KEEP = 200
+
+    def _jobs_dir(self) -> str:
+        return os.path.join(os.path.dirname(os.path.abspath(self.cfg.state_file)), "jobs")
+
     def _job_done(self, job) -> None:
         level = "info" if job.status == "success" else "error"
         msg = job.title + (" completed" if job.status == "success" else f" failed: {job.error}")
-        self.state.log_activity(job.user, msg, level)
+        # keep its steps on disk, so the activity log can show them after a restart
+        try:
+            d = self._jobs_dir()
+            os.makedirs(d, mode=0o700, exist_ok=True)
+            write_atomic(os.path.join(d, f"{int(job.started * 1000):015d}-{job.id}.json"),
+                         json.dumps(job.to_dict(with_log=True)), 0o600)
+            for old in sorted(os.listdir(d))[:-self.JOBS_KEEP]:
+                os.unlink(os.path.join(d, old))
+        except OSError:
+            pass
+        self.state.log_activity(job.user, msg, level, job=job.id)
         if job.status == "error":
             self.notifier.send("task_failed", f"{job.title} failed", f"{job.title} failed:\n{job.error}")
+
+    def job_details(self, job_id: str) -> Optional[dict]:
+        """A job with its steps: running ones from memory, finished ones from disk."""
+        j = self.jobs.get(job_id)
+        if j:
+            return j.to_dict(with_log=True)
+        if not re.fullmatch(r"[0-9a-f]{12}", job_id or ""):
+            return None
+        try:
+            name = next(n for n in os.listdir(self._jobs_dir()) if n.endswith(f"-{job_id}.json"))
+            with open(os.path.join(self._jobs_dir(), name)) as f:
+                return json.load(f)
+        except (OSError, StopIteration, ValueError):
+            return None
 
     # ---------------------------------------------------------------- disks
     def disks(self) -> List[dict]:

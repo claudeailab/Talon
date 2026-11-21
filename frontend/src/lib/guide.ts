@@ -718,10 +718,10 @@ export const GUIDE: Topic[] = [
     sections: [
       {
         id: "log",
-        title: "Activity log and tasks",
+        title: "Activity log",
         blocks: [
           { img: "activity", alt: "Activity" },
-          { p: "**Tasks** lists background jobs, such as creating a RAID array or installing an update, with their progress and result. The **Activity Log** lists everything that happens in Talon: every change made in the web interface, sign-ins, OneDrive and scheduled task runs with their results, alerts and emails, updates and restarts, with who did it and when." },
+          { p: "The **Activity Log** lists everything that happens in Talon: every change made in the web interface, sign-ins, OneDrive and scheduled task runs with their results, alerts and emails, updates and restarts, with who did it and when. **Details** next to a background task, such as creating a RAID array or wiping a disk, shows each step it ran, also after a restart." },
           { p: "Narrow it down by **operation** (for example OneDrive, Scheduled or Files), show **Warnings and errors** or **Errors only**, and **Search** for words in the message or a user name. Choose how many entries to show per page and use **Previous** and **Next**. The newest 20,000 entries are kept." },
         ],
       },

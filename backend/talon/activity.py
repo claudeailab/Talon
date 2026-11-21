@@ -66,10 +66,13 @@ class ActivityLog:
         self.path = path
         self._lock = threading.Lock()
 
-    def add(self, user: str, message: str, level: str = "info", category: Optional[str] = None) -> None:
+    def add(self, user: str, message: str, level: str = "info", category: Optional[str] = None,
+            job: Optional[str] = None) -> None:
         cat = category or request_category.get() or categorize(message)
         entry = {"ts": time.time(), "user": user, "message": message, "level": level,
                  "category": cat if cat in CATEGORIES else "system"}
+        if job:
+            entry["job"] = job                   # its step-by-step details: /api/jobs/<id>
         logged = request_logged.get()
         if logged is not None:
             logged.append(entry)

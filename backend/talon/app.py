@@ -383,10 +383,10 @@ def create_app(cfg, platform) -> FastAPI:
 
     @app.get("/api/jobs/{job_id}")
     def job(job_id: str, _u: str = Depends(current_user)):
-        j = nas.jobs.get(job_id)
+        j = nas.job_details(job_id)
         if not j:
             raise HTTPException(404, "Job not found")
-        return j.to_dict(with_log=True)
+        return j
 
     # ------------------------------------------------------------ shares
     @app.get("/api/shares")

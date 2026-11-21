@@ -235,6 +235,8 @@ export interface Activity {
   message: string;
   level: "info" | "warning" | "error";
   category: string;
+  /** a background task: its step-by-step details are at /api/jobs/<job> */
+  job?: string;
 }
 
 export interface UpdateStatus {

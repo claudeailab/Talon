@@ -76,5 +76,5 @@ class State:
             return result
 
     def log_activity(self, user: str, message: str, level: str = "info",
-                     category: Optional[str] = None) -> None:
-        self.activity.add(user, message, level, category)
+                     category: Optional[str] = None, job: Optional[str] = None) -> None:
+        self.activity.add(user, message, level, category, job)
