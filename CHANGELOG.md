@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.65
+- Sizes are counted like Windows and OneDrive (1 TB = 1024 GB), so they match File Explorer
+- Disks also show the size they were sold as (for example "3.6 TB · sold as 4 TB")
+
 ## 1.0.64
 - Files deleted on the Files page go to the volume's recycle bin for 30 days
 - Recycle bin on by default for new shared folders (not with Time Machine)

@@ -1,16 +1,24 @@
-// Storage vendors label capacity in decimal units (1 TB = 10^12 bytes); we do the same
-// so a "4 TB" disk shows as 4 TB.
+// Sizes are counted like Windows and OneDrive: 1 GB = 1024³ bytes, 1 TB = 1024⁴ bytes,
+// so Talon shows the same numbers as File Explorer. (A disk sold as "4 TB", which is
+// 4×10¹² bytes, shows as 3.6 TB; see soldAs.)
 export function bytes(n: number | null | undefined, digits = 1): string {
   if (n == null || isNaN(n)) return "—";
   const u = ["B", "KB", "MB", "GB", "TB", "PB"];
   let i = 0;
   let v = n;
-  while (v >= 1000 && i < u.length - 1) {
-    v /= 1000;
+  while (v >= 1024 && i < u.length - 1) {
+    v /= 1024;
     i++;
   }
   const d = i === 0 ? 0 : v >= 100 ? 0 : digits;
   return `${v.toFixed(d)} ${u[i]}`;
+}
+
+/** The size printed on the box: disk makers count 1 TB = 10¹² bytes ("4 TB", "500 GB"). */
+export function soldAs(n: number): string {
+  const [v, unit] = n >= 1e12 ? [n / 1e12, "TB"] : [n / 1e9, "GB"];
+  const r = v >= 10 ? Math.round(v) : Math.round(v * 10) / 10;
+  return `${r} ${unit}`;
 }
 
 export function rate(n: number | null | undefined): string {

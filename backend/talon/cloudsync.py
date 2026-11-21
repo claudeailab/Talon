@@ -353,7 +353,7 @@ class CloudSync:
         if self.demo:
             token = {"access_token": "demo", "refresh_token": "demo", "expires_at": time.time() + 3600}
             account = {"name": "Alex Demo", "email": "alex@outlook.com", "drive_id": "demo",
-                       "drive_type": "personal", "used": 412 * 10**9, "total": 10**12}
+                       "drive_type": "personal", "used": 412 * 2**30, "total": 2**40}
         else:
             e = self._entra()
             t = entra.redeem_code(e, code, pending["redirect"], pending["verifier"])

@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Activity, Eraser, HardDrive, MoreHorizontal, Thermometer } from "lucide-react";
 import { api } from "../lib/api";
-import { bytes } from "../lib/format";
+import { bytes, soldAs } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Disk, Job } from "../lib/types";
 import { DiskIcon, DiskStatusBadge, HealthBadge, kindLabel } from "../components/disk";
@@ -70,7 +70,10 @@ export default function DisksPage() {
                             {d.name}
                             <span className="ml-1.5 font-sans font-medium text-zinc-500 sm:hidden">{bytes(d.size)}</span>
                           </div>
-                          <div className="truncate text-xs text-zinc-500 sm:max-w-[16rem]">{d.model}</div>
+                          <div className="truncate text-xs text-zinc-500 sm:max-w-[16rem]">
+                            {d.model}
+                            <span className="sm:hidden"> · sold as {soldAs(d.size)}</span>
+                          </div>
                           {d.serial && <div className="hidden font-mono text-[11px] text-zinc-400 sm:block">{d.serial}</div>}
                           {/* phones: health and usage under the name, so the model has the full width */}
                           <div className="mt-1 flex flex-wrap gap-1.5 sm:hidden">
@@ -80,7 +83,10 @@ export default function DisksPage() {
                         </div>
                       </div>
                     </td>
-                    <td className="tabular hidden px-3 py-3.5 font-medium sm:table-cell">{bytes(d.size)}</td>
+                    <td className="tabular hidden px-3 py-3.5 sm:table-cell">
+                      <div className="font-medium">{bytes(d.size)}</div>
+                      <div className="text-xs whitespace-nowrap text-zinc-500">sold as {soldAs(d.size)}</div>
+                    </td>
                     <td className="hidden px-3 py-3.5 md:table-cell">
                       <Badge>{kindLabel[d.kind]}</Badge>
                     </td>

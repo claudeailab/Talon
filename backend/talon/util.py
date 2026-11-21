@@ -94,10 +94,11 @@ def require(pattern: re.Pattern, value: str, what: str) -> str:
 
 
 def human_bytes(n: float) -> str:
+    """Like Windows and the web interface: 1 GB = 1024**3 bytes."""
     units = ["B", "KB", "MB", "GB", "TB", "PB"]
     i = 0
-    while n >= 1000 and i < len(units) - 1:
-        n /= 1000.0
+    while n >= 1024 and i < len(units) - 1:
+        n /= 1024.0
         i += 1
     return f"{n:.1f} {units[i]}" if i else f"{int(n)} B"
 

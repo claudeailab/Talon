@@ -130,6 +130,7 @@ export const GUIDE: Topic[] = [
           { img: "disks", alt: "Disks page" },
           { p: "Every disk shows its type (HDD, SSD, NVMe, USB), size, what it is used for, health and temperature. Choose **S.M.A.R.T. details** in a disk's **⋯** menu for its power-on time, bad sectors, wear and every attribute." },
           { p: "Virtual disks and some USB enclosures do not report health; they show what they are used for instead." },
+          { p: "Talon counts sizes like Windows and OneDrive (1 TB = 1024 GB), so its numbers match File Explorer. Disk makers count 1 TB = 1000 GB, so a disk sold as 4 TB shows as 3.6 TB; each disk also shows the size it was **sold as**." },
         ],
       },
       {
