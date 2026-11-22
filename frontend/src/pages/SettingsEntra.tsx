@@ -184,13 +184,14 @@ export function SetupGuide({ onClose }: { onClose: () => void }) {
         </Step>
         <Step n={2} title="Register the app">
           <p>
-            <B>App registrations</B> → <B>New registration</B>, name it <B>Talon NAS</B>.
+            <B>App registrations</B> → <B>New registration</B>, name it <B>Talon</B>.
           </p>
-          <p>Supported account types, choose:</p>
-          <p className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-white/[0.04]">
-            <B>Any Entra ID Tenant + Personal Microsoft accounts</B>
-          </p>
-          <p>Then work, school and personal OneDrive all work.</p>
+          <div>
+            <p>Supported account types:</p>
+            <p>
+              <B>Any Entra ID Tenant + Personal Microsoft accounts</B>
+            </p>
+          </div>
           <p>
             Redirect URI: platform <B>Web</B>, paste this address, then click <B>Register</B>.
           </p>
@@ -198,10 +199,31 @@ export function SetupGuide({ onClose }: { onClose: () => void }) {
         </Step>
         <Step n={3} title="Copy the two IDs">
           <p>
-            From the app's <B>Overview</B> page, copy the <B>Application (client) ID</B> and the <B>Directory (tenant) ID</B> into Talon.
+            From the <B>Overview</B> page, copy the <B>Application (client) ID</B> and the <B>Directory (tenant) ID</B> into Talon.
           </p>
         </Step>
-        <Step n={4} title="Create a client secret">
+        <Step n={4} title="Add the permissions">
+          <div>
+            <p>
+              <B>API permissions</B> → <B>Add a permission</B> → <B>Microsoft Graph</B> → <B>Delegated permissions</B>
+            </p>
+            <p>
+              Add: <B>Files.ReadWrite</B> and <B>offline_access</B> (Allows OneDrive Sync)
+            </p>
+          </div>
+          <div>
+            <p>
+              <B>API permissions</B> → <B>Add a permission</B> → <B>Microsoft Graph</B> → <B>Application permissions</B>
+            </p>
+            <p>
+              Add: <B>User.Read.All</B> (Allows EntraID users to access Talon web interface)
+            </p>
+          </div>
+          <p>
+            Click <B>Grant admin consent</B>.
+          </p>
+        </Step>
+        <Step n={5} title="Create a client secret">
           <p>
             <B>Certificates & secrets</B> → <B>New client secret</B>, expiry <B>24 months</B>.
           </p>
@@ -209,35 +231,8 @@ export function SetupGuide({ onClose }: { onClose: () => void }) {
             Copy the secret <B>Value</B> (not the Secret ID) into Talon. It is shown once.
           </p>
           <p>
-            Enter its <B>Expires</B> date under <B>Secret expires on</B>.
+            In Talon, enter its <B>Expires</B> date under <B>Secret expires on</B>.
           </p>
-        </Step>
-        <Step n={5} title="Add the permissions">
-          <div>
-            <p>
-              <B>API permissions</B> → <B>Add a permission</B> → <B>Microsoft Graph</B>
-            </p>
-            <p className="mt-1">
-              <B>Delegated permissions</B>, used for OneDrive sync:
-            </p>
-            <p className="mt-1">
-              <B>Files.ReadWrite</B> and <B>offline_access</B>.
-            </p>
-          </div>
-          <div className="pt-2">
-            <p>
-              <B>API permissions</B> → <B>Add a permission</B> → <B>Microsoft Graph</B>
-            </p>
-            <p className="mt-1">
-              <B>Application permissions</B>, used for adding EntraID users to Talon (optional; skip it if you only use OneDrive):
-            </p>
-            <p className="mt-1">
-              <B>User.Read.All</B>
-            </p>
-            <p className="mt-1">
-              Then click <B>Grant admin consent</B>. This needs a Global Administrator or Privileged Role Administrator.
-            </p>
-          </div>
         </Step>
         <Step n={6} title="Save and test in Talon">
           <p>

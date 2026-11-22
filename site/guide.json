@@ -775,13 +775,12 @@
      },
      {
       "steps": [
-       "Go to **entra.microsoft.com** and sign in.",
-       "**App registrations → New registration**, name it **Talon NAS**. Supported account types: **Any Entra ID Tenant + Personal Microsoft accounts**, so work, school and personal OneDrive all work. Redirect URI: platform **Web**, paste the address from Talon's **Redirect URI** field, then click **Register**.",
-       "From the app's **Overview** page, copy the **Application (client) ID** and the **Directory (tenant) ID** into Talon.",
-       "**Certificates & secrets → New client secret**, expiry **24 months**. Copy the secret **Value** (not the Secret ID) into Talon. It is shown only once. Enter its **Expires** date in Talon under **Secret expires on**.",
-       "**API permissions → Add a permission → Microsoft Graph → Delegated permissions**, used for OneDrive sync: add **Files.ReadWrite** and **offline_access**.",
-       "Optional, used for adding [EntraID users](/documentation?topic=users) to Talon: **API permissions → Add a permission → Microsoft Graph → Application permissions**: add **User.Read.All**, then click **Grant admin consent** (needs a Global Administrator or Privileged Role Administrator). Skip it if you only use OneDrive.",
-       "In Talon, click **Save**, then **Test**."
+       "**Open the Entra admin center**: go to **entra.microsoft.com** and sign in.",
+       "**Register the app**: **App registrations → New registration**, name it **Talon**. Supported account types: **Any Entra ID Tenant + Personal Microsoft accounts**. Redirect URI: platform **Web**, paste the address from Talon's **Redirect URI** field, then click **Register**.",
+       "**Copy the two IDs**: from the **Overview** page, copy the **Application (client) ID** and the **Directory (tenant) ID** into Talon.",
+       "**Add the permissions**: **API permissions → Add a permission → Microsoft Graph → Delegated permissions**, add **Files.ReadWrite** and **offline_access** (allows OneDrive sync). Then **API permissions → Add a permission → Microsoft Graph → Application permissions**, add **User.Read.All** (allows [EntraID users](/documentation?topic=users) to access the Talon web interface). Click **Grant admin consent**.",
+       "**Create a client secret**: **Certificates & secrets → New client secret**, expiry **24 months**. Copy the secret **Value** (not the Secret ID) into Talon. It is shown once. In Talon, enter its **Expires** date under **Secret expires on**.",
+       "**Save and test in Talon**: click **Save**, then **Test**."
       ]
      },
      {

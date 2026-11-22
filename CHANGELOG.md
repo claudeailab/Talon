@@ -1,3 +1,6 @@
+## 1.0.90
+- EntraID setup guide: reordered and simplified steps
+
 ## 1.0.89
 - EntraID setup guide: account type named as in the Entra portal
 
