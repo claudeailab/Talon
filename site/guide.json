@@ -94,7 +94,7 @@
      },
      {
       "list": [
-       "**CPU, Memory, Network and Disk activity**: live values and the last few minutes as a chart.",
+       "**CPU, Memory, Network and Disk activity**: live values and the last few minutes as a chart. Tap a card for its history.",
        "**Storage**: each volume with its free space, each RAID array with its health and disks and, when turned on, OneDrive.",
        "**System**: model, operating system, kernel, processor, memory, uptime, network addresses, and the number of shared folders and users.",
        "**Disks**: every disk with its health and temperature.",
@@ -102,7 +102,10 @@
       ]
      },
      {
-      "p": "The badge at the top right says **All systems healthy**, or how many issues need attention. Each issue appears as a card above the charts; click it to go to the page where you can fix it."
+      "p": "The badge at the top says **All systems healthy**, or how many issues need attention. Each issue appears as a card above the charts; click it to go to the page where you can fix it."
+     },
+     {
+      "p": "**History**: tap the CPU, Memory, Network or Disk activity card, or **History** on the Storage card, to see the last hour, 24 hours, 7 days, 30 days or year, with the average and the peak. Disk activity also shows each disk's temperature; Storage shows how fast each volume grows and when it will be full. Talon keeps a year of history, about 1 MB."
      }
     ]
    }

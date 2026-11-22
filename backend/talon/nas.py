@@ -14,6 +14,7 @@ from .cloudsync import CloudSync
 from .files import FileBrowser
 from .jobs import JobRunner
 from .network import Network
+from .history import History
 from .osupdate import OsUpdate
 from .ramlog import RamLog
 from .notify import Notifier
@@ -36,7 +37,8 @@ class Nas:
         self.p = platform
         if getattr(platform, "demo", False):
             # the simulated host is rebuilt on every start, its activity log too
-            for f in (cfg.state_file, os.path.join(os.path.dirname(os.path.abspath(cfg.state_file)), "activity.jsonl")):
+            for f in (cfg.state_file, *(os.path.join(os.path.dirname(os.path.abspath(cfg.state_file)), n)
+                                        for n in ("activity.jsonl", "history.json"))):
                 if os.path.exists(f):
                     os.unlink(f)
         self.state = State(cfg.state_file)
@@ -61,6 +63,12 @@ class Nas:
         self.network = Network(platform, self.state, demo)
         self.ramlog = RamLog(self.state, demo)
         self.osupdate = OsUpdate(self.state, self.notifier, demo)
+        # usage history (Dashboard → tap a card): written hourly on SD cards, else every 10 minutes
+        self.usage = History(os.path.join(os.path.dirname(os.path.abspath(cfg.state_file)), "history.json"),
+                             3600 if (self.state.get("ramlog") or {}).get("enabled") else 600)
+        self._disk_temps: Dict[str, float] = {}
+        self._vol_used: Dict[str, float] = {}
+        self._vol_checked = 0.0
         self.history: collections.deque = collections.deque(maxlen=90)
         self._last_sample: Optional[dict] = None
         self._stop = threading.Event()
@@ -91,6 +99,12 @@ class Nas:
             self.ramlog.auto_enable()
         except Exception:   # noqa: BLE001 - only a convenience
             pass
+        if getattr(self.p, "demo", False):
+            try:
+                self.usage.seed_demo({v["name"]: float(v["used"]) for v in self.volumes() if v.get("size")},
+                                     [d["name"] for d in self.p.scan_disks()])
+            except Exception:   # noqa: BLE001
+                pass
         threading.Thread(target=self._sampler, daemon=True, name="sampler").start()
         threading.Thread(target=self._smart_refresher, daemon=True, name="smart").start()
         threading.Thread(target=self._watcher, daemon=True, name="notify").start()
@@ -100,6 +114,7 @@ class Nas:
 
     def stop(self) -> None:
         self._stop.set()
+        self.usage.flush()
         self.cloud.stop()
         self.scheduler.stop()
 
@@ -143,15 +158,40 @@ class Nas:
                     point["write"] = max(s["disk_write"] - prev["disk_write"], 0) / dt
                 self._last_sample = s
                 self.history.append(point)
+                self._record_usage(point)
             except Exception:
                 pass
             self._stop.wait(2.0)
 
+    def _record_usage(self, point: dict) -> None:
+        if time.time() - self._vol_checked > 600:               # used space: every 10 minutes
+            self._vol_checked = time.time()
+            self._vol_used = {v["name"]: float(v["used"]) for v in self.volumes() if v.get("mounted") and v.get("size")}
+        p = {"ts": point["ts"], "cpu": point["cpu"],
+             "mem": round(point["mem_used"] / point["mem_total"] * 100, 2) if point.get("mem_total") else None,
+             "temp": point["temp"], "rx": point["rx"], "tx": point["tx"], "read": point["read"], "write": point["write"]}
+        for d, t in self._disk_temps.items():
+            p["disk:" + d] = t
+        for v, used in self._vol_used.items():
+            p["vol:" + v] = used
+        self.usage.add(p)
+
+    def usage_history(self, rng: str) -> dict:
+        vols = {v["name"]: float(v["size"]) for v in self.volumes() if v.get("size")}
+        out = self.usage.series(rng)
+        out["volumes"] = {name: {"size": size, "forecast": self.usage.forecast("vol:" + name, size)} for name, size in vols.items()}
+        out["disks"] = sorted({k[5:] for p in out["points"] for k in p if k.startswith("disk:") and not k.endswith("^")})
+        return out
+
     def _smart_refresher(self) -> None:
         while not self._stop.is_set():
             try:
+                temps = {}
                 for d in self.p.scan_disks():
-                    self.p.smart(d["name"])
+                    t = self.p.smart(d["name"]).get("temperature")
+                    if t:
+                        temps[d["name"]] = float(t)
+                self._disk_temps = temps
             except Exception:
                 pass
             self._stop.wait(300)

@@ -383,6 +383,10 @@ def create_app(cfg, platform) -> FastAPI:
     def dashboard(_u: str = Depends(current_user)):
         return nas.dashboard()
 
+    @app.get("/api/history")
+    def usage_history(range: str = "24h", _u: str = Depends(current_user)):
+        return nas.usage_history(range)
+
     @app.get("/api/stats")
     def stats(_u: str = Depends(current_user)):
         return {"history": list(nas.history)}

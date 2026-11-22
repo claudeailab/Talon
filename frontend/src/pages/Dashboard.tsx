@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -23,10 +24,12 @@ import { Badge, Card, CardHeader, PageLoader, Progress, StatusDot, usageTone } f
 import { DiskIcon, DiskStatusBadge, HealthBadge } from "../components/disk";
 import { VolumeStatusBadge } from "./Volumes";
 import { StatusBadge } from "../components/storage";
+import { HistoryModal, type HistoryMetric } from "../components/history";
 
 export default function DashboardPage() {
   const { data } = useQuery({ queryKey: ["dashboard"], queryFn: () => api.get<Dashboard>("/dashboard"), refetchInterval: 10000 });
   const stats = useQuery({ queryKey: ["stats"], queryFn: () => api.get<{ history: Point[] }>("/stats"), refetchInterval: 2000 });
+  const [histView, setHist] = useState<HistoryMetric | null>(null);
   if (!data) return <PageLoader />;
   const hist = stats.data?.history ?? data.history;
   const last = hist[hist.length - 1];
@@ -36,6 +39,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
+      {histView && <HistoryModal metric={histView} onClose={() => setHist(null)} />}
       {/* hero */}
       <h1 className="sr-only">Dashboard</h1>
       <div className="flex justify-center">
@@ -81,6 +85,7 @@ export default function DashboardPage() {
       {/* live metrics */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
+          onClick={() => setHist("cpu")}
           icon={<Cpu className="size-4" />}
           label="CPU"
           value={last ? `${last.cpu.toFixed(0)}%` : "—"}
@@ -89,6 +94,7 @@ export default function DashboardPage() {
           chart={<AreaChart series={[{ values: hist.map((h) => h.cpu), color: "#6366f1" }]} max={100} height={52} />}
         />
         <MetricCard
+          onClick={() => setHist("mem")}
           icon={<MemoryStick className="size-4" />}
           label="Memory"
           value={last ? `${pct(last.mem_used, last.mem_total).toFixed(0)}%` : "—"}
@@ -96,7 +102,7 @@ export default function DashboardPage() {
           ring={last ? pct(last.mem_used, last.mem_total) : 0}
           chart={<AreaChart series={[{ values: hist.map((h) => pct(h.mem_used, h.mem_total)), color: "#a855f7" }]} max={100} height={52} />}
         />
-        <Card className="p-5">
+        <Card className={TAPPABLE} onClick={() => setHist("net")} {...tap("Network history")}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 text-[13px] font-medium text-zinc-500 dark:text-zinc-400">
               <Network className="size-4" /> Network
@@ -126,7 +132,7 @@ export default function DashboardPage() {
             />
           </div>
         </Card>
-        <Card className="p-5">
+        <Card className={TAPPABLE} onClick={() => setHist("disk")} {...tap("Disk activity history")}>
           <div className="flex items-center gap-2 text-[13px] font-medium text-zinc-500 dark:text-zinc-400">
             <Gauge className="size-4" /> Disk activity
           </div>
@@ -160,9 +166,16 @@ export default function DashboardPage() {
             title="Storage"
             subtitle={totalSize ? `${bytes(totalUsed)} used of ${bytes(totalSize)}` : "No volumes yet"}
             actions={
-              <Link to="/volumes" className="text-[13px] font-medium text-brand-600 hover:text-brand-500 dark:text-brand-400">
-                Manage
-              </Link>
+              <div className="flex items-center gap-4">
+                {data.volumes.length > 0 && (
+                  <button type="button" onClick={() => setHist("storage")} className="text-[13px] font-medium text-brand-600 hover:text-brand-500 dark:text-brand-400">
+                    History
+                  </button>
+                )}
+                <Link to="/volumes" className="text-[13px] font-medium text-brand-600 hover:text-brand-500 dark:text-brand-400">
+                  Manage
+                </Link>
+              </div>
             }
           />
           <div className="px-5 pb-5">
@@ -397,7 +410,21 @@ function Chips({ items }: { items: { key: string; label: string; bad?: boolean; 
   );
 }
 
+const TAPPABLE = "cursor-pointer p-5 transition hover:ring-brand-300 dark:hover:ring-brand-400/40";
+const tap = (label: string) => ({
+  role: "button",
+  tabIndex: 0,
+  "aria-label": label,
+  onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      (e.currentTarget as HTMLElement).click();
+    }
+  },
+});
+
 function MetricCard({
+  onClick,
   icon,
   label,
   value,
@@ -411,9 +438,10 @@ function MetricCard({
   sub: string;
   ring: number;
   chart: React.ReactNode;
+  onClick: () => void;
 }) {
   return (
-    <Card className="p-5">
+    <Card className={TAPPABLE} onClick={onClick} {...tap(`${label} history`)}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2 text-[13px] font-medium text-zinc-500 dark:text-zinc-400">

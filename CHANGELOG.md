@@ -1,3 +1,7 @@
+## 1.0.107
+- Dashboard: tap CPU, Memory, Network or Disk activity for up to a year of history
+- Storage history shows how fast each volume grows and when it will be full
+
 ## 1.0.106
 - Settings → Update: new Operating system tab to install updates with a progress bar
 - Automatic security updates with optional restart; dashboard shows waiting security updates
