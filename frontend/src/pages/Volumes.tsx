@@ -153,7 +153,7 @@ function VolumeCard({ v, onJob }: { v: Volume; onJob: (id: string) => void }) {
               </IconButton>
             }
           >
-            <MenuItem icon={<FolderTree />} disabled={!v.mounted} onClick={() => navigate(`/files?volume=${encodeURIComponent(v.name)}`)}>
+            <MenuItem icon={<FolderTree />} disabled={!v.mounted} onClick={() => navigate(`/browser?volume=${encodeURIComponent(v.name)}`)}>
               Browse files
             </MenuItem>
             {v.can_expand_fs && (

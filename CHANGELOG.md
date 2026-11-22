@@ -1,3 +1,6 @@
+## 1.0.113
+- The Browser page is at /browser; old /files links still work
+
 ## 1.0.112
 - Activity: one list for Talon and the system logs; choose what to show from the list
 - OS updates: progress while checking, automatic install of all updates, restart screen that reconnects

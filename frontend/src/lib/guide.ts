@@ -264,7 +264,7 @@ export const GUIDE: Topic[] = [
           {
             list: [
               "Each volume shows its used and free space and whether it survives disk failures.",
-              "**⋯ → Browse files** opens the volume on the [Browser](/files) page.",
+              "**⋯ → Browse files** opens the volume on the [Browser](/browser) page.",
               "**Expand filesystem** appears after the RAID array under the volume has grown.",
               "**Delete volume** erases everything on it.",
             ],
@@ -280,7 +280,7 @@ export const GUIDE: Topic[] = [
     title: "Browser",
     group: "Storage",
     summary: "Browse, upload and download files on volumes, other disks and OneDrive.",
-    page: { to: "/files", label: "Open Browser" },
+    page: { to: "/browser", label: "Open Browser" },
     sections: [
       {
         id: "browse",
@@ -603,7 +603,7 @@ export const GUIDE: Topic[] = [
         title: "Versions and restoring",
         blocks: [
           { p: "On disks formatted as ext4, XFS, Btrfs or NTFS, every backup is a dated version; files that did not change take no extra space. Versions older than the number of days you chose are removed, and the newest is always kept. FAT32 and exFAT cannot do this: there the backup is one copy, kept up to date." },
-          { p: "**Restore** lists the versions. Choosing one opens it in [Browser](/files), where you can download a file or move it back to a volume." },
+          { p: "**Restore** lists the versions. Choosing one opens it in [Browser](/browser), where you can download a file or move it back to a volume." },
           { p: "**⋯ → Edit** changes the folders or the schedule; **Delete** removes the backup task but keeps the backups on the disk." },
         ],
       },

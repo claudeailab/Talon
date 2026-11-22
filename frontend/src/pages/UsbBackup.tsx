@@ -170,7 +170,7 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
               <Button
                 key={s}
                 size="sm"
-                onClick={() => navigate(`/files?${new URLSearchParams({ volume: t.disk!.id, path: `${backupDir}/${s}` })}`)}
+                onClick={() => navigate(`/browser?${new URLSearchParams({ volume: t.disk!.id, path: `${backupDir}/${s}` })}`)}
               >
                 {snapLabel(s)}
               </Button>

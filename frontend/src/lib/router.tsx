@@ -9,6 +9,12 @@ export function navigate(to: string) {
   window.scrollTo({ top: 0 });
 }
 
+/** Swap the address without a new history entry (old links that moved). */
+export function redirect(to: string) {
+  history.replaceState(null, "", to);
+  listeners.forEach((l) => l());
+}
+
 export function usePath(): string {
   const [path, setPath] = useState(location.pathname);
   useEffect(() => {
