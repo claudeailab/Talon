@@ -1,3 +1,6 @@
+## 1.0.109
+- WebDAV: shared folders over HTTPS at /dav for apps and remote access (turn it on in Services)
+
 ## 1.0.108
 - New Antivirus page: scan shared folders with ClamAV on demand or on a schedule
 - Infected files move to a quarantine; you get an email

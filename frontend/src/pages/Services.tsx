@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { Apple, Cloud, Globe, Monitor, Network, RotateCw, Server, Settings2, Terminal } from "lucide-react";
+import { Apple, Cloud, Copy, FolderSync, Globe, Monitor, Network, RotateCw, Server, Settings2, Terminal } from "lucide-react";
 import { api } from "../lib/api";
 import { useAction } from "../lib/hooks";
 import { navigate } from "../lib/router";
 import type { Service } from "../lib/types";
-import { Badge, Button, Card, PageHeader, PageLoader, StatusDot, Switch } from "../components/ui";
+import { Badge, Button, Card, PageHeader, PageLoader, StatusDot, Switch, useToast } from "../components/ui";
 
 const ICONS: Record<string, React.ReactNode> = {
   smb: <Monitor className="size-5" />,
@@ -14,6 +14,7 @@ const ICONS: Record<string, React.ReactNode> = {
   mdns: <Apple className="size-5" />,
   ssh: <Terminal className="size-5" />,
   onedrive: <Cloud className="size-5" />,
+  webdav: <FolderSync className="size-5" />,
 };
 
 export default function ServicesPage() {
@@ -25,6 +26,8 @@ export default function ServicesPage() {
       if (v.id === "onedrive" && v.action === "enable") navigate("/onedrive"); // straight to setup
     },
   });
+  const toast = useToast();
+  const davUrl = `${location.origin}/dav/`;
   if (!data) return <PageLoader />;
   return (
     <>
@@ -50,9 +53,10 @@ export default function ServicesPage() {
                 onChange={(v) => act.mutate({ id: s.id, action: v ? "enable" : "disable" })}
               />
             </div>
-            <p className="mt-3 truncate text-[13px] text-zinc-500 dark:text-zinc-400" title={s.description}>
-              {s.description}
-            </p>
+            <p className="mt-3 text-[13px] text-zinc-500 dark:text-zinc-400">{s.description}</p>
+            {s.id === "webdav" && s.enabled && (
+              <p className="mt-1 font-mono text-[12.5px] break-all text-zinc-700 dark:text-zinc-300">{davUrl}</p>
+            )}
             <div className="mt-4 flex items-center justify-between">
               {s.app ? (
                 s.enabled ? <Badge tone="green">Enabled</Badge> : <Badge>Disabled</Badge>
@@ -61,7 +65,17 @@ export default function ServicesPage() {
               ) : (
                 <Badge>Disabled at boot</Badge>
               )}
-              {s.app ? (
+              {s.id === "webdav" ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  icon={<Copy className="size-3.5" />}
+                  disabled={!s.enabled}
+                  onClick={() => navigator.clipboard?.writeText(davUrl).then(() => toast("success", "Address copied"), () => toast("error", "Copy failed"))}
+                >
+                  Copy address
+                </Button>
+              ) : s.app ? (
                 <Button size="sm" variant="ghost" icon={<Settings2 className="size-3.5" />} disabled={!s.enabled} onClick={() => navigate("/onedrive")}>
                   Configure
                 </Button>

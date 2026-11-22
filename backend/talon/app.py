@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from . import activity, webconfig, __version__, notify
 from .syslog import SystemLog
+from .webdav import PREFIX as DAV_PREFIX, WebDav
 from .auth import COOKIE, Sessions
 from .nas import Nas
 from .update import DemoUpdater, Updater, health as health_info
@@ -175,6 +176,7 @@ def create_app(cfg, platform) -> FastAPI:
     sessions = Sessions(cfg.session_hours, cfg.sessions_file)
 
     syslog_reader = SystemLog(cfg.demo)
+    webdav = WebDav(nas, platform, cfg.demo)
     updater = (DemoUpdater if cfg.demo else Updater)(cfg, nas.state)
 
     @contextlib.asynccontextmanager
@@ -581,10 +583,15 @@ def create_app(cfg, platform) -> FastAPI:
     # ------------------------------------------------------------ services & system
     @app.get("/api/services")
     def services(_u: str = Depends(current_user)):
-        return platform.services() + [nas.cloud.service_info()]
+        return platform.services() + [nas.cloud.service_info(), webdav.service_info()]
 
     @app.post("/api/services/{sid}/{action}")
     def service_action(sid: str, action: str, user: str = Depends(current_user)):
+        if sid == "webdav":
+            if action not in ("enable", "disable"):
+                raise HTTPException(400, "WebDAV can only be enabled or disabled")
+            webdav.set_enabled(action == "enable", user)
+            return {"ok": True}
         if sid == "onedrive":
             if action not in ("enable", "disable"):
                 raise HTTPException(400, "OneDrive can only be enabled or disabled")
@@ -970,6 +977,9 @@ def create_app(cfg, platform) -> FastAPI:
     @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "DELETE"])
     def api_404(rest: str):
         raise HTTPException(404, "Not found")
+
+    # ------------------------------------------------------------ WebDAV (/dav)
+    app.mount(DAV_PREFIX, webdav)
 
     # ------------------------------------------------------------ web UI
     @app.get("/{path:path}")
