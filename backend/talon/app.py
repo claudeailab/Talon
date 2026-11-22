@@ -1036,11 +1036,6 @@ def create_app(cfg, platform) -> FastAPI:
         r["items"] = [{**e, "kind": "talon"} for e in r["items"]]
         return {**r, "more": r["offset"] + len(r["items"]) < r["total"], "sources": sources}
 
-    @app.get("/api/syslog")
-    def system_log(offset: int = 0, limit: int = 25, source: str = "", level: str = "",
-                   q: str = "", _u: str = Depends(current_user)):
-        return syslog_reader.query(offset, limit, source, level, q)
-
     @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "DELETE"])
     def api_404(rest: str):
         raise HTTPException(404, "Not found")

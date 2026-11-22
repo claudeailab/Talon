@@ -1,3 +1,6 @@
+## 1.0.115
+- Removed leftover code: the old system log address and the old automatic updates switch
+
 ## 1.0.114
 - Removed the old /files redirect
 

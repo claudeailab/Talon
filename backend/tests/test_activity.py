@@ -63,13 +63,13 @@ def test_background_tasks_link_their_details_and_keep_them(client):
 
 
 def test_system_logs(client):
-    r = client.get("/api/syslog", params={"limit": 10}).json()
+    r = client.get("/api/activity", params={"source": "system", "limit": 10}).json()
     assert len(r["items"]) == 10 and r["more"] and {s["id"] for s in r["sources"]} >= {"samba", "ssh", "kernel"}
-    ssh = client.get("/api/syslog", params={"source": "ssh", "limit": 50}).json()["items"]
+    ssh = client.get("/api/activity", params={"source": "system", "system": "ssh", "limit": 50}).json()["items"]
     assert ssh and all(e["source"] == "ssh" for e in ssh)
-    errs = client.get("/api/syslog", params={"level": "error", "limit": 50}).json()["items"]
+    errs = client.get("/api/activity", params={"source": "system", "level": "error", "limit": 50}).json()["items"]
     assert errs and all(e["level"] == "error" for e in errs)
-    found = client.get("/api/syslog", params={"q": "failed password", "limit": 50}).json()["items"]
+    found = client.get("/api/activity", params={"source": "system", "q": "failed password", "limit": 50}).json()["items"]
     assert found and all("Failed password" in e["message"] for e in found)
 
 

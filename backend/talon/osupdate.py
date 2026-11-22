@@ -221,7 +221,7 @@ class OsUpdate:
     # ------------------------------------------------------------ automatic security updates
     def auto_settings(self) -> dict:
         a = self._saved().get("auto") or {}
-        mode = a.get("mode") or ("security" if a.get("security") else "off")      # earlier versions: a switch
+        mode = a.get("mode", "off")
         return {"mode": mode if mode in AUTO_MODES else "off", "restart": bool(a.get("restart")),
                 "restart_time": a.get("restart_time", "04:00")}
 
