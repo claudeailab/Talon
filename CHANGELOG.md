@@ -1,3 +1,6 @@
+## 1.0.105
+- Settings: fewer writes to the system disk, on by default for SD cards and USB flash drives
+
 ## 1.0.104
 - Activity: new System logs tab with Samba, NFS, SSH, disk and kernel messages
 

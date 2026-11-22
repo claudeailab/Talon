@@ -791,6 +791,7 @@ export const GUIDE: Topic[] = [
               "**macOS compatibility**: faster Finder browsing and correct metadata for Macs.",
             ],
           },
+          { p: "**System Disk → Fewer writes to the system disk** keeps the system logs in memory and writes them to the disk once a day and when the NAS shuts down or restarts. SD cards and USB flash drives wear out from many small writes, so they last much longer. It is turned on automatically when Talon runs from an SD card or a USB flash drive, and applies after the next restart. After a power cut, up to a day of system logs can be lost; your files are not affected." },
         ],
       },
       {

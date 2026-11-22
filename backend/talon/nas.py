@@ -14,6 +14,7 @@ from .cloudsync import CloudSync
 from .files import FileBrowser
 from .jobs import JobRunner
 from .network import Network
+from .ramlog import RamLog
 from .notify import Notifier
 from .scheduler import Scheduler
 from .state import State
@@ -57,6 +58,7 @@ class Nas:
         self._purged = 0.0
         self.scheduler = Scheduler(cfg, self.state, self, demo)
         self.network = Network(platform, self.state, demo)
+        self.ramlog = RamLog(self.state, demo)
         self.history: collections.deque = collections.deque(maxlen=90)
         self._last_sample: Optional[dict] = None
         self._stop = threading.Event()
@@ -83,6 +85,10 @@ class Nas:
 
     # ---------------------------------------------------------------- lifecycle
     def start(self) -> None:
+        try:
+            self.ramlog.auto_enable()
+        except Exception:   # noqa: BLE001 - only a convenience
+            pass
         threading.Thread(target=self._sampler, daemon=True, name="sampler").start()
         threading.Thread(target=self._smart_refresher, daemon=True, name="smart").start()
         threading.Thread(target=self._watcher, daemon=True, name="notify").start()

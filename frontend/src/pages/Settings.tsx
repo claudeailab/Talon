@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { CheckCircle2, Download, Info, KeyRound, Mail, Network, RefreshCw, Server, SlidersHorizontal, Sparkles } from "lucide-react";
+import { CheckCircle2, Download, HardDrive, Info, KeyRound, Mail, Network, RefreshCw, Server, SlidersHorizontal, Sparkles } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, bytes, date } from "../lib/format";
 import { useAction } from "../lib/hooks";
@@ -66,6 +66,7 @@ function GeneralTab() {
   const FIELDS = ["hostname", "timezone", "workgroup", "smb_min_protocol", "smb_macos_compat"] as const;
   const changed = !!settings.data && FIELDS.some((k) => form[k] !== settings.data![k]);
   return (
+    <div className="space-y-5">
     <Card>
       <CardHeader
         icon={<Server className="size-4.5" />}
@@ -120,6 +121,64 @@ function GeneralTab() {
             <Switch checked={form.smb_macos_compat} onChange={(v) => set("smb_macos_compat", v)} label="macOS compatibility" />
           </div>
         </div>
+      </div>
+    </Card>
+    <SystemDiskCard />
+    </div>
+  );
+}
+
+type SdCard = {
+  enabled: boolean;
+  active: boolean;
+  restart_needed: boolean;
+  disk: string;
+  flash: "sd" | "usb" | "";
+  recommended: boolean;
+  used_mb: number | null;
+  size_mb: number;
+  synced_at: number | null;
+};
+
+/** Fewer writes to the system disk: logs in memory, copied to the disk once a day. */
+function SystemDiskCard() {
+  const q = useQuery({ queryKey: ["sdcard"], queryFn: () => api.get<SdCard>("/settings/sdcard") });
+  const save = useAction((enabled: boolean) => api.put<SdCard>("/settings/sdcard", { enabled }), {
+    success: (_r, on) => (on ? "Turned on. It applies after the next restart." : "Turned off. It applies after the next restart."),
+    invalidate: ["sdcard"],
+  });
+  if (!q.data) return null;
+  const d = q.data;
+  const what = d.flash === "sd" ? "an SD card" : d.flash === "usb" ? "a USB flash drive" : null;
+  return (
+    <Card>
+      <CardHeader
+        icon={<HardDrive className="size-4.5" />}
+        title="System Disk"
+        subtitle={`Talon runs from ${d.disk}${what ? `, ${what}` : ""}`}
+      />
+      <div className="space-y-3 px-5 pb-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <div className="text-[13.5px] font-medium">Fewer writes to the system disk</div>
+            <div className="text-[13px] text-zinc-500">
+              Keeps the system logs in memory and writes them to the disk once a day and when the NAS shuts down or restarts. SD cards and USB flash drives last
+              much longer. After a power cut, up to a day of system logs can be lost; your files are not affected.
+              {what && !d.enabled && <span className="font-medium text-amber-600 dark:text-amber-400"> Recommended for {what}.</span>}
+            </div>
+          </div>
+          <Switch checked={d.enabled} onChange={(v) => save.mutate(v)} label="Fewer writes to the system disk" />
+        </div>
+        {d.restart_needed ? (
+          <Callout tone="info">Applies after the next restart of the NAS.</Callout>
+        ) : (
+          d.active && (
+            <div className="text-xs text-zinc-500">
+              Logs in memory: {d.used_mb ?? "?"} MB of {d.size_mb} MB
+              {d.synced_at ? ` · last written to the disk ${ago(d.synced_at)}` : " · not written to the disk yet"}
+            </div>
+          )
+        )}
       </div>
     </Card>
   );

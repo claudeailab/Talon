@@ -16,8 +16,12 @@ PURGE=0; [ "${1:-}" = "--purge" ] && PURGE=1
 
 if [ -d /run/systemd/system ]; then
   systemctl disable --now talon >/dev/null 2>&1 || true
+  # logs kept in memory: stopping copies them back to the disk and unmounts the memory
+  systemctl disable --now talon-ramlog-sync.timer talon-ramlog.service >/dev/null 2>&1 || true
 fi
 rm -f /etc/systemd/system/talon.service /etc/pam.d/talon /usr/local/sbin/talon
+rm -f /etc/systemd/system/talon-ramlog.service /etc/systemd/system/talon-ramlog-sync.service \
+  /etc/systemd/system/talon-ramlog-sync.timer /etc/systemd/journald.conf.d/talon-ramlog.conf /usr/local/sbin/talon-ramlog
 [ -d /run/systemd/system ] && systemctl daemon-reload || true
 rm -rf /opt/talon
 echo "Talon web interface removed."

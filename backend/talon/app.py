@@ -870,6 +870,14 @@ def create_app(cfg, platform) -> FastAPI:
         nas.update_settings(body, user)
         return nas.settings()
 
+    @app.get("/api/settings/sdcard")
+    def sdcard(_u: str = Depends(current_user)):
+        return nas.ramlog.status()
+
+    @app.put("/api/settings/sdcard")
+    def sdcard_update(body: dict = Body(...), user: str = Depends(current_user)):
+        return nas.ramlog.set_enabled(bool(body.get("enabled")), user)
+
     @app.get("/api/settings/timezones")
     def timezones(_u: str = Depends(current_user)):
         return platform.timezones()

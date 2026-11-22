@@ -280,3 +280,20 @@ def test_alert_thresholds(client):
     assert not any("tank is almost full" in a["title"] for a in nas.alerts())
     for bad in ({"temp_hdd": 10}, {"volume_full": 100}, {"ssd_wear": "x"}):
         assert client.put("/api/thresholds", json={**info["values"], **bad}).status_code == 400
+
+
+def test_fewer_writes_to_the_system_disk(client):
+    st = client.get("/api/settings/sdcard").json()
+    # the demo system disk is an SD card: turned on by default, active after a restart
+    assert st["recommended"] and st["flash"] == "sd" and st["enabled"]
+    st = client.put("/api/settings/sdcard", json={"enabled": False}).json()
+    assert not st["enabled"]
+    acts = client.get("/api/activity", params={"q": "system disk"}).json()["items"]
+    assert acts and "Turned off" in acts[0]["message"]
+
+
+def test_ramlog_script_never_blocks_the_boot():
+    from talon.ramlog import SCRIPT_TEXT, UNIT_TEXT, flash_kind
+    assert SCRIPT_TEXT.rstrip().endswith("exit 0") and "|| exit 0" in SCRIPT_TEXT
+    assert "DefaultDependencies=no" in UNIT_TEXT and "ExecStop=" in UNIT_TEXT
+    assert (flash_kind("mmcblk0"), flash_kind("sda", "usb", False), flash_kind("sda", "usb", True), flash_kind("nvme0n1")) == ("sd", "usb", "", "")
