@@ -876,8 +876,13 @@ class Nas:
 
     def create_group(self, name: str, members: List[str], actor: str, description: str = "") -> None:
         require(USER_NAME_RE, name, "group name")
-        if self.p.group_exists(name) or name in (self.cfg.admin_group, self.cfg.users_group):
+        if name in self.state.get("groups"):
             raise UserError(f"Group {name} already exists")
+        if name in (self.cfg.admin_group, self.cfg.users_group):
+            raise UserError(f"{name} is used by Talon itself. Choose another name.")
+        if self.p.group_exists(name):
+            raise UserError(f"{name} is already a group of the operating system, so Talon cannot use the name. "
+                            "Choose another name, for example staff or team.")
         self.p.create_group(name)
         self.state.update(lambda d: d["groups"].append(name))
         self.set_group_description(name, description)

@@ -136,6 +136,16 @@ def test_users_groups(client):
     assert client.delete("/api/groups/kids").status_code == 200
 
 
+def test_group_names_taken_by_the_system_or_talon(client):
+    r = client.post("/api/groups", json={"name": "users", "members": []})
+    assert r.status_code == 400 and "operating system" in r.json()["detail"]
+    r = client.post("/api/groups", json={"name": "nasusers", "members": []})
+    assert r.status_code == 400 and "Talon itself" in r.json()["detail"]
+    assert client.post("/api/groups", json={"name": "team", "members": []}).status_code == 200
+    r = client.post("/api/groups", json={"name": "team", "members": []})
+    assert r.status_code == 400 and "already exists" in r.json()["detail"]
+
+
 def test_group_description(client):
     assert client.post("/api/groups", json={"name": "sales", "members": [], "description": "Sales team"}).status_code == 200
     g = next(g for g in client.get("/api/groups").json() if g["name"] == "sales")

@@ -1,3 +1,6 @@
+## 1.0.94
+- Groups: clear message when a name is already used by the operating system (for example users)
+
 ## 1.0.93
 - EntraID users get web interface access when added; turn it off with Edit
 - Email addresses wrap after the @ on phones
