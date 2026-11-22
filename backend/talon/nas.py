@@ -12,6 +12,7 @@ from typing import Dict, List, Optional
 from . import raid, sharecfg
 from .cloudsync import CloudSync
 from .files import FileBrowser
+from .folderperms import FolderPerms
 from .jobs import JobRunner
 from .network import Network
 from .antivirus import Antivirus
@@ -54,6 +55,7 @@ class Nas:
                                  demo)
         self.cloud = CloudSync(cfg, self.state, self, demo)
         self.files = FileBrowser(self, demo)
+        self.folder_perms = FolderPerms(self, demo)
         from .restore import Restore
         self.restore = Restore(self)
         from .entrausers import EntraUsers

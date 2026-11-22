@@ -15,6 +15,7 @@ import time
 import zipfile
 from typing import Iterator, List, Optional, Tuple
 
+from .folderperms import has_default_acl
 from .util import UserError
 
 HIDDEN = (".",)          # dot-files (.recycle, .versions, ...) are not shown
@@ -164,9 +165,12 @@ class FileBrowser:
         if os.geteuid() != 0:
             return
         try:
-            st = os.stat(os.path.dirname(path))
+            parent = os.path.dirname(path)
+            st = os.stat(parent)
             os.chown(path, st.st_uid, st.st_gid)
-            os.chmod(path, 0o2775 if os.path.isdir(path) else 0o664)
+            # inside a folder with folder permissions the default ACL decides the access
+            if not has_default_acl(parent):
+                os.chmod(path, 0o2775 if os.path.isdir(path) else 0o664)
         except OSError:
             pass
 
@@ -224,6 +228,8 @@ class FileBrowser:
         if not os.path.isdir(target):
             raise UserError("Not a folder")
         items = []
+        rel_dir = os.path.relpath(target, root)
+        custom = self.nas.folder_perms.flags(volume, "" if rel_dir == "." else rel_dir) if self.has_bin(volume) else set()
         with os.scandir(target) as it:
             for e in it:
                 if e.name.startswith(HIDDEN):
@@ -243,7 +249,8 @@ class FileBrowser:
                         count = 0
                 items.append({"name": e.name, "folder": folder,
                               "size": 0 if folder else st.st_size,
-                              "modified": st.st_mtime, "count": count})
+                              "modified": st.st_mtime, "count": count,
+                              "custom": folder and e.name in custom})
         items.sort(key=lambda i: (not i["folder"], i["name"].lower()))
         return {"volume": volume, "path": _rel(path), "items": items}
 
@@ -274,6 +281,7 @@ class FileBrowser:
         if os.path.lexists(dst):
             raise UserError(f"{name} already exists")
         os.rename(src, dst)
+        self.nas.folder_perms.moved(volume, os.path.relpath(src, root), volume, os.path.relpath(dst, root))
         return os.path.relpath(dst, root)
 
     def move(self, volume: str, items: List[str], dest_volume: str, dest: str) -> int:
@@ -302,6 +310,9 @@ class FileBrowser:
             if os.path.lexists(target):
                 raise UserError(f"{os.path.basename(src)} already exists in the destination")
             shutil.move(src, target)
+            if self.has_bin(volume) and self.has_bin(dest_volume):
+                self.nas.folder_perms.moved(volume, os.path.relpath(src, root), dest_volume,
+                                            os.path.relpath(target, self._root(dest_volume)))
             moved += 1
         return moved
 
@@ -320,6 +331,7 @@ class FileBrowser:
             if target == root:
                 raise UserError("The volume itself cannot be deleted")
             if self.has_bin(volume):
+                self.nas.folder_perms.removed(volume, os.path.relpath(target, root))
                 self._to_bin(root, target, user)
             elif os.path.isdir(target) and not os.path.islink(target):
                 shutil.rmtree(target)

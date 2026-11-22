@@ -47,3 +47,34 @@ def test_webdav_respects_share_permissions(client):
     assert client.put("/dav/Documents/x.txt", content=b"x", headers=z).status_code == 403
     assert client.request("PROPFIND", "/dav/Documents/%2e%2e/%2e%2e/etc", headers=z).status_code == 400
     assert client.request("PROPFIND", "/dav/Documents/.recycle", headers=z).status_code == 404
+
+
+def test_folder_permissions(client):
+    from conftest import wait_job
+    client.post("/api/services/webdav/enable")
+    for n in ("zoe", "max"):
+        assert client.post("/api/users", json={"name": n, "password": "longenough1"}).status_code == 200
+    vol = next(s for s in client.get("/api/shares").json() if s["name"] == "Documents")
+    vol["users"] = {**vol["users"], "zoe": "rw", "max": "rw"}
+    assert client.put("/api/shares/Documents", json=vol).status_code == 200
+    folder = vol["folder"]
+    assert client.post("/api/files/folder", json={"volume": vol["volume"], "path": folder, "name": "Salaries"}).status_code == 200
+    info = client.get("/api/folder-perms", params={"volume": vol["volume"], "path": f"{folder}/Salaries"}).json()
+    assert info["share"] == "Documents" and info["custom"] is None and not info["share_root"]
+    # the shared folder itself is edited under Shared Folders
+    assert client.put("/api/folder-perms", json={"volume": vol["volume"], "path": folder, "custom": True,
+                                                  "users": {"zoe": "rw"}}).status_code == 400
+    assert client.put("/api/folder-perms", json={"volume": vol["volume"], "path": f"{folder}/Salaries",
+                                                  "custom": True}).status_code == 400          # nobody
+    job = client.put("/api/folder-perms", json={"volume": vol["volume"], "path": f"{folder}/Salaries", "custom": True,
+                                                 "users": {"zoe": "rw"}}).json()
+    assert wait_job(client, job)["status"] == "success"
+    items = client.get("/api/files", params={"volume": vol["volume"], "path": folder}).json()["items"]
+    assert next(i for i in items if i["name"] == "Salaries")["custom"] is True
+    z, m = _auth("zoe", "longenough1"), _auth("max", "longenough1")
+    assert client.put("/dav/Documents/Salaries/pay.txt", content=b"1", headers=z).status_code == 201
+    assert client.request("PROPFIND", "/dav/Documents/Salaries/", headers={**m, "Depth": "1"}).status_code == 404
+    assert client.get("/dav/Documents/Salaries/pay.txt", headers=m).status_code == 404
+    # renaming keeps the rule
+    assert client.post("/api/files/rename", json={"volume": vol["volume"], "path": f"{folder}/Salaries", "name": "Pay"}).status_code == 200
+    assert client.get("/api/folder-perms", params={"volume": vol["volume"], "path": f"{folder}/Pay"}).json()["custom"]["users"] == {"zoe": "rw"}

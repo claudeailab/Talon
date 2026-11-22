@@ -100,6 +100,7 @@ ACTIONS = {
     "POST /api/update/check": ("updates", "Checked for updates"),
     "PUT /api/update/settings": ("updates", None),
     "POST /api/os-update/check": ("updates", None),
+    "PUT /api/folder-perms": ("sharing", None),
     "POST /api/antivirus/install": ("antivirus", None),
     "POST /api/antivirus/remove": ("antivirus", None),
     "PUT /api/antivirus/settings": ("antivirus", None),
@@ -356,6 +357,14 @@ def create_app(cfg, platform) -> FastAPI:
     def update_check(_u: str = Depends(current_user)):
         updater.check(force=True)
         return updater.info()
+
+    @app.get("/api/folder-perms")
+    def folder_perms(volume: str, path: str = "", _u: str = Depends(current_user)):
+        return nas.folder_perms.get(volume, path)
+
+    @app.put("/api/folder-perms")
+    def folder_perms_set(body: dict = Body(...), user: str = Depends(current_user)):
+        return nas.folder_perms.set(str(body.get("volume", "")), str(body.get("path", "")), body, user).to_dict()
 
     @app.get("/api/antivirus")
     def antivirus(_u: str = Depends(current_user)):

@@ -28,6 +28,8 @@ from typing import Dict, List, Optional, Tuple
 from xml.etree import ElementTree as ET
 
 from starlette.requests import Request
+
+from .folderperms import has_default_acl
 from starlette.responses import FileResponse, Response
 
 
@@ -246,6 +248,8 @@ class WebDav:
         if real != root and not real.startswith(root + os.sep):
             raise DavError(403, "Outside the shared folder")
         access = self._folder_access(user, share, root, target, access)
+        if access == "none":                                  # a folder with custom permissions
+            raise DavError(404, "Not found")
         if write and access != "rw":
             raise DavError(403, "You can only read this folder")
         return target, share, access
@@ -386,7 +390,8 @@ class WebDav:
             uid = pwd.getpwnam(user).pw_uid
             gid = grp.getgrnam(self.nas.cfg.users_group).gr_gid
             os.chown(path, uid, gid)
-            os.chmod(path, 0o2775 if os.path.isdir(path) else 0o664)
+            if not has_default_acl(os.path.dirname(path)):       # else the folder permissions decide
+                os.chmod(path, 0o2775 if os.path.isdir(path) else 0o664)
         except (KeyError, OSError):
             pass
 

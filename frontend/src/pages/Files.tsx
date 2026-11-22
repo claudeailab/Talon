@@ -16,6 +16,7 @@ import {
   FolderOpen,
   FolderPlus,
   FolderTree,
+  Lock,
   Image,
   MoreHorizontal,
   Move,
@@ -31,9 +32,11 @@ import {
 import { api } from "../lib/api";
 import { ago, bytes, cx, dateTime } from "../lib/format";
 import { useAction } from "../lib/hooks";
+import { FolderPermsDialog } from "../components/folderperms";
+import { JobDialog } from "../components/jobs";
 import { Button, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Select } from "../components/ui";
 
-type Item = { name: string; folder: boolean; size: number; modified: number; count: number | null };
+type Item = { name: string; folder: boolean; size: number; modified: number; count: number | null; custom?: boolean };
 type Listing = { volume: string; path: string; items: Item[] };
 type Loc = { id: string; kind: "volume" | "usb" | "disk" | "onedrive"; name: string; detail: string; mounted: boolean; ejectable: boolean };
 
@@ -70,6 +73,8 @@ export default function FilesPage() {
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [dragging, setDragging] = useState(false);
   const [versionsOf, setVersionsOf] = useState<string | null>(null);   // a file's previous versions
+  const [permsOf, setPermsOf] = useState<string | null>(null);         // a folder's permissions
+  const [permsJob, setPermsJob] = useState<string | null>(null);
   const [showBin, setShowBin] = useState(false);
   const touch = useMemo(() => window.matchMedia("(hover: none) and (pointer: coarse)").matches, []);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -358,6 +363,11 @@ export default function FilesPage() {
                         <span className={cx("truncate", it.folder && "font-medium")} title={it.name}>
                           {it.name}
                         </span>
+                        {it.custom && (
+                          <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-brand-50 px-1.5 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300" title="Custom permissions">
+                            <Lock className="size-3" /> Custom
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="hidden px-3 whitespace-nowrap text-zinc-500 sm:table-cell">{it.folder ? `${it.count} item${it.count === 1 ? "" : "s"}` : bytes(it.size)}</td>
@@ -386,6 +396,11 @@ export default function FilesPage() {
                         {!it.folder && here?.kind === "volume" && (
                           <MenuItem icon={<RotateCcw />} onClick={() => setVersionsOf(join(path, it.name))}>
                             Previous versions
+                          </MenuItem>
+                        )}
+                        {it.folder && here?.kind === "volume" && (
+                          <MenuItem icon={<Lock />} onClick={() => setPermsOf(join(path, it.name))}>
+                            Permissions
                           </MenuItem>
                         )}
                         <MenuItem icon={<Move />} onClick={() => act([it.name], "move")}>
@@ -455,6 +470,24 @@ export default function FilesPage() {
         }
       />
       {versionsOf && <VersionsDialog volume={volume} path={versionsOf} onClose={() => setVersionsOf(null)} onDone={refresh} />}
+      {permsOf && (
+        <FolderPermsDialog
+          volume={volume}
+          path={permsOf}
+          onClose={() => setPermsOf(null)}
+          onDone={(id) => {
+            setPermsOf(null);
+            setPermsJob(id);
+          }}
+        />
+      )}
+      <JobDialog
+        jobId={permsJob}
+        onClose={() => {
+          setPermsJob(null);
+          refresh();
+        }}
+      />
       {showBin && <RecycleBin volume={volume} name={here?.name ?? volume} onClose={() => setShowBin(false)} onDone={refresh} />}
       {uploads.length > 0 && <UploadPanel uploads={uploads} where={`${here?.name ?? volume}${path ? "/" + path : ""}`} onClose={() => setUploads((u) => u.filter((x) => x.status === "uploading" || x.status === "waiting"))} />}
     </>

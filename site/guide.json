@@ -436,6 +436,28 @@
       "warn": "USB and other disks outside a volume have no recycle bin: delete there is permanent."
      }
     ]
+   },
+   {
+    "id": "folder-permissions",
+    "title": "Folder permissions",
+    "blocks": [
+     {
+      "p": "A folder inside a shared folder can have its own permissions, for example a **Salaries** folder inside **Finance** that only the management group may open."
+     },
+     {
+      "steps": [
+       "In a folder's **⋯** menu, choose **Permissions**.",
+       "Choose **Custom**. On the **Users** and **Groups** tabs, give **Read** or **Read & write** to the people who may open it; everyone else gets **No access**.",
+       "Click **Save**. The permissions apply to the folder and everything in it, including files added later."
+      ]
+     },
+     {
+      "p": "Folders with custom permissions show a **Custom** badge. People also need access to the shared folder, and get the lower of the two; each row shows what the shared folder gives them. **Same as the shared folder** removes the custom permissions."
+     },
+     {
+      "p": "Folder permissions apply over SMB and WebDAV. NFS clients cannot open folders with custom permissions."
+     }
+    ]
    }
   ]
  },

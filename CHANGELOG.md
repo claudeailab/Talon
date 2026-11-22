@@ -1,3 +1,6 @@
+## 1.0.110
+- Files: folder permissions; give a folder inside a shared folder its own users and groups
+
 ## 1.0.109
 - WebDAV: shared folders over HTTPS at /dav for apps and remote access (turn it on in Services)
 
