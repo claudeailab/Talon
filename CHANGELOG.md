@@ -1,3 +1,6 @@
+## 1.0.98
+- Notifications subtitle: "Choose when Talon warns you"
+
 ## 1.0.97
 - Shorter page subtitles
 
