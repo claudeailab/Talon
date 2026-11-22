@@ -22,6 +22,7 @@ import {
   RotateCcw,
   Server,
   Settings as SettingsIcon,
+  ShieldCheck,
   Sun,
   Users as UsersIcon,
   X,
@@ -50,6 +51,7 @@ import SettingsPage from "./pages/Settings";
 import ActivityPage from "./pages/Activity";
 import DocumentationPage from "./pages/Documentation";
 import ScheduledPage from "./pages/Scheduled";
+import AntivirusPage from "./pages/Antivirus";
 
 type Me = { user: string; version: string; demo: boolean };
 
@@ -79,6 +81,7 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
       { to: "/settings", label: "Settings", icon: SettingsIcon, page: SettingsPage },
       { to: "/services", label: "Services", icon: Server, page: ServicesPage },
       { to: "/scheduled", label: "Scheduled", icon: Clock, page: ScheduledPage },
+      { to: "/antivirus", label: "Antivirus", icon: ShieldCheck, page: AntivirusPage },
       { to: "/notifications", label: "Notifications", icon: Mail, page: NotificationsPage },
       { to: "/documentation", label: "Documentation", icon: BookOpen, page: DocumentationPage },
     ],

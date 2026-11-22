@@ -746,6 +746,44 @@ export const GUIDE: Topic[] = [
 
   // ------------------------------------------------------------ System
   {
+    id: "antivirus",
+    title: "Antivirus",
+    group: "System",
+    summary: "Scan shared folders for viruses with ClamAV, on demand or on a schedule.",
+    page: { to: "/antivirus", label: "Open Antivirus" },
+    sections: [
+      {
+        id: "install",
+        title: "Install ClamAV",
+        blocks: [
+          { p: "Talon uses **ClamAV**, a free, open-source antivirus by Cisco Talos. It is not installed until you want it: on the [Antivirus](/antivirus) page, click **Install ClamAV**. It downloads about 300 MB, including the virus definitions, which then update automatically several times a day." },
+          { p: "A scan loads the virus definitions into memory while it runs, about 1.5 GB, and frees it afterwards. ClamAV needs at least 2 GB of memory and recommends 3 GB or more; Talon tells you when the NAS has too little." },
+        ],
+      },
+      {
+        id: "scan",
+        title: "Scan and schedule",
+        blocks: [
+          {
+            steps: [
+              "Under **Scan Now**, keep **All shared folders** or choose some, then click **Scan now**. A progress bar shows how many files are done; **Stop** ends the scan.",
+              "Under **Scheduled Scan**, choose **Daily** or **Weekly**, the time and the shared folders, then click **Save**.",
+            ],
+          },
+          { p: "Scans run at low priority, so shared folders stay responsive. A scan that finds something is in the [Activity](/activity) log and you get an email (**Virus found** in [Notifications](/notifications))." },
+        ],
+      },
+      {
+        id: "quarantine",
+        title: "Quarantine",
+        blocks: [
+          { p: "Infected files move to the volume's quarantine, outside every shared folder, so nobody opens them by accident. In **Quarantine**, each file's **⋯** menu can **Delete** it for good or **Restore** it to its folder; only restore a file you are sure is a false alarm." },
+          { p: "**⋯ → Remove ClamAV** uninstalls it. Files in the quarantine stay until you restore or delete them." },
+        ],
+      },
+    ],
+  },
+  {
     id: "activity",
     title: "Activity",
     group: "System",

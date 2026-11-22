@@ -1,3 +1,7 @@
+## 1.0.108
+- New Antivirus page: scan shared folders with ClamAV on demand or on a schedule
+- Infected files move to a quarantine; you get an email
+
 ## 1.0.107
 - Dashboard: tap CPU, Memory, Network or Disk activity for up to a year of history
 - Storage history shows how fast each volume grows and when it will be full

@@ -99,6 +99,13 @@ ACTIONS = {
     "POST /api/update/check": ("updates", "Checked for updates"),
     "PUT /api/update/settings": ("updates", None),
     "POST /api/os-update/check": ("updates", None),
+    "POST /api/antivirus/install": ("antivirus", None),
+    "POST /api/antivirus/remove": ("antivirus", None),
+    "PUT /api/antivirus/settings": ("antivirus", None),
+    "POST /api/antivirus/scan": ("antivirus", None),
+    "POST /api/antivirus/stop": ("antivirus", "Stopped the virus scan"),
+    "POST /api/antivirus/quarantine/{qid}/restore": ("antivirus", None),
+    "DELETE /api/antivirus/quarantine/{qid}": ("antivirus", None),
     "POST /api/os-update/install": ("updates", None),
     "PUT /api/os-update/auto": ("updates", None),
     "POST /api/update/install": ("updates", "Started installing an update"),
@@ -347,6 +354,41 @@ def create_app(cfg, platform) -> FastAPI:
     def update_check(_u: str = Depends(current_user)):
         updater.check(force=True)
         return updater.info()
+
+    @app.get("/api/antivirus")
+    def antivirus(_u: str = Depends(current_user)):
+        return nas.antivirus.info()
+
+    @app.post("/api/antivirus/install")
+    def antivirus_install(user: str = Depends(current_user)):
+        return nas.antivirus.install(user).to_dict()
+
+    @app.post("/api/antivirus/remove")
+    def antivirus_remove(user: str = Depends(current_user)):
+        return nas.antivirus.remove(user).to_dict()
+
+    @app.put("/api/antivirus/settings")
+    def antivirus_settings(body: dict = Body(...), user: str = Depends(current_user)):
+        return nas.antivirus.save_settings(body, user)
+
+    @app.post("/api/antivirus/scan")
+    def antivirus_scan(body: dict = Body(default={}), user: str = Depends(current_user)):
+        return nas.antivirus.scan(user, body.get("shares"))
+
+    @app.post("/api/antivirus/stop")
+    def antivirus_stop(_u: str = Depends(current_user)):
+        nas.antivirus.stop()
+        return {"ok": True}
+
+    @app.post("/api/antivirus/quarantine/{qid}/restore")
+    def antivirus_restore(qid: str, user: str = Depends(current_user)):
+        nas.antivirus.restore(qid, user)
+        return nas.antivirus.info()
+
+    @app.delete("/api/antivirus/quarantine/{qid}")
+    def antivirus_delete(qid: str, user: str = Depends(current_user)):
+        nas.antivirus.delete(qid, user)
+        return nas.antivirus.info()
 
     @app.get("/api/os-update")
     def os_update(_u: str = Depends(current_user)):

@@ -25,6 +25,7 @@ EVENTS: Dict[str, tuple] = {
     "cloud_failed": ("OneDrive task failed", True),
     "update": ("Software update available", True),
     "os_updates": ("Operating system security updates", True),
+    "virus": ("Virus found", True),
     "login_failed": ("Failed sign-in attempt", False),
 }
 

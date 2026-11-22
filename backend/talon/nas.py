@@ -14,6 +14,7 @@ from .cloudsync import CloudSync
 from .files import FileBrowser
 from .jobs import JobRunner
 from .network import Network
+from .antivirus import Antivirus
 from .history import History
 from .osupdate import OsUpdate
 from .ramlog import RamLog
@@ -69,6 +70,7 @@ class Nas:
         self._disk_temps: Dict[str, float] = {}
         self._vol_used: Dict[str, float] = {}
         self._vol_checked = 0.0
+        self.antivirus = Antivirus(self, bool(getattr(platform, "demo", False)))
         self.history: collections.deque = collections.deque(maxlen=90)
         self._last_sample: Optional[dict] = None
         self._stop = threading.Event()
@@ -110,6 +112,7 @@ class Nas:
         threading.Thread(target=self._watcher, daemon=True, name="notify").start()
         self.cloud.start()
         self.scheduler.start()
+        threading.Thread(target=self.antivirus.background_loop, args=(self._stop,), daemon=True, name="antivirus").start()
         threading.Thread(target=self.osupdate.background_loop, args=(self._stop,), daemon=True, name="os-update-check").start()
 
     def stop(self) -> None:

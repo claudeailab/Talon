@@ -25,6 +25,7 @@ CATEGORIES = {
     "users": "Users & Groups",
     "onedrive": "OneDrive",
     "scheduled": "Scheduled",
+    "antivirus": "Antivirus",
     "services": "Services",
     "settings": "Settings",
     "updates": "Updates",
@@ -35,6 +36,7 @@ CATEGORIES = {
 # the category of a message logged outside a web request (background work)
 _RULES = [
     (r"\bOneDrive\b|EntraID", "onedrive"),
+    (r"[Vv]irus|ClamAV|quarantine", "antivirus"),
     (r"^(Started |Created |Updated |Deleted |Paused |Resumed |Skipped )?scheduled task|^Scheduled task|^Test run as", "scheduled"),
     (r"^Notification|^Alert|^Resolved|email", "alerts"),
     (r"Signed (in|out)|[Ff]ailed login|sign-in", "signin"),
