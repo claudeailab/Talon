@@ -83,6 +83,7 @@ class AddDiskIn(BaseModel):
 class GroupIn(BaseModel):
     name: str = ""
     members: List[str] = []
+    description: Optional[str] = None
 
 
 # Every request that changes something is in the activity log: the category of
@@ -495,12 +496,14 @@ def create_app(cfg, platform) -> FastAPI:
 
     @app.post("/api/groups")
     def group_create(body: GroupIn, user: str = Depends(current_user)):
-        nas.create_group(body.name, body.members, user)
+        nas.create_group(body.name, body.members, user, body.description or "")
         return {"ok": True}
 
     @app.put("/api/groups/{name}")
     def group_update(name: str, body: GroupIn, user: str = Depends(current_user)):
         nas.set_group_members(name, body.members, user)
+        if body.description is not None:
+            nas.set_group_description(name, body.description)
         return {"ok": True}
 
     @app.delete("/api/groups/{name}")

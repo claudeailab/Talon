@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { MoreHorizontal, Pencil, Plus, ShieldCheck, Trash2, UserPlus, Users as UsersIcon, UserX } from "lucide-react";
+import { KeyRound, MoreHorizontal, Pencil, Plus, ShieldCheck, Trash2, User as UserIcon, UserPlus, Users as UsersIcon, UserX } from "lucide-react";
 import { api } from "../lib/api";
 import { cx, sameSet } from "../lib/format";
 import { useAction } from "../lib/hooks";
@@ -28,7 +28,9 @@ type EntraUser = { oid: string; name: string; upn: string; email: string; web: b
 type Person = { id: string; name: string; upn: string; email: string; enabled: boolean; added: boolean };
 
 export default function UsersPage() {
-  const [tab, setTab] = useState<"local" | "entra">("local");
+  const [tab, setTab] = useState<"local" | "entra" | "groups">("local");
+  const [groupDlg, setGroupDlg] = useState<{ group: Group | null } | null>(null);
+  const [delGroup, setDelGroup] = useState<Group | null>(null);
   const entra = useQuery({ queryKey: ["entra-users"], queryFn: () => api.get<{ ready: boolean; configured: boolean; users: EntraUser[] }>("/entra/users") });
   const [addEntra, setAddEntra] = useState(false);
   const users = useQuery({ queryKey: ["users"], queryFn: () => api.get<User[]>("/users") });
@@ -37,6 +39,7 @@ export default function UsersPage() {
   const [userDlg, setUserDlg] = useState<{ user: User | null } | null>(null);
   const [delUser, setDelUser] = useState<User | null>(null);
   const removeUser = useAction((n: string) => api.del(`/users/${n}`), { success: "User deleted", invalidate: ["users", "groups"], onSuccess: () => setDelUser(null) });
+  const removeGroup = useAction((n: string) => api.del(`/groups/${n}`), { success: "Group deleted", invalidate: ["groups", "users", "shares"], onSuccess: () => setDelGroup(null) });
   const toggle = useAction((u: User) => api.put(`/users/${u.name}`, { disabled: !u.disabled }), {
     success: (_r, u) => (u.disabled ? `${u.name} enabled` : `${u.name} disabled`),
     invalidate: ["users"],
@@ -44,7 +47,7 @@ export default function UsersPage() {
   if (!users.data || !groups.data || !entra.data) return <PageLoader />;
   // the EntraID Users tab appears once the EntraID app is set up; choosing people
   // needs the app to be set up for one organization (see EntraSetupNeeded)
-  const view = entra.data.configured ? tab : "local";
+  const view = tab === "entra" && !entra.data.configured ? "local" : tab;
 
   return (
     <>
@@ -52,7 +55,11 @@ export default function UsersPage() {
         title="Users & Groups"
         description="Accounts for shared folders and this web interface."
         actions={
-          view === "local" || !entra.data.ready ? (
+          view === "groups" ? (
+            <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setGroupDlg({ group: null })}>
+              Add group
+            </Button>
+          ) : view === "local" || !entra.data.ready ? (
             <Button variant="primary" icon={<UserPlus className="size-4" />} onClick={() => setUserDlg({ user: null })}>
               Add user
             </Button>
@@ -63,18 +70,32 @@ export default function UsersPage() {
           )
         }
       />
-      {entra.data.configured && (
-        <div className="mb-5">
-          <Tabs
-            value={view}
-            onChange={setTab}
-            tabs={[
-              { value: "local", label: <>Local Users <Badge>{users.data.length}</Badge></> },
-              { value: "entra", label: <>EntraID Users <Badge>{entra.data.users.length}</Badge></> },
-            ]}
-          />
-        </div>
-      )}
+      <div className="mb-5">
+        <Tabs
+          value={view}
+          onChange={setTab}
+          tabs={[
+            { value: "local", label: <>Local Users <Badge>{users.data.length}</Badge></>, icon: <UserIcon className="size-4" /> },
+            ...(entra.data.configured
+              ? [{ value: "entra" as const, label: <>EntraID Users <Badge>{entra.data.users.length}</Badge></>, icon: <KeyRound className="size-4" /> }]
+              : []),
+            { value: "groups", label: <>Groups <Badge>{groups.data.length}</Badge></>, icon: <UsersIcon className="size-4" /> },
+          ]}
+        />
+      </div>
+
+      {view === "groups" && <GroupsTab groups={groups.data} onAdd={() => setGroupDlg({ group: null })} onEdit={(g) => setGroupDlg({ group: g })} onDelete={setDelGroup} />}
+      {groupDlg && <GroupDialog group={groupDlg.group} users={users.data} onClose={() => setGroupDlg(null)} />}
+      <ConfirmDialog
+        open={!!delGroup}
+        onClose={() => setDelGroup(null)}
+        onConfirm={() => delGroup && removeGroup.mutate(delGroup.name)}
+        loading={removeGroup.isPending}
+        danger
+        title={`Delete group ${delGroup?.name}?`}
+        confirmText="Delete group"
+        message="The users stay. Members lose the shared folder access they had through this group."
+      />
 
       {view === "entra" &&
         (entra.data.ready ? (
@@ -131,7 +152,7 @@ export default function UsersPage() {
                     </td>
                     <td className="hidden px-3 py-3 md:table-cell">
                       <div className="flex flex-wrap gap-1">
-                        {u.groups.length ? u.groups.map((g) => <Badge key={g}>@{g}</Badge>) : <span className="text-xs text-zinc-400">—</span>}
+                        {u.groups.length ? u.groups.map((g) => <Badge key={g}>{g}</Badge>) : <span className="text-xs text-zinc-400">—</span>}
                       </div>
                     </td>
                     <td className="px-3 py-3">
@@ -188,6 +209,131 @@ export default function UsersPage() {
         message="The account is removed and its share permissions are revoked. Files the user created stay on the volumes."
       />
     </>
+  );
+}
+
+/** Groups of local users: give a team access to shared folders at once. */
+function GroupsTab({ groups, onAdd, onEdit, onDelete }: { groups: Group[]; onAdd: () => void; onEdit: (g: Group) => void; onDelete: (g: Group) => void }) {
+  if (!groups.length)
+    return (
+      <Card>
+        <Empty
+          icon={<UsersIcon className="size-6" />}
+          title="No groups"
+          text="Give a team access to shared folders at once."
+          action={
+            <Button variant="primary" icon={<Plus className="size-4" />} onClick={onAdd}>
+              Add group
+            </Button>
+          }
+        />
+      </Card>
+    );
+  return (
+    <Card className="divide-y divide-zinc-100 overflow-hidden dark:divide-white/5">
+      {groups.map((g) => (
+        <div key={g.name} className="flex items-center gap-3 px-5 py-3 transition hover:bg-zinc-50/70 dark:hover:bg-white/[0.02]">
+          <button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => onEdit(g)}>
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-sky-100 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300">
+              <UsersIcon className="size-4.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-medium break-words">{g.name}</div>
+              <div className="text-xs break-words text-zinc-500">
+                {g.description ? `${g.description} · ` : ""}
+                {g.members.length ? g.members.slice(0, 3).join(", ") + (g.members.length > 3 ? ` +${g.members.length - 3}` : "") : "No members"}
+              </div>
+            </div>
+            <Badge>
+              {g.members.length} {g.members.length === 1 ? "member" : "members"}
+            </Badge>
+          </button>
+          <Menu
+            trigger={
+              <IconButton label="Group actions">
+                <MoreHorizontal className="size-5" />
+              </IconButton>
+            }
+          >
+            <MenuItem icon={<Pencil />} onClick={() => onEdit(g)}>
+              Edit
+            </MenuItem>
+            <MenuItem icon={<Trash2 />} danger onClick={() => onDelete(g)}>
+              Delete
+            </MenuItem>
+          </Menu>
+        </div>
+      ))}
+    </Card>
+  );
+}
+
+function GroupDialog({ group, users, onClose }: { group: Group | null; users: User[]; onClose: () => void }) {
+  const isNew = !group;
+  const [name, setName] = useState(group?.name ?? "");
+  const [description, setDescription] = useState(group?.description ?? "");
+  const [members, setMembers] = useState<string[]>(group?.members ?? []);
+  const [search, setSearch] = useState("");
+  const err = name && !/^[a-z_][a-z0-9_-]{0,31}$/.test(name) ? "Lowercase letters, digits, - and _" : null;
+  const save = useAction(
+    () => (isNew ? api.post("/groups", { name, description, members }) : api.put(`/groups/${group!.name}`, { description, members })),
+    { success: isNew ? `Group ${name} created` : "Group saved", invalidate: ["groups", "users"], onSuccess: onClose },
+  );
+  const words = search.toLowerCase().split(/\s+/).filter(Boolean);
+  const shown = users.filter((u) => words.every((w) => `${u.name} ${u.full_name}`.toLowerCase().includes(w)));
+  const changed = isNew || description.trim() !== group!.description || !sameSet(members, group!.members);
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={isNew ? "New group" : `Edit ${group!.name}`}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="primary" disabled={!name || !!err || !changed} loading={save.isPending} onClick={() => save.mutate()}>
+            {isNew ? "Create group" : "Save"}
+          </Button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <Field label="Name" error={err} hint={isNew ? "Lowercase, for example accounting" : undefined}>
+          <Input value={name} disabled={!isNew} onChange={(e) => setName(e.target.value.toLowerCase())} placeholder="accounting" />
+        </Field>
+        <Field label="Description (optional)">
+          <Input value={description} onChange={(e) => setDescription(e.target.value)} maxLength={200} placeholder="Finance team" />
+        </Field>
+        <div>
+          <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2 text-[13px] font-medium">
+            Members
+            <span className="text-xs font-normal text-zinc-500">
+              {members.length} of {users.length} selected
+            </span>
+          </div>
+          {users.length > 6 && <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search users" aria-label="Search users" className="mb-2" />}
+          <div className="max-h-72 divide-y divide-zinc-100 overflow-y-auto rounded-xl ring-1 ring-zinc-200 dark:divide-white/5 dark:ring-white/10">
+            {shown.map((u) => (
+              <label key={u.name} className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-white/[0.02]">
+                <input
+                  type="checkbox"
+                  className="size-4 shrink-0 rounded accent-brand-600"
+                  checked={members.includes(u.name)}
+                  onChange={(e) => setMembers(e.target.checked ? [...members, u.name] : members.filter((m) => m !== u.name))}
+                />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium break-words">{u.name}</span>
+                  {u.full_name && u.full_name !== u.name && <span className="block text-xs break-words text-zinc-500">{u.full_name}</span>}
+                </span>
+              </label>
+            ))}
+            {!shown.length && <div className="px-4 py-3 text-sm text-zinc-500">No users match</div>}
+          </div>
+          <p className="mt-2 text-xs text-zinc-500">Only local users can be members: EntraID users cannot open shared folders.</p>
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -267,7 +413,7 @@ function UserDialog({ user, groups, isSelf, onClose }: { user: User | null; grou
                       on ? "bg-brand-50 text-brand-700 ring-brand-300 dark:bg-brand-500/15 dark:text-brand-300 dark:ring-brand-400/30" : "ring-zinc-200 hover:bg-zinc-50 dark:ring-white/10 dark:hover:bg-white/5",
                     )}
                   >
-                    @{g.name}
+                    {g.name}
                   </button>
                 );
               })}

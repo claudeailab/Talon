@@ -864,16 +864,23 @@ class Nas:
 
     def groups(self) -> List[dict]:
         out = []
+        info = self.state.get("group_info") or {}
         for g in sorted(self.state.get("groups")):
-            out.append({"name": g, "members": self.p.group_members(g)})
+            out.append({"name": g, "members": self.p.group_members(g),
+                        "description": (info.get(g) or {}).get("description", "")})
         return out
 
-    def create_group(self, name: str, members: List[str], actor: str) -> None:
+    def set_group_description(self, name: str, description: str) -> None:
+        description = (description or "").strip()[:200]
+        self.state.update(lambda d: d.setdefault("group_info", {}).setdefault(name, {}).__setitem__("description", description))
+
+    def create_group(self, name: str, members: List[str], actor: str, description: str = "") -> None:
         require(USER_NAME_RE, name, "group name")
         if self.p.group_exists(name) or name in (self.cfg.admin_group, self.cfg.users_group):
             raise UserError(f"Group {name} already exists")
         self.p.create_group(name)
         self.state.update(lambda d: d["groups"].append(name))
+        self.set_group_description(name, description)
         self.set_group_members(name, members, actor, log=False)
         self.state.log_activity(actor, f"Created group {name}")
 
@@ -895,6 +902,7 @@ class Nas:
 
         def upd(d):
             d["groups"].remove(name)
+            (d.get("group_info") or {}).pop(name, None)
             for s in d["shares"].values():
                 s["groups"].pop(name, None)
         self.state.update(upd)

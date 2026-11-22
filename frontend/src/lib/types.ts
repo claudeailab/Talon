@@ -138,6 +138,7 @@ export interface User {
 export interface Group {
   name: string;
   members: string[];
+  description: string;
 }
 
 export interface Job {

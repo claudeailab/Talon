@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Apple, Check, Copy, FolderOpen, Globe, MonitorSmartphone, Pencil, Plus, Recycle, Server, Trash2, Users as UsersIcon, X } from "lucide-react";
+import { Apple, Check, Copy, FolderOpen, Globe, Lock, MonitorSmartphone, Pencil, Plus, Recycle, Server, Trash2, Users as UsersIcon, X } from "lucide-react";
 import { api } from "../lib/api";
 import { cx, sameValue } from "../lib/format";
 import { useAction } from "../lib/hooks";
@@ -128,7 +128,7 @@ function CopyLine({ label, value }: { label: string; value: string }) {
 
 function ShareCard({ s, ip, hostname, onEdit, onDelete }: { s: Share; ip: string; hostname: string; onEdit: () => void; onDelete: () => void }) {
   const principals = [
-    ...Object.entries(s.groups).map(([n, a]) => ({ n: n === USERS_GROUP ? "All users" : `@${n}`, a, g: true })),
+    ...Object.entries(s.groups).map(([n, a]) => ({ n: n === USERS_GROUP ? "All NAS users" : n, a, g: true })),
     ...Object.entries(s.users).map(([n, a]) => ({ n, a, g: false })),
   ];
   return (
@@ -208,7 +208,7 @@ function AccessPicker({ value, onChange }: { value: Access | "none"; onChange: (
       options={[
         { value: "none", label: "No access" },
         { value: "ro", label: "Read", tone: "text-sky-700 dark:text-sky-300" },
-        { value: "rw", label: "Read/Write", tone: "text-emerald-700 dark:text-emerald-300" },
+        { value: "rw", label: "Read & write", tone: "text-emerald-700 dark:text-emerald-300" },
       ]}
     />
   );
@@ -273,10 +273,10 @@ function ShareEditor({ initial, isNew, volumes, onClose }: { initial: Share; isN
           value={tab}
           onChange={setTab}
           tabs={[
-            { value: "general", label: "General" },
-            { value: "perm", label: "Permissions" },
-            { value: "smb", label: <><MonitorSmartphone className="size-4" /> SMB</> },
-            { value: "nfs", label: <><Server className="size-4" /> NFS</> },
+            { value: "general", label: "General", icon: <FolderOpen className="size-4" /> },
+            { value: "perm", label: "Permissions", icon: <Lock className="size-4" /> },
+            { value: "smb", label: "SMB", icon: <MonitorSmartphone className="size-4" /> },
+            { value: "nfs", label: "NFS", icon: <Server className="size-4" /> },
           ]}
         />
       </div>
@@ -302,11 +302,8 @@ function ShareEditor({ initial, isNew, volumes, onClose }: { initial: Share; isN
       )}
 
       {tab === "perm" && (
-        <div className="space-y-5">
-          <p className="text-[13px] text-zinc-500">
-            Controls who can access this share over SMB. A user gets the highest access granted to them directly or through a group.
-          </p>
-          <div className="divide-y divide-zinc-100 rounded-xl ring-1 ring-zinc-200 dark:divide-white/5 dark:ring-white/10">
+        <div className="space-y-4">
+          <div className="rounded-xl ring-1 ring-zinc-200 dark:ring-white/10">
             <PermRow icon={<Globe className="size-4" />} title="Guests" subtitle="Anyone on the network, without a password">
               <Segmented
                 size="sm"
@@ -318,25 +315,8 @@ function ShareEditor({ initial, isNew, volumes, onClose }: { initial: Share; isN
                 ]}
               />
             </PermRow>
-            <PermRow icon={<UsersIcon className="size-4" />} title="All NAS users" subtitle="Every user account">
-              <AccessPicker value={s.groups[USERS_GROUP] ?? "none"} onChange={(a) => setPerm("groups", USERS_GROUP, a)} />
-            </PermRow>
-            {(groups.data ?? []).map((g) => (
-              <PermRow key={g.name} icon={<UsersIcon className="size-4" />} title={`@${g.name}`} subtitle={`${g.members.length} member(s)`}>
-                <AccessPicker value={s.groups[g.name] ?? "none"} onChange={(a) => setPerm("groups", g.name, a)} />
-              </PermRow>
-            ))}
-            {(users.data ?? []).map((u) => (
-              <PermRow
-                key={u.name}
-                icon={<span className="text-xs font-semibold uppercase">{u.name[0]}</span>}
-                title={u.name}
-                subtitle={u.full_name !== u.name ? u.full_name : undefined}
-              >
-                <AccessPicker value={s.users[u.name] ?? "none"} onChange={(a) => setPerm("users", u.name, a)} />
-              </PermRow>
-            ))}
           </div>
+          <PermTabs share={s} users={users.data ?? []} groups={groups.data ?? []} setPerm={setPerm} />
         </div>
       )}
 
@@ -406,7 +386,7 @@ function ShareEditor({ initial, isNew, volumes, onClose }: { initial: Share; isN
                           onChange={(a) => set("nfs", { ...s.nfs, clients: s.nfs.clients.map((x, j) => (j === i ? { ...x, access: a } : x)) })}
                           options={[
                             { value: "ro", label: "Read" },
-                            { value: "rw", label: "Read/Write" },
+                            { value: "rw", label: "Read & write" },
                           ]}
                         />
                         <IconButton label="Remove" onClick={() => set("nfs", { ...s.nfs, clients: s.nfs.clients.filter((_, j) => j !== i) })}>
@@ -439,14 +419,111 @@ function ShareEditor({ initial, isNew, volumes, onClose }: { initial: Share; isN
   );
 }
 
+function PermTabs({
+  share,
+  users,
+  groups,
+  setPerm,
+}: {
+  share: Share;
+  users: User[];
+  groups: Group[];
+  setPerm: (kind: "users" | "groups", n: string, a: Access | "none") => void;
+}) {
+  const [view, setView] = useState<"users" | "groups">("users");
+  const [search, setSearch] = useState("");
+  const [onlyAccess, setOnlyAccess] = useState(false);
+  const words = search.toLowerCase().split(/\s+/).filter(Boolean);
+  const match = (text: string) => words.every((w) => text.toLowerCase().includes(w));
+  const userCount = users.filter((u) => share.users[u.name]).length;
+  const groupCount = Object.keys(share.groups).filter((g) => g === USERS_GROUP || groups.some((x) => x.name === g)).length;
+  const shownUsers = users.filter((u) => match(`${u.name} ${u.full_name}`) && (!onlyAccess || share.users[u.name]));
+  const allUsers = { name: USERS_GROUP, members: users.map((u) => u.name), description: "" };
+  const shownGroups = [allUsers, ...groups].filter(
+    (g) => match(g.name === USERS_GROUP ? "All NAS users" : `${g.name} ${g.description}`) && (!onlyAccess || share.groups[g.name]),
+  );
+  const tabBtn = (v: "users" | "groups", label: string, n: number) => (
+    <button
+      type="button"
+      onClick={() => {
+        setView(v);
+        setSearch("");
+      }}
+      className={cx(
+        "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition",
+        view === v ? "bg-white text-zinc-900 shadow-sm dark:bg-white/10 dark:text-white" : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200",
+      )}
+    >
+      {label}
+      <span className="rounded-full bg-brand-100 px-1.5 text-[11px] text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">{n}</span>
+    </button>
+  );
+  return (
+    <div className="space-y-3">
+      <div className="flex rounded-xl bg-zinc-100 p-1 dark:bg-white/5">
+        {tabBtn("users", "Users", userCount)}
+        {tabBtn("groups", "Groups", groupCount)}
+      </div>
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder={view === "users" ? "Search users" : "Search groups"}
+          aria-label={view === "users" ? "Search users" : "Search groups"}
+          className="min-w-0 flex-1 basis-48"
+        />
+        <label className="flex cursor-pointer items-center gap-2 text-[13px] text-zinc-600 dark:text-zinc-400">
+          <input type="checkbox" className="size-4 rounded accent-brand-600" checked={onlyAccess} onChange={(e) => setOnlyAccess(e.target.checked)} />
+          Only with access
+        </label>
+      </div>
+      <div className="max-h-[22rem] divide-y divide-zinc-100 overflow-y-auto rounded-xl ring-1 ring-zinc-200 dark:divide-white/5 dark:ring-white/10">
+        {view === "users" &&
+          shownUsers.map((u) => (
+            <PermRow
+              key={u.name}
+              icon={<span className="text-xs font-semibold uppercase">{u.name[0]}</span>}
+              title={u.name}
+              subtitle={u.full_name && u.full_name !== u.name ? u.full_name : undefined}
+            >
+              <AccessPicker value={share.users[u.name] ?? "none"} onChange={(a) => setPerm("users", u.name, a)} />
+            </PermRow>
+          ))}
+        {view === "groups" &&
+          shownGroups.map((g) => (
+            <PermRow
+              key={g.name}
+              icon={<UsersIcon className="size-4" />}
+              title={g.name === USERS_GROUP ? "All NAS users" : g.name}
+              subtitle={
+                g.name === USERS_GROUP
+                  ? "Everyone, including users added later"
+                  : `${g.members.length} ${g.members.length === 1 ? "member" : "members"}` +
+                    (g.members.length ? ` · ${g.members.slice(0, 3).join(", ")}${g.members.length > 3 ? ` +${g.members.length - 3}` : ""}` : "")
+              }
+            >
+              <AccessPicker value={share.groups[g.name] ?? "none"} onChange={(a) => setPerm("groups", g.name, a)} />
+            </PermRow>
+          ))}
+        {(view === "users" ? shownUsers : shownGroups).length === 0 && (
+          <div className="px-4 py-3 text-sm text-zinc-500">
+            {view === "groups" && !groups.length && !words.length && !onlyAccess ? "No groups yet. Create them under Users & Groups → Groups." : "Nothing matches"}
+          </div>
+        )}
+      </div>
+      <p className="text-xs text-zinc-500">Controls access over SMB. Someone with access directly and through a group gets the higher of the two.</p>
+    </div>
+  );
+}
+
 function PermRow({ icon, title, subtitle, children }: { icon: React.ReactNode; title: string; subtitle?: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-zinc-500 dark:bg-white/5">{icon}</div>
         <div className="min-w-0">
-          <div className="truncate text-sm font-medium">{title}</div>
-          {subtitle && <div className="truncate text-xs text-zinc-500">{subtitle}</div>}
+          <div className="text-sm font-medium break-words">{title}</div>
+          {subtitle && <div className="text-xs break-words text-zinc-500">{subtitle}</div>}
         </div>
       </div>
       {children}

@@ -457,7 +457,7 @@
       "steps": [
        "On the [Shared Folders](/shares) page, click **New share**.",
        "**General**: enter the **Name** that people see on the network, pick the **Volume** and optionally a **Description**. A folder with this name is created on the volume.",
-       "**Permissions**: give **All NAS users**, each group and each user **No access**, **Read** or **Read/Write**. **Guests** (anyone on the network, without a password) can get **Read** at most.",
+       "**Permissions**: **Guests** (anyone on the network, without a password) can get **Read** at most. Below are two tabs: **Users** and **Groups** (with **All NAS users** at the top). Give each **No access**, **Read** or **Read & write**. Search and **Only with access** help with many users. Someone with access directly and through a group gets the higher of the two.",
        "**SMB**: for Windows, macOS, Linux, Android and iOS. On by default. Options below.",
        "**NFS**: for Linux, Kodi, VMware ESXi and Proxmox. Options below.",
        "Click **Create share**."
@@ -488,7 +488,7 @@
     "blocks": [
      {
       "list": [
-       "**Allowed clients**: add each computer's address or network (for example 192.168.1.0/24) with **Read** or **Read/Write**.",
+       "**Allowed clients**: add each computer's address or network (for example 192.168.1.0/24) with **Read** or **Read & write**.",
        "**User mapping**: **Map all users to the NAS users group** is the simplest and recommended choice.",
        "**Allow unprivileged source ports**: only needed by some clients, such as macOS."
       ]
@@ -622,11 +622,31 @@
     ]
    },
    {
+    "id": "groups",
+    "title": "Groups",
+    "blocks": [
+     {
+      "p": "A group gives a team access to shared folders at once, instead of one user at a time."
+     },
+     {
+      "steps": [
+       "On the [Users & Groups](/users) page, open **Groups** and click **Add group**.",
+       "Enter a **Name** (lowercase, for example accounting) and optionally a **Description**.",
+       "Tick the **Members**. Search helps with many users.",
+       "Click **Create group**, then give the group access under a shared folder's **Permissions → Groups**."
+      ]
+     },
+     {
+      "p": "Click a group to change its description and members. **Delete** removes the group; its members stay but lose the access they had through it. Only local users can be members: EntraID users cannot open shared folders."
+     }
+    ]
+   },
+   {
     "id": "entra-users",
     "title": "EntraID Users",
     "blocks": [
      {
-      "p": "Once the [EntraID](/documentation?topic=entra) app is set up for your organization, the page has two tabs: **Local Users** and **EntraID Users**."
+      "p": "Once the [EntraID](/documentation?topic=entra) app is set up for your organization, the page also has an **EntraID Users** tab."
      },
      {
       "steps": [

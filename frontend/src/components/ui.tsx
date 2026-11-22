@@ -527,7 +527,7 @@ export function Tabs<T extends string>({
   return (
     <>
       {tiles && (
-        <div className="grid grid-cols-4 gap-2 sm:hidden">
+        <div className="grid gap-2 sm:hidden" style={{ gridTemplateColumns: `repeat(${Math.min(tabs.length, 4)}, minmax(0, 1fr))` }}>
           {tabs.map((t) => (
             <button
               key={t.value}
@@ -535,14 +535,14 @@ export function Tabs<T extends string>({
               onClick={() => onChange(t.value)}
               aria-pressed={value === t.value}
               className={cx(
-                "flex min-w-0 flex-col items-center gap-1.5 rounded-xl px-1 py-3 text-[12px] font-medium ring-1 transition ring-inset [&>svg]:size-5",
+                "flex min-w-0 flex-col items-center gap-1.5 rounded-xl px-0.5 py-3 text-[11.5px] font-medium ring-1 transition ring-inset [&>svg]:size-5",
                 value === t.value
                   ? "bg-brand-600 text-white ring-brand-600 dark:bg-brand-500 dark:ring-brand-500"
                   : "bg-white text-zinc-600 ring-zinc-200 hover:bg-zinc-50 dark:bg-white/[0.04] dark:text-zinc-300 dark:ring-white/10",
               )}
             >
               {t.icon}
-              <span className="max-w-full truncate">{t.label}</span>
+              <span className="flex max-w-full flex-wrap items-center justify-center gap-1 text-center">{t.label}</span>
             </button>
           ))}
         </div>

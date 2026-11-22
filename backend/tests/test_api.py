@@ -136,6 +136,19 @@ def test_users_groups(client):
     assert client.delete("/api/groups/kids").status_code == 200
 
 
+def test_group_description(client):
+    assert client.post("/api/groups", json={"name": "sales", "members": [], "description": "Sales team"}).status_code == 200
+    g = next(g for g in client.get("/api/groups").json() if g["name"] == "sales")
+    assert g["description"] == "Sales team"
+    assert client.put("/api/groups/sales", json={"members": ["admin"]}).status_code == 200   # description kept
+    g = next(g for g in client.get("/api/groups").json() if g["name"] == "sales")
+    assert (g["description"], g["members"]) == ("Sales team", ["admin"])
+    assert client.put("/api/groups/sales", json={"members": [], "description": ""}).status_code == 200
+    assert next(g for g in client.get("/api/groups").json() if g["name"] == "sales")["description"] == ""
+    assert client.delete("/api/groups/sales").status_code == 200
+    assert "sales" not in (client.app.state.nas.state.get("group_info") or {})
+
+
 def test_expand_and_replace(client):
     r = client.post("/api/raid/tank/disks", json={"disk": "sdd", "mode": "spare"})
     assert wait_job(client, r.json())["status"] == "success"

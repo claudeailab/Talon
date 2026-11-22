@@ -1,3 +1,8 @@
+## 1.0.91
+- Groups tab is back under Users & Groups, with descriptions and member search
+- Shared folder permissions: separate Users and Groups tabs with search
+- Tabs on phones no longer cut off text
+
 ## 1.0.90
 - EntraID setup guide: reordered and simplified steps
 
