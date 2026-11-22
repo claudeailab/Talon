@@ -1,3 +1,6 @@
+## 1.0.89
+- EntraID setup guide: account type named as in the Entra portal
+
 ## 1.0.88
 - EntraID setup guide: clearer steps; shows which permissions are for OneDrive sync and which for EntraID users
 

@@ -776,7 +776,7 @@
      {
       "steps": [
        "Go to **entra.microsoft.com** and sign in.",
-       "**App registrations → New registration**, name it **Talon NAS**. Supported account types: choose the one option **Accounts in any organizational directory (Any Microsoft Entra ID tenant - Multitenant) and personal Microsoft accounts**, so work, school and personal OneDrive all work. Redirect URI: platform **Web**, paste the address from Talon's **Redirect URI** field, then click **Register**.",
+       "**App registrations → New registration**, name it **Talon NAS**. Supported account types: **Any Entra ID Tenant + Personal Microsoft accounts**, so work, school and personal OneDrive all work. Redirect URI: platform **Web**, paste the address from Talon's **Redirect URI** field, then click **Register**.",
        "From the app's **Overview** page, copy the **Application (client) ID** and the **Directory (tenant) ID** into Talon.",
        "**Certificates & secrets → New client secret**, expiry **24 months**. Copy the secret **Value** (not the Secret ID) into Talon. It is shown only once. Enter its **Expires** date in Talon under **Secret expires on**.",
        "**API permissions → Add a permission → Microsoft Graph → Delegated permissions**, used for OneDrive sync: add **Files.ReadWrite** and **offline_access**.",

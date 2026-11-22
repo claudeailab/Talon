@@ -186,9 +186,9 @@ export function SetupGuide({ onClose }: { onClose: () => void }) {
           <p>
             <B>App registrations</B> → <B>New registration</B>, name it <B>Talon NAS</B>.
           </p>
-          <p>Supported account types, choose this one option:</p>
+          <p>Supported account types, choose:</p>
           <p className="rounded-lg bg-zinc-50 px-3 py-2 dark:bg-white/[0.04]">
-            <B>Accounts in any organizational directory (Any Microsoft Entra ID tenant - Multitenant) and personal Microsoft accounts</B>
+            <B>Any Entra ID Tenant + Personal Microsoft accounts</B>
           </p>
           <p>Then work, school and personal OneDrive all work.</p>
           <p>
