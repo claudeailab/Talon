@@ -223,6 +223,9 @@ class Nas:
                         "health": self._health(smart),
                         "temperature": smart.get("temperature") or None,
                         "power_on_hours": smart.get("power_on_hours")})
+        limits = self.thresholds()
+        for d in out:   # the "Disk too hot" alert threshold for this kind of disk
+            d["temp_limit"] = limits[f"temp_{self._temp_kind(d)}"]
         return out
 
     # ---------------------------------------------------------------- alert thresholds

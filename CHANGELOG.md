@@ -1,3 +1,6 @@
+## 1.0.101
+- Disks: temperature shown on phones too; amber when a disk is too hot
+
 ## 1.0.100
 - Website: data loss and backup notice on the home page
 

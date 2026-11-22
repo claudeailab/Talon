@@ -13,6 +13,7 @@ interface Smart {
   available: boolean;
   passed: boolean | null;
   temperature: number | null;
+  temp_limit?: number;
   power_on_hours: number | null;
   power_cycles: number | null;
   bad_sectors: number | null;
@@ -22,6 +23,19 @@ interface Smart {
   attributes: { id: number; name: string; value: number; worst: number; thresh: number; raw: string; failing: boolean }[];
   self_tests: { type: string; status: string; hours: number }[];
   messages: string[];
+}
+
+const hot = (d: { temperature: number | null; temp_limit?: number }) => d.temperature != null && d.temp_limit != null && d.temperature >= d.temp_limit;
+
+/** Phones: the disk temperature as a chip, amber at the "Disk too hot" alert threshold. */
+function TempBadge({ d }: { d: { temperature: number | null; temp_limit?: number } }) {
+  if (d.temperature == null) return null;
+  return (
+    <Badge tone={hot(d) ? "amber" : undefined}>
+      <Thermometer className="size-3" />
+      {d.temperature}°C
+    </Badge>
+  );
 }
 
 export default function DisksPage() {
@@ -75,6 +89,7 @@ export default function DisksPage() {
                           {/* phones: health and usage under the name, so the model has the full width */}
                           <div className="mt-1 flex flex-wrap gap-1.5 sm:hidden">
                             <HealthBadge health={d.health} />
+                            <TempBadge d={d} />
                             <DiskStatusBadge d={d} />
                           </div>
                         </div>
@@ -87,8 +102,12 @@ export default function DisksPage() {
                     <td className="hidden px-3 py-3.5 sm:table-cell">
                       <HealthBadge health={d.health} />
                     </td>
-                    <td className="tabular hidden px-3 py-3.5 text-zinc-600 sm:table-cell dark:text-zinc-400">
-                      {d.temperature != null ? `${d.temperature}°C` : "—"}
+                    <td className="tabular hidden px-3 py-3.5 sm:table-cell">
+                      {d.temperature != null ? (
+                        <span className={hot(d) ? "font-medium text-amber-600 dark:text-amber-400" : "text-zinc-600 dark:text-zinc-400"}>{d.temperature}°C</span>
+                      ) : (
+                        <span className="text-zinc-400">—</span>
+                      )}
                     </td>
                     <td className="hidden px-3 py-3.5 sm:table-cell">
                       <div className="flex flex-col items-start gap-0.5">
