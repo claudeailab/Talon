@@ -263,7 +263,7 @@ export const GUIDE: Topic[] = [
           {
             list: [
               "Each volume shows its used and free space and whether it survives disk failures.",
-              "**Browse files** opens the volume on the [Files](/files) page.",
+              "**⋯ → Browse files** opens the volume on the [Files](/files) page.",
               "**Expand filesystem** appears after the RAID array under the volume has grown.",
               "**Delete volume** erases everything on it.",
             ],

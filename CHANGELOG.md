@@ -1,3 +1,6 @@
+## 1.0.103
+- Documentation: Browse files is in the volume's ⋯ menu
+
 ## 1.0.102
 - Volumes: more compact header; Browse files moved into the ⋯ menu
 
