@@ -1,3 +1,7 @@
+## 1.0.92
+- Website: menu no longer overlaps the logo on the Screenshots page
+- README: License section removed
+
 ## 1.0.91
 - Groups tab is back under Users & Groups, with descriptions and member search
 - Shared folder permissions: separate Users and Groups tabs with search

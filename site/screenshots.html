@@ -24,13 +24,13 @@
   .bar .cap { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .stage { position:relative; flex:1; display:flex; align-items:center; justify-content:center; min-height:0; padding:0 72px 24px; }
   .stage img { max-width:100%; max-height:100%; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,.5); user-select:none; }
-  .nav, .close { border:0; cursor:pointer; color:#fff; background:rgba(255,255,255,.12); border-radius:999px; display:flex; align-items:center; justify-content:center; }
-  .nav:hover, .close:hover { background:rgba(255,255,255,.22); }
-  .nav { position:absolute; top:50%; transform:translateY(-50%); width:48px; height:48px; font-size:24px; }
+  .arrow, .close { border:0; cursor:pointer; color:#fff; background:rgba(255,255,255,.12); border-radius:999px; display:flex; align-items:center; justify-content:center; }
+  .arrow:hover, .close:hover { background:rgba(255,255,255,.22); }
+  .arrow { position:absolute; top:50%; transform:translateY(-50%); width:48px; height:48px; font-size:24px; }
   .prev { left:14px; } .next { right:14px; }
   .close { width:36px; height:36px; font-size:20px; flex-shrink:0; }
   .count { color:rgba(255,255,255,.7); white-space:nowrap; }
-  @media (max-width:700px) { .stage { padding:0 8px 16px; } .nav { top:auto; bottom:22px; transform:none; } }
+  @media (max-width:700px) { .stage { padding:0 8px 16px; } .arrow { top:auto; bottom:22px; transform:none; } }
 </style>
 </head>
 <body>
@@ -65,9 +65,9 @@
     <span style="display:flex;align-items:center;gap:14px"><span class="count" id="count"></span><button class="close" id="close" aria-label="Close">✕</button></span>
   </div>
   <div class="stage" id="stage">
-    <button class="nav prev" id="prev" aria-label="Previous">‹</button>
+    <button class="arrow prev" id="prev" aria-label="Previous">‹</button>
     <img id="big" alt="">
-    <button class="nav next" id="next" aria-label="Next">›</button>
+    <button class="arrow next" id="next" aria-label="Next">›</button>
   </div>
 </div>
 

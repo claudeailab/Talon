@@ -112,7 +112,3 @@ Updates are detected automatically and installed from the web interface.
 ```
 
 Add `--purge` to also remove the settings. Your data is never touched.
-
-## License
-
-[MIT](LICENSE)
