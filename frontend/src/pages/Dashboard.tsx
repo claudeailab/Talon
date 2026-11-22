@@ -37,7 +37,6 @@ export default function DashboardPage() {
   const last = hist[hist.length - 1];
   const totalSize = data.volumes.reduce((a, v) => a + v.size, 0);
   const totalUsed = data.volumes.reduce((a, v) => a + v.used, 0);
-  const shares = data.share_list;
   const critical = data.alerts.filter((a) => a.level === "critical").length;
 
   return (
@@ -213,14 +212,6 @@ export default function DashboardPage() {
                     </Tile>
                   );
                 })}
-                <Tile to="/shares">
-                  <TileHead name="Shared Folders" badge={String(shares.length)} />
-                  <TileLine
-                    left={shares.length ? count(shares, "smb", "SMB", "nfs", "NFS") : "No shared folders yet"}
-                    right={shares.some((x) => x.time_machine) ? "Time Machine" : ""}
-                  />
-                  <Chips items={shares.map((x) => ({ key: x.name, label: x.name }))} />
-                </Tile>
                 {data.onedrive && (
                   <Tile to="/onedrive">
                     <TileHead
@@ -391,15 +382,6 @@ function TileLine({ left, right }: { left: string; right: string }) {
       <span className="tabular shrink-0 text-zinc-500">{right}</span>
     </div>
   );
-}
-
-function count(list: Record<string, unknown>[], ...pairs: string[]) {
-  const out: string[] = [];
-  for (let i = 0; i < pairs.length; i += 2) {
-    const n = list.filter((x) => x[pairs[i]]).length;
-    if (n) out.push(`${n} ${pairs[i + 1]}`);
-  }
-  return out.join(" · ") || "Not shared";
 }
 
 function Chips({ items }: { items: { key: string; label: string; bad?: boolean; mono?: boolean }[] }) {

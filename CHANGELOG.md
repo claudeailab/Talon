@@ -1,3 +1,6 @@
+## 1.0.95
+- Dashboard: Shared Folders removed from the Storage card
+
 ## 1.0.94
 - Groups: clear message when a name is already used by the operating system (for example users)
 
