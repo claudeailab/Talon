@@ -24,7 +24,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
-import { cx } from "../lib/format";
+import { cx, dateFormat, dateToIso, isoToDate } from "../lib/format";
 
 /* ------------------------------------------------------------------ Button */
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "soft";
@@ -343,17 +343,16 @@ export function TimeInput({
   );
 }
 
-/** A date typed as dd-mm-yyyy, with a calendar button. `value` is the text the user sees. */
-export function DateInput({ value, onChange, className }: { value: string; onChange: (dmy: string) => void; className?: string }) {
+/** A date typed in the chosen date format, with a calendar button. `value` is the text the user sees. */
+export function DateInput({ value, onChange, className }: { value: string; onChange: (text: string) => void; className?: string }) {
   const picker = useRef<HTMLInputElement>(null);
-  const m = /^(\d{1,2})-(\d{1,2})-(\d{4})$/.exec(value.trim());
-  const iso = m ? `${m[3]}-${m[2].padStart(2, "0")}-${m[1].padStart(2, "0")}` : "";
+  const iso = dateToIso(value) ?? "";
   return (
     <div className={cx("relative", className)}>
       <input
         value={value}
-        onChange={(e) => onChange(e.target.value.replace(/[^\d./-]/g, "").replace(/[./]/g, "-"))}
-        placeholder="dd-mm-yyyy"
+        onChange={(e) => onChange(e.target.value.replace(/[^\d./-]/g, ""))}
+        placeholder={dateFormat()}
         inputMode="numeric"
         maxLength={10}
         className={cx(inputCls, "tabular pr-10")}
@@ -375,7 +374,7 @@ export function DateInput({ value, onChange, className }: { value: string; onCha
       >
         <CalendarDays className="size-4" />
       </button>
-      {/* the browser's own calendar; its value is converted to dd-mm-yyyy */}
+      {/* the browser's own calendar; its value is converted to the chosen format */}
       <input
         ref={picker}
         type="date"
@@ -383,8 +382,7 @@ export function DateInput({ value, onChange, className }: { value: string; onCha
         aria-hidden
         value={iso}
         onChange={(e) => {
-          const [y, mo, d] = e.target.value.split("-");
-          if (y && mo && d) onChange(`${d}-${mo}-${y}`);
+          if (e.target.value) onChange(isoToDate(e.target.value));
         }}
         className="pointer-events-none absolute right-2 bottom-0 h-0 w-0 opacity-0"
       />

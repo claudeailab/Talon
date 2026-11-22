@@ -884,6 +884,7 @@ export const GUIDE: Topic[] = [
             list: [
               "**Hostname**: the NAS's name on the network. It is reachable as <hostname>.local.",
               "**Time zone**: used for schedules and times shown in Talon.",
+              "**Date format** and **Time format**: how dates and times are shown and typed everywhere in Talon and in its emails, for example 22-11-2026 or 11/22/2026, and 17:45 or 5:45 PM.",
               "**Workgroup**: the Windows workgroup. WORKGROUP is the Windows default.",
               "**Minimum SMB protocol**: SMB2_10 or newer is recommended. Lower it only for very old devices.",
               "**macOS compatibility**: faster Finder browsing and correct metadata for Macs.",

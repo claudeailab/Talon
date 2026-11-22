@@ -335,3 +335,13 @@ def test_apt_parsing():
     assert parse_status("pmstatus:libc6:amd64:40.0:Installing libc6:amd64") == {
         "phase": "install", "package": "libc6", "percent": 40.0, "text": "Installing libc6:amd64"}
     assert parse_status("random text") is None
+
+
+def test_date_and_time_format(client):
+    s = client.get("/api/settings").json()
+    assert (s["date_format"], s["time_format"]) == ("dd-mm-yyyy", "24h")
+    s = client.put("/api/settings", json={"date_format": "mm/dd/yyyy", "time_format": "12h"}).json()
+    assert (s["date_format"], s["time_format"]) == ("mm/dd/yyyy", "12h")
+    assert client.put("/api/settings", json={"date_format": "yyyy/dd/mm"}).status_code == 400
+    from talon.util import date_pattern
+    assert date_pattern(s, True) == "%m/%d/%Y %I:%M %p" and date_pattern({}) == "%d-%m-%Y"

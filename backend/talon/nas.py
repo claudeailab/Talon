@@ -23,7 +23,7 @@ from .backup import Backup
 from .notify import Notifier
 from .scheduler import Scheduler
 from .state import State
-from .util import (NFS_CLIENT_RE, RESERVED_SHARES, SHARE_NAME_RE, USER_NAME_RE,
+from .util import (DATE_FORMATS, TIME_FORMATS, NFS_CLIENT_RE, RESERVED_SHARES, SHARE_NAME_RE, USER_NAME_RE,
                    VOLUME_NAME_RE, UserError, require, unique, write_atomic)
 
 SYSTEM_MOUNTS = {"/", "/boot", "/boot/efi", "/boot/firmware", "/usr", "/var", "/home",
@@ -1008,6 +1008,19 @@ class Nas:
             self.state.update(lambda d: d["settings"].update(smb_keys))
             self.apply_shares()
             changes.append("file sharing settings")
+        fmt = {}
+        if "date_format" in data:
+            if data["date_format"] not in DATE_FORMATS:
+                raise UserError("Invalid date format")
+            fmt["date_format"] = data["date_format"]
+        if "time_format" in data:
+            if data["time_format"] not in TIME_FORMATS:
+                raise UserError("Invalid time format")
+            fmt["time_format"] = data["time_format"]
+        cur = self.state.get("settings")
+        if any(cur.get(k) != v for k, v in fmt.items()):
+            self.state.update(lambda d: d["settings"].update(fmt))
+            changes.append("date and time format")
         if changes:
             self.state.log_activity(actor, "Updated " + ", ".join(changes))
 

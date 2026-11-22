@@ -110,3 +110,15 @@ def unique(items: Iterable[str]) -> list:
             seen.add(x)
             out.append(x)
     return out
+
+
+# date and time formats (Settings → General); strftime patterns for emails and logs
+DATE_FORMATS = {"dd-mm-yyyy": "%d-%m-%Y", "dd/mm/yyyy": "%d/%m/%Y", "dd.mm.yyyy": "%d.%m.%Y",
+                "mm/dd/yyyy": "%m/%d/%Y", "yyyy-mm-dd": "%Y-%m-%d"}
+TIME_FORMATS = {"24h": "%H:%M", "12h": "%I:%M %p"}
+
+
+def date_pattern(settings: Optional[dict], with_time: bool = False) -> str:
+    s = settings or {}
+    d = DATE_FORMATS.get(s.get("date_format", ""), DATE_FORMATS["dd-mm-yyyy"])
+    return f"{d} {TIME_FORMATS.get(s.get('time_format', ''), TIME_FORMATS['24h'])}" if with_time else d

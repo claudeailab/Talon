@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { DatabaseBackup, HardDrive, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Square, Trash2, Usb } from "lucide-react";
 import { api } from "../lib/api";
-import { ago, bytes, cx, rate } from "../lib/format";
+import { ago, bytes, cx, dateTime, rate } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import { navigate } from "../lib/router";
 import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Select, Switch } from "../components/ui";
@@ -30,7 +30,8 @@ type Info = { tasks: Task[]; disks: Disk[]; shares: string[]; backup_dir: string
 const KEEP = [7, 14, 30, 90, 365];
 const whenText = (t: Pick<Task, "when" | "time">) =>
   t.when === "plug" ? "Runs when the disk is plugged in" : t.when === "daily" ? `Runs every day at ${t.time}` : `Runs when plugged in and every day at ${t.time}`;
-const snapLabel = (s: string) => (s === "Current" ? "Latest copy" : `${s.slice(8, 10)}-${s.slice(5, 7)}-${s.slice(0, 4)} ${s.slice(11, 13)}:${s.slice(13, 15)}`);
+const snapLabel = (s: string) =>
+  s === "Current" ? "Latest copy" : dateTime(new Date(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10), +s.slice(11, 13), +s.slice(13, 15)).getTime() / 1000);
 
 export default function BackupPage() {
   const q = useQuery({

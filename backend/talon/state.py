@@ -22,6 +22,8 @@ DEFAULT_STATE: dict = {
         "server_string": "Talon",
         "smb_min_protocol": "SMB2_10",
         "smb_macos_compat": True,
+        "date_format": "dd-mm-yyyy",
+        "time_format": "24h",
     },
     "entra": {},
     "smtp": {},

@@ -29,7 +29,8 @@ import {
   X,
 } from "lucide-react";
 import { api, setUnauthorizedHandler } from "./lib/api";
-import { cx } from "./lib/format";
+import type { Settings } from "./lib/types";
+import { cx, setFormats } from "./lib/format";
 import { useTheme } from "./lib/hooks";
 import { Link, navigate, usePath } from "./lib/router";
 import type { Alert, Job, OneDriveStatus, UpdateInfo } from "./lib/types";
@@ -129,6 +130,9 @@ function Logo() {
 
 function Shell({ me }: { me: Me }) {
   const path = usePath();
+  // dates and times in the format chosen in Settings → General, before anything renders them
+  const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.get<Settings>("/settings"), staleTime: 60000 });
+  setFormats(settings.data?.date_format, settings.data?.time_format);
   const qc = useQueryClient();
   const [dark, toggleTheme] = useTheme();
   const [mobileNav, setMobileNav] = useState(false);
@@ -329,7 +333,7 @@ function Shell({ me }: { me: Me }) {
         </header>
         <main className="mx-auto max-w-[1400px] px-4 pt-4 pb-6 sm:px-6 lg:px-8 lg:pt-3 lg:pb-8">
           <div key={path} className="animate-in">
-            <Page />
+            <Page key={`${settings.data?.date_format}-${settings.data?.time_format}`} />
           </div>
         </main>
       </div>

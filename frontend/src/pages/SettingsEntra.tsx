@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { BookOpen, Copy, KeyRound, PlugZap } from "lucide-react";
 import { api } from "../lib/api";
-import { dmyToIso, isoToDmy } from "../lib/format";
+import { dateFormat, dateToIso, isoToDate } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { EntraCheck, EntraConfig } from "../lib/types";
 import { TestResult } from "../components/testresult";
@@ -46,12 +46,12 @@ export default function EntraTab() {
     setTenantId(GUID.test(q.data.tenant) ? q.data.tenant : "");
     setClientId(q.data.client_id);
     setSecret("");
-    setExpires(isoToDmy(q.data.secret_expires));
+    setExpires(isoToDate(q.data.secret_expires));
     setRemindDays(q.data.remind_days);
     setRemindTo(q.data.remind_to.join(", "));
   }, [q.data]);
   const tenant = tenantId.trim();
-  const expiresIso = expires.trim() === "" ? "" : dmyToIso(expires);
+  const expiresIso = expires.trim() === "" ? "" : dateToIso(expires);
   const body = { tenant, client_id: clientId.trim(), client_secret: secret };
   const save = useAction(() => api.put<EntraConfig>("/settings/entra", { ...body, origin: location.origin, secret_expires: expiresIso ?? "", remind_days: remindDays, remind_to: remindTo }), {
     success: "EntraID app saved",
@@ -115,7 +115,7 @@ export default function EntraTab() {
           Client secret expiry <ExpiryBadge expiry={q.data.expiry} />
         </div>
         <div className="grid gap-x-8 gap-y-4 md:grid-cols-3 [&>*]:min-w-0">
-          <Field label="Secret expires on" error={expiresBad ? "Enter the date as dd-mm-yyyy" : null}>
+          <Field label="Secret expires on" error={expiresBad ? `Enter the date as ${dateFormat()}` : null}>
             <DateInput value={expires} onChange={setExpires} />
           </Field>
           <Field label="Send a reminder">

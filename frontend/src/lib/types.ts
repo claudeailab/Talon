@@ -228,6 +228,8 @@ export interface Settings {
   hostname: string;
   timezone: string;
   smb_protocols: string[];
+  date_format: string;
+  time_format: string;
 }
 
 export interface Activity {

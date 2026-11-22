@@ -2,7 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { CheckCircle2, Download, HardDrive, Info, KeyRound, Mail, Network, RefreshCw, Server, SlidersHorizontal, Sparkles } from "lucide-react";
 import { api } from "../lib/api";
-import { ago, bytes, date } from "../lib/format";
+import { ago, bytes, date, DATE_FORMATS } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Settings, SysInfo, UpdateInfo } from "../lib/types";
 import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Field, Input, PageHeader, PageLoader, Select, SubTabs, Switch, Tabs } from "../components/ui";
@@ -64,7 +64,7 @@ function GeneralTab() {
   });
   if (!form) return <PageLoader />;
   const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setForm({ ...form, [k]: v });
-  const FIELDS = ["hostname", "timezone", "workgroup", "smb_min_protocol", "smb_macos_compat"] as const;
+  const FIELDS = ["hostname", "timezone", "workgroup", "smb_min_protocol", "smb_macos_compat", "date_format", "time_format"] as const;
   const changed = !!settings.data && FIELDS.some((k) => form[k] !== settings.data![k]);
   return (
     <div className="space-y-5">
@@ -72,7 +72,7 @@ function GeneralTab() {
       <CardHeader
         icon={<Server className="size-4.5" />}
         title="General & Sharing"
-        subtitle="Name, time zone and Windows/macOS sharing"
+        subtitle="Name, date and time, and Windows/macOS sharing"
         actions={
           <Button
             variant="primary"
@@ -85,6 +85,8 @@ function GeneralTab() {
                 workgroup: form.workgroup,
                 smb_min_protocol: form.smb_min_protocol,
                 smb_macos_compat: form.smb_macos_compat,
+                date_format: form.date_format,
+                time_format: form.time_format,
               })
             }
           >
@@ -105,6 +107,23 @@ function GeneralTab() {
               {form.smb_protocols.map((p) => (
                 <option key={p}>{p}</option>
               ))}
+            </Select>
+          </Field>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 [&>*]:min-w-0">
+          <Field label="Date format">
+            <Select value={form.date_format} onChange={(e) => set("date_format", e.target.value)}>
+              {DATE_FORMATS.map((f) => (
+                <option key={f} value={f}>
+                  {f} ({example(f)})
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="Time format">
+            <Select value={form.time_format} onChange={(e) => set("time_format", e.target.value)}>
+              <option value="24h">24-hour (17:45)</option>
+              <option value="12h">12-hour (5:45 PM)</option>
             </Select>
           </Field>
         </div>
@@ -183,6 +202,13 @@ function SystemDiskCard() {
       </div>
     </Card>
   );
+}
+
+/** The date of today in a format, for the Date format choices. */
+function example(f: string): string {
+  const d = new Date();
+  const [dd, mm, y] = [String(d.getDate()).padStart(2, "0"), String(d.getMonth() + 1).padStart(2, "0"), d.getFullYear()];
+  return f === "yyyy-mm-dd" ? `${y}-${mm}-${dd}` : f === "mm/dd/yyyy" ? `${mm}/${dd}/${y}` : f.replace("dd", dd).replace("mm", mm).replace("yyyy", String(y));
 }
 
 function AboutTab() {

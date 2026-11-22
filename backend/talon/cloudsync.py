@@ -27,7 +27,7 @@ import zipfile
 from typing import Dict, Optional
 
 from . import entra
-from .util import UserError, write_atomic
+from .util import UserError, date_pattern, write_atomic
 
 # rclone's exit codes (https://rclone.org/docs/#exit-code), used when it printed no error
 RCLONE_EXIT = {
@@ -204,7 +204,7 @@ class CloudSync:
         e = self._entra()
         if stage in e.get("reminded", []):
             return
-        dmy = datetime.date.fromisoformat(exp["date"]).strftime("%d-%m-%Y")
+        dmy = datetime.date.fromisoformat(exp["date"]).strftime(date_pattern(self.state.get("settings")))
         if stage == "soon":
             subject = f"EntraID client secret expires on {dmy}"
             when = "tomorrow" if exp["days"] == 1 else ("today" if exp["days"] == 0 else f"in {exp['days']} days")
@@ -1039,7 +1039,7 @@ class CloudSync:
         attempts = 1 + int(t.get("retries", 0))
         mode = r.get("mode") or "run"
         what = {"run": "Run", "quick": "Quick check", "full": "Full check"}[mode]
-        log.append(self._line(time.strftime(f"{what} started %d-%m-%Y %H:%M") + (
+        log.append(self._line(time.strftime(f"{what} started " + date_pattern(self.state.get("settings"), True)) + (
             " (resumed after a restart)" if r.get("resumed") else "")))
         verified = None
         try:

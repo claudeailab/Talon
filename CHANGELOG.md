@@ -1,3 +1,6 @@
+## 1.0.117
+- Settings → General: choose the date format and 12- or 24-hour time, used everywhere including emails
+
 ## 1.0.116
 - Backup (formerly USB Backup) also uses internal SATA and NVMe disks and shows each disk's type
 - Antivirus scans whole volumes; NFS and Bonjour are off after a fresh install

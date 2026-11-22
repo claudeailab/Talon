@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../lib/api";
-import { bytes, clock, cx, dateTime, rate } from "../lib/format";
+import { bytes, clock, cx, dateTime, rate, shortDate } from "../lib/format";
 import { Modal, PageLoader, Segmented } from "./ui";
 
 export type HistoryMetric = "cpu" | "mem" | "net" | "disk" | "storage";
@@ -21,10 +21,6 @@ const RANGES: { value: Range; label: string }[] = [
 const DISK_COLORS = ["#6366f1", "#f59e0b", "#10b981", "#ec4899", "#0ea5e9", "#8b5cf6", "#ef4444", "#14b8a6"];
 const TITLES: Record<HistoryMetric, string> = { cpu: "CPU", mem: "Memory", net: "Network", disk: "Disk Activity", storage: "Used Space" };
 
-const dm = (ts: number) => {
-  const d = new Date(ts * 1000);
-  return `${String(d.getDate()).padStart(2, "0")}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-};
 const pctFmt = (v: number) => (v === 0 ? "0%" : `${v.toFixed(v < 10 ? 1 : 0)}%`);
 const tempFmt = (v: number) => `${v.toFixed(0)} °C`;
 
@@ -39,7 +35,7 @@ export function HistoryModal({ metric, onClose }: { metric: HistoryMetric; onClo
     placeholderData: (prev) => prev,
   });
   const d = q.data;
-  const label = (ts: number) => (range === "1h" || range === "24h" ? clock(ts) : dm(ts));
+  const label = (ts: number) => (range === "1h" || range === "24h" ? clock(ts) : shortDate(ts));
 
   return (
     <Modal open onClose={onClose} size="lg" title={TITLES[metric]} description={d ? summary(metric, d, vol) : undefined}>
@@ -175,7 +171,16 @@ function Stats({ items }: { items: [string, string][] | string[][] }) {
       {items.map(([k, v]) => (
         <div key={k} className="min-w-0 rounded-xl bg-zinc-50 px-3 py-2 dark:bg-white/[0.04]">
           <div className="text-xs text-zinc-500">{k}</div>
-          <div className="tabular text-[13px] font-semibold break-words">{v}</div>
+          {(() => {
+            // "100% · 21-11-2026 18:40": the value, then when, on its own smaller line
+            const [main, ...rest] = v.split(" · ");
+            return (
+              <>
+                <div className="tabular text-[13px] font-semibold break-words">{main}</div>
+                {rest.length > 0 && <div className="tabular text-[11.5px] text-zinc-500">{rest.join(" · ")}</div>}
+              </>
+            );
+          })()}
         </div>
       ))}
     </div>
