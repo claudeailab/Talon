@@ -1,3 +1,6 @@
+## 1.0.104
+- Activity: new System logs tab with Samba, NFS, SSH, disk and kernel messages
+
 ## 1.0.103
 - Documentation: Browse files is in the volume's ⋯ menu
 

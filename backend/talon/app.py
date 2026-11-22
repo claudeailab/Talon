@@ -18,6 +18,7 @@ from starlette.routing import Match
 from pydantic import BaseModel
 
 from . import activity, webconfig, __version__, notify
+from .syslog import SystemLog
 from .auth import COOKIE, Sessions
 from .nas import Nas
 from .update import DemoUpdater, Updater, health as health_info
@@ -163,6 +164,7 @@ def create_app(cfg, platform) -> FastAPI:
     nas = Nas(cfg, platform)
     sessions = Sessions(cfg.session_hours, cfg.sessions_file)
 
+    syslog_reader = SystemLog(cfg.demo)
     updater = (DemoUpdater if cfg.demo else Updater)(cfg, nas.state)
 
     @contextlib.asynccontextmanager
@@ -886,6 +888,11 @@ def create_app(cfg, platform) -> FastAPI:
     def activity_log(offset: int = 0, limit: int = 10, category: str = "", level: str = "",
                      q: str = "", _u: str = Depends(current_user)):
         return nas.state.activity.query(offset, limit, category, level, q)
+
+    @app.get("/api/syslog")
+    def system_log(offset: int = 0, limit: int = 25, source: str = "", level: str = "",
+                   q: str = "", _u: str = Depends(current_user)):
+        return syslog_reader.query(offset, limit, source, level, q)
 
     @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "DELETE"])
     def api_404(rest: str):

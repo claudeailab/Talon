@@ -474,6 +474,40 @@ export function ToggleRow({
   );
 }
 
+/** Two or three tabs inside a card or page section, as one full-width switch. */
+export function SubTabs<T extends string>({
+  value,
+  onChange,
+  tabs,
+  className,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  tabs: { value: T; label: ReactNode; count?: number }[];
+  className?: string;
+}) {
+  return (
+    <div className={cx("flex rounded-xl bg-zinc-100 p-1 dark:bg-white/5", className)} role="tablist">
+      {tabs.map((t) => (
+        <button
+          key={t.value}
+          type="button"
+          role="tab"
+          aria-selected={value === t.value}
+          onClick={() => onChange(t.value)}
+          className={cx(
+            "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-center text-[13px] font-semibold transition",
+            value === t.value ? "bg-white text-zinc-900 shadow-sm dark:bg-white/10 dark:text-white" : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200",
+          )}
+        >
+          {t.label}
+          {t.count != null && <span className="rounded-full bg-brand-100 px-1.5 text-[11px] text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">{t.count}</span>}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function Segmented<T extends string>({
   value,
   onChange,

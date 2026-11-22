@@ -19,6 +19,7 @@ import {
   PageHeader,
   PageLoader,
   Segmented,
+  SubTabs,
   Select,
   Tabs,
   ToggleRow,
@@ -442,28 +443,19 @@ function PermTabs({
   const shownGroups = [allUsers, ...groups].filter(
     (g) => match(g.name === USERS_GROUP ? "All NAS users" : `${g.name} ${g.description}`) && (!onlyAccess || share.groups[g.name]),
   );
-  const tabBtn = (v: "users" | "groups", label: string, n: number) => (
-    <button
-      type="button"
-      onClick={() => {
-        setView(v);
-        setSearch("");
-      }}
-      className={cx(
-        "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition",
-        view === v ? "bg-white text-zinc-900 shadow-sm dark:bg-white/10 dark:text-white" : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200",
-      )}
-    >
-      {label}
-      <span className="rounded-full bg-brand-100 px-1.5 text-[11px] text-brand-700 dark:bg-brand-500/20 dark:text-brand-300">{n}</span>
-    </button>
-  );
   return (
     <div className="space-y-3">
-      <div className="flex rounded-xl bg-zinc-100 p-1 dark:bg-white/5">
-        {tabBtn("users", "Users", userCount)}
-        {tabBtn("groups", "Groups", groupCount)}
-      </div>
+      <SubTabs
+        value={view}
+        onChange={(v) => {
+          setView(v);
+          setSearch("");
+        }}
+        tabs={[
+          { value: "users", label: "Users", count: userCount },
+          { value: "groups", label: "Groups", count: groupCount },
+        ]}
+      />
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <Input
           value={search}

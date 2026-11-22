@@ -60,3 +60,20 @@ def test_background_tasks_link_their_details_and_keep_them(client):
     details = client.get(f"/api/jobs/{job.id}").json()
     assert details["status"] == "success" and "step one" in details["log"]
     assert client.get("/api/jobs/zzzzzzzzzzzz").status_code == 404
+
+
+def test_system_logs(client):
+    r = client.get("/api/syslog", params={"limit": 10}).json()
+    assert len(r["items"]) == 10 and r["more"] and {s["id"] for s in r["sources"]} >= {"samba", "ssh", "kernel"}
+    ssh = client.get("/api/syslog", params={"source": "ssh", "limit": 50}).json()["items"]
+    assert ssh and all(e["source"] == "ssh" for e in ssh)
+    errs = client.get("/api/syslog", params={"level": "error", "limit": 50}).json()["items"]
+    assert errs and all(e["level"] == "error" for e in errs)
+    found = client.get("/api/syslog", params={"q": "failed password", "limit": 50}).json()["items"]
+    assert found and all("Failed password" in e["message"] for e in found)
+
+
+def test_journal_search_is_literal():
+    from talon.syslog import _escape, _level
+    assert _escape("a.b (c)") == r"a\.b \(c\)"
+    assert (_level("3"), _level(4), _level("6"), _level(None)) == ("error", "warning", "info", "info")

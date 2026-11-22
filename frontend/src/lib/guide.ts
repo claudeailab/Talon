@@ -748,7 +748,7 @@ export const GUIDE: Topic[] = [
     id: "activity",
     title: "Activity",
     group: "System",
-    summary: "A log of administrative actions and background tasks.",
+    summary: "A log of everything Talon does, and the system logs.",
     page: { to: "/activity", label: "Open Activity" },
     sections: [
       {
@@ -758,6 +758,14 @@ export const GUIDE: Topic[] = [
           { img: "activity", alt: "Activity" },
           { p: "The **Activity Log** lists everything that happens in Talon: every change made in the web interface, sign-ins, OneDrive and scheduled task runs with their results, alerts and emails, updates and restarts, with who did it and when. **Details** next to a background task, such as creating a RAID array or wiping a disk, shows each step it ran, also after a restart." },
           { p: "Narrow it down by **operation** (for example OneDrive, Scheduled or Files), show **Warnings and errors** or **Errors only**, and **Search** for words in the message or a user name. Choose how many entries to show per page and use **Previous** and **Next**. The newest 20,000 entries are kept." },
+        ],
+      },
+      {
+        id: "system-logs",
+        title: "System logs",
+        blocks: [
+          { p: "The **System logs** tab shows what the operating system and its services wrote to the system journal: Samba, NFS, SSH, disks (S.M.A.R.T. and RAID), the kernel and Talon's own service. Choose a source, show **Warnings and errors** or **Errors only**, and **Search** for words. Tap a message to read it in full; **Older** and **Newer** page through the newest 5,000 messages." },
+          { p: "Useful when something does not work, for example a computer that cannot connect to a shared folder (Samba) or failed SSH sign-ins." },
         ],
       },
     ],
