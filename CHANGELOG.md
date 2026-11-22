@@ -1,3 +1,6 @@
+## 1.0.96
+- Dashboard: host name and greeting removed; the status chip is centred at the top
+
 ## 1.0.95
 - Dashboard: Shared Folders removed from the Storage card
 

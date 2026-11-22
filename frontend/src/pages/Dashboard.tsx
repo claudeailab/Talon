@@ -24,11 +24,6 @@ import { DiskIcon, DiskStatusBadge, HealthBadge } from "../components/disk";
 import { VolumeStatusBadge } from "./Volumes";
 import { StatusBadge } from "../components/storage";
 
-function greeting() {
-  const h = new Date().getHours();
-  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
-}
-
 export default function DashboardPage() {
   const { data } = useQuery({ queryKey: ["dashboard"], queryFn: () => api.get<Dashboard>("/dashboard"), refetchInterval: 10000 });
   const stats = useQuery({ queryKey: ["stats"], queryFn: () => api.get<{ history: Point[] }>("/stats"), refetchInterval: 2000 });
@@ -42,14 +37,11 @@ export default function DashboardPage() {
   return (
     <div className="space-y-5">
       {/* hero */}
-      <div className="flex min-h-10 flex-col justify-between gap-3 sm:flex-row sm:items-center">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-          <h1 className="text-2xl font-semibold tracking-tight">{data.info.hostname}</h1>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">{greeting()}</p>
-        </div>
+      <h1 className="sr-only">Dashboard</h1>
+      <div className="flex justify-center">
         <div
           className={cx(
-            "inline-flex items-center gap-2 self-start rounded-full px-3.5 py-1.5 text-sm font-medium ring-1 ring-inset sm:self-auto",
+            "inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-center text-sm font-medium ring-1 ring-inset",
             data.alerts.length === 0
               ? "bg-emerald-50 text-emerald-700 ring-emerald-600/15 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20"
               : critical
