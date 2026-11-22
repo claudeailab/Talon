@@ -1,3 +1,6 @@
+## 1.0.102
+- Volumes: more compact header; Browse files moved into the ⋯ menu
+
 ## 1.0.101
 - Disks: temperature shown on phones too; amber when a disk is too hot
 

@@ -137,47 +137,15 @@ function VolumeCard({ v, onJob }: { v: Volume; onJob: (id: string) => void }) {
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-start justify-between gap-4 p-5">
-        <div className="flex min-w-0 items-center gap-3.5">
+      <div className="p-5 pb-4">
+        <div className="flex items-center gap-3.5">
           <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-violet-500 text-white shadow-md shadow-brand-500/20">
             <Database className="size-5" />
           </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-lg font-semibold tracking-tight">{v.name}</h3>
-              <StatusBadge status={v.status} />
-            </div>
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[13px] text-zinc-500">
-              {v.array ? (
-                <Link
-                  to="/raid"
-                  className="font-medium text-zinc-700 hover:text-brand-600 dark:text-zinc-300"
-                >
-                  RAID {v.array} ({levelLabel[v.level] ?? v.level})
-                </Link>
-              ) : (
-                <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                  Disk {v.disk ?? "?"}
-                </span>
-              )}
-              <span>·</span>
-              <span>{v.fs.toUpperCase()}</span>
-              <span>·</span>
-              <span className="font-mono text-xs">{v.mountpoint}</span>
-            </div>
+          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+            <h3 className="text-lg font-semibold tracking-tight break-words">{v.name}</h3>
+            <StatusBadge status={v.status} />
           </div>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            size="sm"
-            icon={<FolderTree className="size-4" />}
-            disabled={!v.mounted}
-            onClick={() =>
-              navigate(`/files?volume=${encodeURIComponent(v.name)}`)
-            }
-          >
-            Browse files
-          </Button>
           <Menu
             trigger={
               <IconButton label="Volume actions">
@@ -185,19 +153,32 @@ function VolumeCard({ v, onJob }: { v: Volume; onJob: (id: string) => void }) {
               </IconButton>
             }
           >
+            <MenuItem icon={<FolderTree />} disabled={!v.mounted} onClick={() => navigate(`/files?volume=${encodeURIComponent(v.name)}`)}>
+              Browse files
+            </MenuItem>
             {v.can_expand_fs && (
               <MenuItem icon={<Expand />} onClick={() => expand.mutate()}>
                 Expand filesystem
               </MenuItem>
             )}
-            <MenuItem
-              icon={<Trash2 />}
-              danger
-              onClick={() => setConfirmDelete(true)}
-            >
+            <MenuItem icon={<Trash2 />} danger onClick={() => setConfirmDelete(true)}>
               Delete volume
             </MenuItem>
           </Menu>
+        </div>
+        {/* full card width, so it usually fits on one line; it wraps between the parts, not inside them */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-zinc-500">
+          {v.array ? (
+            <Link to="/raid" className="font-medium whitespace-nowrap text-zinc-700 hover:text-brand-600 dark:text-zinc-300">
+              RAID {v.array} ({levelLabel[v.level] ?? v.level})
+            </Link>
+          ) : (
+            <span className="font-medium whitespace-nowrap text-zinc-700 dark:text-zinc-300">Disk {v.disk ?? "?"}</span>
+          )}
+          <span aria-hidden>·</span>
+          <span className="whitespace-nowrap">{v.fs.toUpperCase()}</span>
+          <span aria-hidden>·</span>
+          <span className="font-mono text-xs break-words">{v.mountpoint}</span>
         </div>
       </div>
 
