@@ -39,7 +39,7 @@ export default function DisksPage() {
 
   return (
     <>
-      <PageHeader title="Disks" description="Physical disks and their health." />
+      <PageHeader title="Disks" description="Physical disks and their health" />
       <Card className="overflow-hidden">
         {data.length === 0 ? (
           <Empty icon={<HardDrive className="size-6" />} title="No disks detected" />

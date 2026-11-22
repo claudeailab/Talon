@@ -157,7 +157,7 @@ export const GUIDE: Topic[] = [
     id: "raid",
     title: "RAID",
     group: "Storage",
-    summary: "Combine disks into one array that survives disk failures.",
+    summary: "Combine disks into one array",
     page: { to: "/raid", label: "Open RAID" },
     sections: [
       {

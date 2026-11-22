@@ -28,7 +28,7 @@ export default function ServicesPage() {
   if (!data) return <PageLoader />;
   return (
     <>
-      <PageHeader title="Services" description="Services that make the NAS reachable on the network." />
+      <PageHeader title="Services" description="System services" />
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {data.map((s) => (
           <Card key={s.id} className="flex flex-col p-5">

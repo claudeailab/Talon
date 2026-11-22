@@ -192,7 +192,7 @@ export default function OneDrivePage() {
   const header = (
     <PageHeader
       title="OneDrive"
-      description="Back up or sync folders with OneDrive."
+      description="Back up or sync folders with OneDrive"
       actions={
         d.enabled && d.connected ? (
           <Button

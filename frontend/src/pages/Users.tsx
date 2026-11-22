@@ -53,7 +53,7 @@ export default function UsersPage() {
     <>
       <PageHeader
         title="Users & Groups"
-        description="Accounts for shared folders and this web interface."
+        description="Accounts for shared folders"
         actions={
           view === "groups" ? (
             <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setGroupDlg({ group: null })}>

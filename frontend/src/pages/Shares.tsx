@@ -62,7 +62,7 @@ export default function SharesPage() {
     <>
       <PageHeader
         title="Shared Folders"
-        description="Folders shared over the network (SMB and NFS)."
+        description="Folders shared over the network"
         actions={
           <Button variant="primary" icon={<Plus className="size-4" />} disabled={!mounted.length} onClick={() => setEdit({ share: blank(mounted[0].name), isNew: true })}>
             New share

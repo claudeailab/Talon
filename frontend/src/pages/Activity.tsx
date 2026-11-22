@@ -35,7 +35,7 @@ export default function ActivityPage() {
   if (!act.data) return <PageLoader />;
   return (
     <>
-      <PageHeader title="Activity" description="Everything that happens in Talon." />
+      <PageHeader title="Activity" description="Everything that happens in Talon" />
       <div>
         <Card>
           <CardHeader title="Activity Log" subtitle={`${act.data.total} event${act.data.total === 1 ? "" : "s"}${filtered ? " found" : ""}`} />

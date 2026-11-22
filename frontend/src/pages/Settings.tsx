@@ -36,7 +36,7 @@ export default function SettingsPage() {
   };
   return (
     <>
-      <PageHeader title="Settings" description="System, network, Microsoft sign-in, email and updates." />
+      <PageHeader title="Settings" description="All system settings" />
       <div className="mb-5">
         <Tabs value={tab} onChange={change} tabs={TABS} />
       </div>

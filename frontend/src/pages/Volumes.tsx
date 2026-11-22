@@ -80,7 +80,7 @@ export default function VolumesPage() {
     <>
       <PageHeader
         title="Volumes"
-        description="Storage on a RAID array or a single disk."
+        description="Storage on a RAID array or a single disk"
         actions={button}
       />
       {vols.data.length === 0 ? (

@@ -84,7 +84,7 @@ export default function ScheduledPage() {
 
   return (
     <>
-      <PageHeader title="Scheduled" description="Run commands and scripts on a schedule." actions={tasks.length > 0 && newButton} />
+      <PageHeader title="Scheduled" description="Run scripts on a schedule" actions={tasks.length > 0 && newButton} />
       {tasks.length === 0 ? (
         <Card>
           <Empty icon={<Clock className="size-6" />} title="No scheduled tasks" text="Run a command or script on a schedule, or when the NAS starts." action={newButton} />

@@ -19,7 +19,7 @@ export default function NotificationsPage() {
   };
   const header = (
     <>
-      <PageHeader title="Notifications" description="Choose when the NAS warns you." />
+      <PageHeader title="Notifications" description="Choose when the NAS warns you" />
       <div className="mb-5">
         <Tabs
           value={tab}

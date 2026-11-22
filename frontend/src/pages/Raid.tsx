@@ -26,7 +26,7 @@ export default function RaidPage() {
 
   return (
     <>
-      <PageHeader title="RAID" description="Combine disks into one array that survives disk failures." actions={create} />
+      <PageHeader title="RAID" description="Combine disks into one array" actions={create} />
       {arrays.data.length === 0 ? (
         <Card>
           <Empty

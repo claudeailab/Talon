@@ -191,7 +191,7 @@ export default function FilesPage() {
   const header = (
     <PageHeader
       title="Files"
-      description="Browse, upload and download files on your volumes, disks and OneDrive."
+      description="Browse, upload and download files on your system"
       actions={
         volume ? (
           <>
