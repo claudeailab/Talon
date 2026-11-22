@@ -42,6 +42,7 @@ class DemoPlatform:
             ("sdg", "Samsung PSSD T7", 1 * TB, "usb", "S5SXNG0R"),
             ("sdh", "ST2000VN004-2E4164", 2 * TB, "hdd", "Z52A1H7K"),
             ("sdi", "ST2000VN004-2E4164", 2 * TB, "hdd", "Z52A1J2M"),
+            ("sdj", "WD My Passport 2TB", 2 * TB, "usb", "WX42A81F"),
         ]:
             self.disks[name] = {"name": name, "model": model, "size": size, "kind": kind,
                                 "serial": serial, "parts": [], "signature": None,
@@ -52,6 +53,8 @@ class DemoPlatform:
             {"name": "nvme0n1p2", "size": 999 * GB, "fstype": "ext4", "mounts": ["/"]},
         ]
         self.disks["sdg"]["parts"] = [{"name": "sdg1", "size": 1 * TB, "fstype": "exfat",
+                                       "mounts": []}]
+        self.disks["sdj"]["parts"] = [{"name": "sdj1", "size": 2 * TB, "fstype": "ext4", "label": "Backup",
                                        "mounts": []}]
         self.arrays: Dict[str, dict] = {}
         self.fs: Dict[str, dict] = {}
@@ -152,7 +155,7 @@ class DemoPlatform:
                     "transport": {"nvme": "nvme", "usb": "usb"}.get(d["kind"], "sata"),
                     "kind": d["kind"], "removable": d["kind"] == "usb",
                     "partitions": [{"name": p["name"], "size": p["size"],
-                                    "fstype": p.get("fstype"), "label": None,
+                                    "fstype": p.get("fstype"), "label": p.get("label"),
                                     "mountpoints": p["mounts"]} for p in d["parts"]],
                     "mounts": mounts, "md": md, "fstypes": fstypes, "busy": False,
                     "has_signature": bool(d["parts"] or d["signature"]),

@@ -715,6 +715,54 @@
   ]
  },
  {
+  "id": "usb-backup",
+  "title": "USB Backup",
+  "group": "Cloud and alerts",
+  "summary": "Copy shared folders to a USB disk when you plug it in or every day, with earlier versions.",
+  "page": {
+   "to": "/usb-backup",
+   "label": "Open USB Backup"
+  },
+  "sections": [
+   {
+    "id": "create",
+    "title": "Create a backup",
+    "blocks": [
+     {
+      "p": "RAID keeps the NAS running when a disk fails, but it is not a backup. A USB disk you keep elsewhere protects against deleted files, ransomware, theft or a broken NAS."
+     },
+     {
+      "steps": [
+       "Plug in the USB disk. On the [USB Backup](/usb-backup) page, click **New backup**.",
+       "**Disk**: choose the disk.",
+       "**Folders**: keep **All shared folders** or choose some.",
+       "**When**: **Whenever I plug in the disk**, **Every day** at a time you choose, or both. Turn on **Eject the disk when done** to unplug it safely afterwards, and choose how long to **Keep earlier versions**.",
+       "**Name**: check the summary and click **Create and back up now**."
+      ]
+     },
+     {
+      "p": "The disk is recognised wherever you plug it in. Backups are in the folder **Talon Backup** on the disk, as normal files that any computer can open. You get an email when a backup completes or fails."
+     }
+    ]
+   },
+   {
+    "id": "versions",
+    "title": "Versions and restoring",
+    "blocks": [
+     {
+      "p": "On disks formatted as ext4, XFS, Btrfs or NTFS, every backup is a dated version; files that did not change take no extra space. Versions older than the number of days you chose are removed, and the newest is always kept. FAT32 and exFAT cannot do this: there the backup is one copy, kept up to date."
+     },
+     {
+      "p": "**Restore** lists the versions. Choosing one opens it in [Files](/files), where you can download a file or move it back to a volume."
+     },
+     {
+      "p": "**⋯ → Edit** changes the folders or the schedule; **Delete** removes the backup task but keeps the backups on the disk."
+     }
+    ]
+   }
+  ]
+ },
+ {
   "id": "onedrive",
   "title": "OneDrive",
   "group": "Cloud and alerts",

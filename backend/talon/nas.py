@@ -19,6 +19,7 @@ from .antivirus import Antivirus
 from .history import History
 from .osupdate import OsUpdate
 from .ramlog import RamLog
+from .usbbackup import UsbBackup
 from .notify import Notifier
 from .scheduler import Scheduler
 from .state import State
@@ -73,6 +74,7 @@ class Nas:
         self._vol_used: Dict[str, float] = {}
         self._vol_checked = 0.0
         self.antivirus = Antivirus(self, bool(getattr(platform, "demo", False)))
+        self.usb_backup = UsbBackup(self, bool(getattr(platform, "demo", False)))
         self.history: collections.deque = collections.deque(maxlen=90)
         self._last_sample: Optional[dict] = None
         self._stop = threading.Event()
@@ -114,6 +116,7 @@ class Nas:
         threading.Thread(target=self._watcher, daemon=True, name="notify").start()
         self.cloud.start()
         self.scheduler.start()
+        threading.Thread(target=self.usb_backup.background_loop, args=(self._stop,), daemon=True, name="usb-backup").start()
         threading.Thread(target=self.antivirus.background_loop, args=(self._stop,), daemon=True, name="antivirus").start()
         threading.Thread(target=self.osupdate.background_loop, args=(self._stop,), daemon=True, name="os-update-check").start()
 

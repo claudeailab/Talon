@@ -24,6 +24,7 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   Sun,
+  Usb,
   Users as UsersIcon,
   X,
 } from "lucide-react";
@@ -52,6 +53,7 @@ import ActivityPage from "./pages/Activity";
 import DocumentationPage from "./pages/Documentation";
 import ScheduledPage from "./pages/Scheduled";
 import AntivirusPage from "./pages/Antivirus";
+import UsbBackupPage from "./pages/UsbBackup";
 
 type Me = { user: string; version: string; demo: boolean };
 
@@ -65,6 +67,7 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
       { to: "/volumes", label: "Volumes", icon: Database, page: VolumesPage },
       { to: "/files", label: "Files", icon: FolderTree, page: FilesPage },
       { to: "/onedrive", label: "OneDrive", icon: Cloud, page: OneDrivePage },
+      { to: "/usb-backup", label: "USB Backup", icon: Usb, page: UsbBackupPage },
     ],
   },
   {

@@ -1,3 +1,7 @@
+## 1.0.111
+- New USB Backup page: copy shared folders to a USB disk when plugged in or every day
+- Earlier versions that only store what changed; restore from Files
+
 ## 1.0.110
 - Files: folder permissions; give a folder inside a shared folder its own users and groups
 
