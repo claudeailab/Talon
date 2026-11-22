@@ -27,6 +27,7 @@ class DemoPlatform:
     def __init__(self, cfg):
         self.cfg = cfg
         self.lock = threading.RLock()
+        self.pause = 0.0          # simulated command time; none while seeding the demo disks
         self.hostname = "talon-demo"
         self.tz = "Europe/Nicosia"
         self.disks: Dict[str, dict] = {}
@@ -65,6 +66,7 @@ class DemoPlatform:
         self.smb_conf = ""
         self.nfs_conf = ""
         self._seed()
+        self.pause = 1.0
 
     # ----------------------------------------------------------- seed data
     def _seed(self) -> None:
@@ -197,7 +199,7 @@ class DemoPlatform:
             for u in [u for u, f in self.fs.items() if f["dev"] in names]:
                 self.fs.pop(u)
             d["parts"], d["signature"] = [], None
-        time.sleep(0.3)
+        time.sleep(0.3 * self.pause)
 
     def make_partition(self, disk: str, raid: bool, log) -> str:
         with self.lock:
@@ -236,7 +238,7 @@ class DemoPlatform:
                                 "members": members, "sync_start": time.time(),
                                 "sync_kind": None if level == "raid0" else ("recover" if level == "raid5" else "resync"),
                                 "check": None}
-            time.sleep(0.5)
+            time.sleep(0.5 * self.pause)
             return {"dev": dev, "uuid": self.arrays[dev]["uuid"]}
 
     def _array_size(self, a: dict) -> int:
@@ -339,7 +341,7 @@ class DemoPlatform:
             u = _uuid()
             self.fs[u] = {"dev": dev, "fs": fs, "size": int(size * 0.98), "used": 0,
                           "mountpoint": None}
-            time.sleep(0.5)
+            time.sleep(0.5 * self.pause)
             return u
 
     def fs_info(self, u) -> Optional[dict]:

@@ -1,3 +1,7 @@
+## 1.0.87
+- Faster builds: tests run in parallel and release notes sync in one request
+- Demo starts faster
+
 ## 1.0.86
 - EntraID app: only the Application ID, Directory (tenant) ID and secret are needed
 - Talon detects which accounts the app allows: work, school and personal OneDrive and Sign in with Microsoft

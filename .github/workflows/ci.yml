@@ -43,11 +43,11 @@ jobs:
             echo "changed=1" >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/setup-python@v7
-        with: { python-version: "3.12" }
+        with: { python-version: "3.12", cache: pip, cache-dependency-path: backend/requirements.txt }
       - uses: actions/setup-node@v7
-        with: { node-version: "22" }
-      - run: pip install -r backend/requirements.txt pytest httpx shellcheck-py
-      - run: cd backend && python -m pytest -q tests
+        with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: pip install -r backend/requirements.txt pytest pytest-xdist httpx shellcheck-py
+      - run: cd backend && python -m pytest -q -n 8 tests   # tests mostly wait: run 8 at a time
       - run: shellcheck -S warning install.sh uninstall.sh
       - run: cd frontend && npm ci && npm run build
       - name: Committed web build is up to date
@@ -81,14 +81,7 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           git fetch -q --force --tags origin
-          for v in $(sed -n 's/^## \([0-9][0-9.]*\)[[:space:]]*$/\1/p' CHANGELOG.md); do
-            gh release view "v$v" --repo "$REPO" >/dev/null 2>&1 || continue
-            python3 .github/scripts/release_notes.py "$v" "$REPO" > "$RUNNER_TEMP/notes.md"
-            if [ "$(gh release view "v$v" --repo "$REPO" --json body --jq .body)" != "$(cat "$RUNNER_TEMP/notes.md")" ]; then
-              gh release edit "v$v" --repo "$REPO" --notes-file "$RUNNER_TEMP/notes.md"
-              echo "v$v: notes updated"
-            fi
-          done
+          python3 .github/scripts/sync_release_notes.py "$REPO"
 
   about:
     # Keeps the repository's About section (description, website, topics) in sync.
