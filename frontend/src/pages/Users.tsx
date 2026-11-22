@@ -478,19 +478,17 @@ function AddEntraDialog({ onClose }: { onClose: () => void }) {
 function EntraSetupNeeded() {
   return (
     <Card className="p-5">
-      <div className="text-[15px] font-semibold">Set up the EntraID app for your organization</div>
+      <div className="text-[15px] font-semibold">One more step</div>
       <p className="mt-1 text-sm text-zinc-500">To choose people from your organization's directory:</p>
       <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm">
         <li>
-          In <b>Settings → EntraID</b>, set <b>Account type</b> to <b>Work or school account</b> and enter your work email domain (for example contoso.com) under{" "}
-          <b>Your organization</b>. Then click <b>Save</b>.
+          In <b>Settings → EntraID</b>, enter the <b>Directory (tenant) ID</b> from the app's Overview page in the Entra portal, then click <b>Save</b>.
         </li>
         <li>
           In the Entra portal, open the app's <b>API permissions → Add a permission → Microsoft Graph → Application permissions</b>, add <b>User.Read.All</b>{" "}
           and click <b>Grant admin consent</b>.
         </li>
       </ol>
-      <p className="mt-3 text-[13px] text-zinc-500">EntraID Users need a work or school account; personal Microsoft accounts have no organization directory.</p>
       <div className="mt-4">
         <Button variant="primary" onClick={() => navigate("/settings?tab=entra")}>Open Settings → EntraID</Button>
       </div>

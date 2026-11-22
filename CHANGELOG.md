@@ -1,3 +1,8 @@
+## 1.0.86
+- EntraID app: only the Application ID, Directory (tenant) ID and secret are needed
+- Talon detects which accounts the app allows: work, school and personal OneDrive and Sign in with Microsoft
+- Existing setups move over automatically
+
 # Changelog
 
 ## 1.0.85

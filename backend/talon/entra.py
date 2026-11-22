@@ -28,6 +28,9 @@ GUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]
 ACCOUNT_TYPES = {"common": "Personal and work or school accounts",
                  "organizations": "Work or school accounts",
                  "consumers": "Personal Microsoft accounts"}
+ACCOUNTS = {"common": "Work or school and personal accounts can connect OneDrive",
+            "consumers": "Personal accounts can connect OneDrive",
+            "tenant": "Accounts of your organization can connect OneDrive"}
 ORIGIN_RE = re.compile(r"^https?://[A-Za-z0-9.\-\[\]:]+$")
 
 
@@ -59,6 +62,9 @@ def resolve_tenant(text: str) -> str:
     return m.group(1).lower()
 
 
+PERSONAL_TENANT = "9188040d-6c67-4c5b-b112-36a304b66dad"   # personal Microsoft accounts
+
+
 def tenant_from_token(access_token: str) -> Optional[str]:
     """The tenant ID inside a work or school access token (a JWT); personal
     account tokens are not readable and give None."""
@@ -67,7 +73,9 @@ def tenant_from_token(access_token: str) -> Optional[str]:
         tid = json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4))).get("tid")
     except (IndexError, ValueError):
         return None
-    return tid.lower() if isinstance(tid, str) and GUID_RE.match(tid) else None
+    if not isinstance(tid, str) or not GUID_RE.match(tid) or tid.lower() == PERSONAL_TENANT:
+        return None
+    return tid.lower()
 
 
 def redirect_uri(origin: str) -> str:
@@ -167,18 +175,18 @@ def test(cfg: dict, origin: str) -> list:
     if not app_ok:
         return checks
 
-    # 2. Redirect URI and account type: Microsoft's sign-in page shows AADSTS
-    #    errors for an unregistered redirect URI or a wrong audience.
+    # 2. Which accounts the app allows, and the redirect URI: Microsoft's sign-in
+    #    page shows AADSTS errors for an unregistered redirect URI.
+    authority = detect_onedrive_authority(cfg, redirect)
     q = urllib.parse.urlencode({"client_id": cfg["client_id"], "response_type": "code",
                                 "redirect_uri": redirect, "scope": SCOPES,
                                 "response_mode": "query", "state": "talon-test"})
-    status, text = _request(f"{LOGIN}/{tenant}/oauth2/v2.0/authorize?{q}")
+    status, text = _request(f"{LOGIN}/{authority}/oauth2/v2.0/authorize?{q}")
     codes = _error_codes({}, text)
     ok = status == 200 and not codes
     checks.append({"name": "Redirect URI", "ok": ok,
                    "detail": redirect if ok else explain(codes, f"Microsoft returned HTTP {status}")})
-    checks.append({"name": "Account types", "ok": True, "detail": ACCOUNT_TYPES.get(
-        tenant, "Accounts of one organization")})
+    checks.append({"name": "Accounts", "ok": True, "detail": ACCOUNTS.get(authority, ACCOUNTS["tenant"])})
     # 3. One organization: may the app read its users (Users → EntraID Users)?
     if GUID_RE.match(tenant):
         try:
@@ -197,18 +205,47 @@ def new_pkce() -> Tuple[str, str]:
     return verifier, challenge.decode()
 
 
+def onedrive_authority(cfg: dict) -> str:
+    """Where OneDrive signs in: "common" when the app allows work or school and
+    personal accounts, "consumers" for personal accounts only, else the tenant.
+    Detected from the app itself (see detect_onedrive_authority)."""
+    a = (cfg.get("onedrive_authority") or "").strip()
+    return a if a in ACCOUNT_TYPES or GUID_RE.match(a) else tenant_of(cfg)
+
+
+def _allows(client_id: str, authority: str, redirect: str) -> bool:
+    """Does Microsoft's sign-in page accept this app at this authority?"""
+    q = urllib.parse.urlencode({"client_id": client_id, "response_type": "code", "redirect_uri": redirect,
+                                "scope": SCOPES, "response_mode": "query", "state": "talon-probe"})
+    status, text = _request(f"{LOGIN}/{authority}/oauth2/v2.0/authorize?{q}")
+    if status != 200 or 'id="errorCode"' in text or 'id="errorDescription"' in text:   # personal account error page
+        return False
+    codes = _error_codes({}, text) | {int(c) for c in re.findall(r'"sErrorCode":"(\d+)"', text)}
+    return not (codes - {50058})   # 50058: nobody is signed in yet, the sign-in page is shown
+
+
+def detect_onedrive_authority(cfg: dict, redirect: str) -> str:
+    """Which accounts the app registration allows, so nobody has to choose an
+    account type: its own organization, personal accounts, or both."""
+    # Microsoft checks the app before sign-in only at "consumers" and "organizations";
+    # every app allows its own organization.
+    if not _allows(cfg["client_id"], "consumers", redirect):
+        return tenant_of(cfg)
+    return "common" if _allows(cfg["client_id"], "organizations", redirect) else "consumers"
+
+
 def authorize_url(cfg: dict, redirect: str, state: str, challenge: str) -> str:
     q = urllib.parse.urlencode({
         "client_id": cfg["client_id"], "response_type": "code", "redirect_uri": redirect,
         "response_mode": "query", "scope": SCOPES, "state": state, "prompt": "select_account",
         "code_challenge": challenge, "code_challenge_method": "S256"})
-    return f"{LOGIN}/{tenant_of(cfg)}/oauth2/v2.0/authorize?{q}"
+    return f"{LOGIN}/{onedrive_authority(cfg)}/oauth2/v2.0/authorize?{q}"
 
 
-def _token(cfg: dict, data: dict, scope: str = SCOPES) -> dict:
+def _token(cfg: dict, data: dict, scope: str = SCOPES, authority: Optional[str] = None) -> dict:
     data = {"client_id": cfg["client_id"], "client_secret": cfg["client_secret"],
             "scope": scope, **data}
-    status, text = _request(f"{LOGIN}/{tenant_of(cfg)}/oauth2/v2.0/token", data)
+    status, text = _request(f"{LOGIN}/{authority or onedrive_authority(cfg)}/oauth2/v2.0/token", data)
     payload = _json(text)
     if status != 200 or "access_token" not in payload:
         raise UserError(explain(_error_codes(payload, text),
@@ -237,7 +274,7 @@ def login_identity(cfg: dict, code: str, redirect: str, verifier: str, nonce: st
     exchange for the code and the app's client secret, so its signature does not
     need checking (OpenID Connect Core 3.1.3.7); audience and nonce are checked."""
     t = _token(cfg, {"grant_type": "authorization_code", "code": code,
-                     "redirect_uri": redirect, "code_verifier": verifier}, LOGIN_SCOPES)
+                     "redirect_uri": redirect, "code_verifier": verifier}, LOGIN_SCOPES, tenant_of(cfg))
     try:
         part = t["id_token"].split(".")[1]
         claims = json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4)))

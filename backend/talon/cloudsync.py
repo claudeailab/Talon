@@ -141,6 +141,17 @@ class CloudSync:
         merged = {**data, "tenant": tenant, "client_secret": data.get("client_secret") or old.get("client_secret", "")}
         clean = entra.validate(merged)
         clean["tenant"] = tenant
+        # which accounts the app allows (work or school, personal, or both): asked
+        # of Microsoft, so Settings never has to ask for an account type
+        clean["onedrive_authority"] = old.get("onedrive_authority") or tenant
+        if clean["client_id"]:
+            if self.demo:
+                clean["onedrive_authority"] = "common"
+            elif data.get("origin"):
+                try:
+                    clean["onedrive_authority"] = entra.detect_onedrive_authority(clean, entra.redirect_uri(data["origin"]))
+                except UserError:
+                    pass
         # keep the domain the organization was entered with, to show it again
         raw = str(data.get("tenant") or "").strip().lower().split("@")[-1]
         clean["domain"] = raw if entra.GUID_RE.match(tenant) and not entra.GUID_RE.match(raw) else ""
@@ -218,7 +229,7 @@ class CloudSync:
         school organization by tenant ID or email domain (turned into the ID)."""
         tenant = str(value or "").strip()
         if not tenant:
-            raise UserError("Choose the account type")
+            raise UserError("Enter the Directory (tenant) ID from the app's Overview page")
         if self.demo and tenant not in ("consumers", "common", "organizations") and not entra.GUID_RE.match(tenant):
             return "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
         return entra.resolve_tenant(tenant)
@@ -236,8 +247,7 @@ class CloudSync:
             return [{"name": "Application ID and client secret", "ok": True,
                      "detail": "Accepted by Microsoft (demo)"},
                     {"name": "Redirect URI", "ok": True, "detail": entra.redirect_uri(origin)},
-                    {"name": "Account types", "ok": True,
-                     "detail": entra.ACCOUNT_TYPES.get(entra.tenant_of(merged), "One organization")}] + (
+                    {"name": "Accounts", "ok": True, "detail": entra.ACCOUNTS["common"] + " (demo)"}] + (
                 [{"name": "Directory users (EntraID Users)", "ok": True,
                   "detail": "The app can read your organization's users (demo)"}]
                 if entra.GUID_RE.match(entra.tenant_of(merged)) else [])
@@ -790,23 +800,24 @@ class CloudSync:
         return False
 
     def migrate_tenant(self) -> None:
-        """Earlier versions offered "personal and work accounts" and "any work or
-        school account". Settings now offers work or school (one organization) or
-        personal: move such setups to the one that fits the connected OneDrive."""
+        """Earlier versions asked for an account type (personal and work, any work
+        or school account, personal only). Settings now asks only for the
+        Directory (tenant) ID: keep OneDrive signing in where it did, and fill in
+        the tenant ID from the connected work or school OneDrive."""
         e = self._entra()
-        if e.get("tenant") not in ("common", "organizations"):
+        old = e.get("tenant")
+        if old not in ("common", "organizations", "consumers"):
             return
-        od = self._od()
-        account = od.get("account") or {}
-        new = None
-        if account.get("drive_type") == "personal":
-            new = "consumers"
-        elif od.get("token", {}).get("access_token"):
-            new = entra.tenant_from_token(od["token"]["access_token"])
-        if new:
-            self.state.update(lambda d: d["entra"].__setitem__("tenant", new))
-            self.state.log_activity("talon", "EntraID app: account type set to "
-                                    + ("personal" if new == "consumers" else "work or school"), "info", "settings")
+        tid = entra.tenant_from_token(((self._od().get("token") or {}).get("access_token")) or "")
+
+        def upd(d):
+            d["entra"]["onedrive_authority"] = d["entra"].get("onedrive_authority") or old
+            if tid:
+                d["entra"]["tenant"] = tid
+        self.state.update(upd)
+        if tid:
+            self.state.log_activity("talon", "EntraID app: Directory (tenant) ID filled in from OneDrive",
+                                    "info", "settings")
 
     def start(self) -> None:
         try:
@@ -900,7 +911,7 @@ class CloudSync:
         od = self._od()
         token = od["token"]
         account = od.get("account") or {}
-        tenant = entra.tenant_of(e)
+        tenant = entra.onedrive_authority(e)
         expiry = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(token["expires_at"]))
         tok = json.dumps({"access_token": token["access_token"], "token_type": "Bearer",
                           "refresh_token": token["refresh_token"], "expiry": expiry})

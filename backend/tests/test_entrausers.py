@@ -93,24 +93,44 @@ def test_organization_by_email_domain(monkeypatch):
         entra.resolve_tenant("not a domain")
 
 
-def test_settings_need_an_account_type_and_take_a_domain(client):
+def test_settings_need_the_tenant_id_and_detect_the_accounts(client):
     body = {"client_id": GUID, "client_secret": "s"}
     assert client.put("/api/settings/entra", json={**body, "tenant": ""}).status_code == 400
-    assert client.put("/api/settings/entra", json={**body, "tenant": "contoso.com"}).json()["tenant"] == TENANT  # demo lookup
-    assert client.put("/api/settings/entra", json={**body, "tenant": "consumers"}).json()["tenant"] == "consumers"
+    assert client.put("/api/settings/entra", json={**body, "tenant": TENANT}).json()["tenant"] == TENANT
+    assert client.app.state.nas.state.get("entra")["onedrive_authority"] == "common"   # demo: work and personal
 
 
-def test_old_account_types_move_to_the_one_that_fits(client):
+def test_detect_onedrive_authority(monkeypatch):
+    from talon import entra
+    cfg = {"tenant": TENANT, "client_id": GUID}
+    for allowed, want in (({"organizations", "consumers"}, "common"), ({"consumers"}, "consumers"),
+                          ({"organizations"}, TENANT), (set(), TENANT)):
+        monkeypatch.setattr(entra, "_allows", lambda c, a, r, allowed=allowed: a in allowed)
+        assert entra.detect_onedrive_authority(cfg, "https://nas/api/onedrive/callback") == want
+    assert entra.onedrive_authority({"tenant": TENANT, "onedrive_authority": "consumers"}) == "consumers"
+    assert entra.onedrive_authority({"tenant": TENANT}) == TENANT
+
+
+def test_old_account_types_keep_onedrive_and_fill_in_the_tenant(client):
     import base64, json
     cloud = client.app.state.nas.cloud
-    payload = base64.urlsafe_b64encode(json.dumps({"tid": TENANT}).encode()).decode().rstrip("=")
+
+    def token(tid):
+        return "x." + base64.urlsafe_b64encode(json.dumps({"tid": tid}).encode()).decode().rstrip("=") + ".y"
     client.app.state.nas.state.update(lambda d: (
         d.__setitem__("entra", {"tenant": "common", "client_id": GUID, "client_secret": "s"}),
-        d["onedrive"].__setitem__("token", {"access_token": f"x.{payload}.y"}),
-        d["onedrive"].__setitem__("account", {"drive_type": "business"})))
+        d["onedrive"].__setitem__("token", {"access_token": token(TENANT)})))
     cloud.migrate_tenant()
-    assert client.app.state.nas.state.get("entra")["tenant"] == TENANT
+    e = client.app.state.nas.state.get("entra")
+    assert (e["tenant"], e["onedrive_authority"]) == (TENANT, "common")
     client.app.state.nas.state.update(lambda d: (
-        d["entra"].__setitem__("tenant", "common"), d["onedrive"].__setitem__("account", {"drive_type": "personal"})))
+        d.__setitem__("entra", {"tenant": "consumers", "client_id": GUID, "client_secret": "s"}),
+        d["onedrive"].__setitem__("token", {"access_token": token(entra_personal())})))
     cloud.migrate_tenant()
-    assert client.app.state.nas.state.get("entra")["tenant"] == "consumers"
+    e = client.app.state.nas.state.get("entra")
+    assert (e["tenant"], e["onedrive_authority"]) == ("consumers", "consumers")   # no tenant ID to fill in
+
+
+def entra_personal():
+    from talon import entra
+    return entra.PERSONAL_TENANT
