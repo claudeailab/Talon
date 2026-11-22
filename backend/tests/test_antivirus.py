@@ -16,9 +16,13 @@ def test_install_scan_quarantine(client):
     info = client.get("/api/antivirus").json()
     assert not info["installed"] and info["ram_ok"]
     assert client.post("/api/antivirus/scan").status_code == 400          # not installed
-    job = client.post("/api/antivirus/install").json()
-    assert wait_job(client, job)["status"] == "success"
-    assert client.get("/api/antivirus").json()["installed"]
+    assert client.post("/api/antivirus/install").status_code == 200
+    for _ in range(100):
+        info = client.get("/api/antivirus").json()
+        if info["setup"]["state"] != "running":
+            break
+        time.sleep(0.1)
+    assert info["setup"]["state"] == "success" and info["installed"] and info["updates"] == "every hour"
     assert client.post("/api/antivirus/scan", json={}).status_code == 200
     info = _wait_scan(client)
     assert info["progress"]["state"] == "success" and info["last_scan"]["found"] == 1

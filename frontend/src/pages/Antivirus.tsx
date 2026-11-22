@@ -4,8 +4,7 @@ import { CalendarClock, MoreHorizontal, Play, RotateCcw, ShieldAlert, ShieldChec
 import { api } from "../lib/api";
 import { ago, bytes, cx, dateTime, duration } from "../lib/format";
 import { useAction } from "../lib/hooks";
-import type { Job, Share } from "../lib/types";
-import { JobDialog } from "../components/jobs";
+import type { Share } from "../lib/types";
 import {
   Badge,
   Button,
@@ -38,6 +37,8 @@ type AvInfo = {
   settings: { shares: string[]; schedule: "off" | "daily" | "weekly"; time: string; weekday: number };
   last_scan: { at: number; duration: number; files: number; found: number; shares: string[]; stopped: boolean; error: string | null } | null;
   quarantine: QItem[];
+  setup: { state: "idle" | "running" | "success" | "error"; action?: "install" | "remove"; percent?: number; text?: string; error?: string };
+  updates: string | null;
 };
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -45,19 +46,12 @@ export default function AntivirusPage() {
   const q = useQuery({
     queryKey: ["antivirus"],
     queryFn: () => api.get<AvInfo>("/antivirus"),
-    refetchInterval: (query) => (query.state.data?.progress.state === "running" ? 1000 : 15000),
+    refetchInterval: (query) => (query.state.data?.progress.state === "running" || query.state.data?.setup.state === "running" ? 1000 : 15000),
   });
   const shares = useQuery({ queryKey: ["shares"], queryFn: () => api.get<Share[]>("/shares") });
-  const [job, setJob] = useState<string | null>(null);
   const [remove, setRemove] = useState(false);
-  const install = useAction(() => api.post<Job>("/antivirus/install"), { invalidate: ["antivirus"], onSuccess: (j) => setJob(j.id) });
-  const uninstall = useAction(() => api.post<Job>("/antivirus/remove"), {
-    invalidate: ["antivirus"],
-    onSuccess: (j) => {
-      setRemove(false);
-      setJob(j.id);
-    },
-  });
+  const install = useAction(() => api.post<AvInfo>("/antivirus/install"), { invalidate: ["antivirus"] });
+  const uninstall = useAction(() => api.post<AvInfo>("/antivirus/remove"), { invalidate: ["antivirus"], onSuccess: () => setRemove(false) });
   if (!q.data || !shares.data) return <PageLoader />;
   const d = q.data;
   return (
@@ -68,9 +62,9 @@ export default function AntivirusPage() {
           <CardHeader
             icon={<ShieldCheck className="size-4.5" />}
             title="ClamAV"
-            subtitle="Free, open-source antivirus by Cisco Talos"
+            subtitle={d.installed && d.version ? `Version ${d.version} · last scan ${d.last_scan ? ago(d.last_scan.at) : "never"}` : "Free, open-source antivirus by Cisco Talos"}
             actions={
-              d.installed && (
+              d.installed && d.setup.state !== "running" && (
                 <Menu
                   trigger={
                     <IconButton label="Antivirus actions">
@@ -86,8 +80,21 @@ export default function AntivirusPage() {
             }
           />
           <div className="space-y-3 px-5 pb-5">
-            {!d.installed ? (
+            {d.setup.state === "running" ? (
+              <div className="rounded-2xl bg-zinc-50 p-4 dark:bg-white/[0.03]">
+                <div className="flex items-baseline justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold">{d.setup.action === "remove" ? "Removing ClamAV" : "Installing ClamAV"}</div>
+                    <div className="text-[13px] break-words text-zinc-500">{d.setup.text}</div>
+                  </div>
+                  <span className="tabular text-sm font-semibold text-zinc-500">{Math.round(d.setup.percent ?? 0)}%</span>
+                </div>
+                <Progress value={d.setup.percent ?? 0} className="mt-3 h-2" />
+                <p className="mt-2 text-xs text-zinc-500">You can leave this page; it continues in the background.</p>
+              </div>
+            ) : !d.installed ? (
               <>
+                {d.setup.state === "error" && <Callout tone="danger" title="The installation failed">{d.setup.error}</Callout>}
                 <p className="text-[13px] text-zinc-600 dark:text-zinc-400">
                   Scans your shared folders on demand or on a schedule. Infected files move to a quarantine, where you can restore or delete them, and you get an
                   email. A scan uses about 1.5 GB of memory while it runs; nothing stays in memory afterwards.
@@ -101,21 +108,18 @@ export default function AntivirusPage() {
                     </Callout>
                   )
                 )}
-                <Button variant="primary" disabled={!d.ram_ok} loading={install.isPending} onClick={() => install.mutate()}>
-                  Install ClamAV
-                </Button>
-                <p className="text-xs text-zinc-500">Downloads about 300 MB, including the virus definitions.</p>
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button variant="primary" disabled={!d.ram_ok} loading={install.isPending} onClick={() => install.mutate()}>
+                    Install ClamAV
+                  </Button>
+                  <span className="text-xs text-zinc-500">Downloads about 300 MB, including the virus definitions.</span>
+                </div>
               </>
             ) : (
-              <div className="grid gap-2 sm:grid-cols-3">
-                <Fact label="Version" value={d.version ?? "—"} />
-                <Fact
-                  label="Virus definitions"
-                  value={d.db_date ? `Updated ${ago(d.db_date)}` : d.definitions ? "Installed" : "Downloading…"}
-                  hint="Updated automatically several times a day"
-                />
-                <Fact label="Last scan" value={d.last_scan ? ago(d.last_scan.at) : "Never"} />
-              </div>
+              <p className="text-[13px] text-zinc-600 dark:text-zinc-400">
+                Virus definitions {d.db_date ? `updated ${ago(d.db_date)}` : d.definitions ? "installed" : "downloading…"}; they update automatically {d.updates}. ClamAV itself
+                updates with the operating system updates.
+              </p>
             )}
           </div>
         </Card>
@@ -124,7 +128,6 @@ export default function AntivirusPage() {
         {d.installed && <ScheduleCard d={d} shares={shares.data} />}
         {(d.installed || d.quarantine.length > 0) && <QuarantineCard items={d.quarantine} />}
       </div>
-      <JobDialog jobId={job} onClose={() => setJob(null)} />
       <ConfirmDialog
         open={remove}
         onClose={() => setRemove(false)}
@@ -136,16 +139,6 @@ export default function AntivirusPage() {
         message="Scheduled scans stop. Files in the quarantine stay there until you restore or delete them."
       />
     </>
-  );
-}
-
-function Fact({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <div className="min-w-0 rounded-xl bg-zinc-50 px-3.5 py-2.5 dark:bg-white/[0.04]">
-      <div className="text-xs text-zinc-500">{label}</div>
-      <div className="text-[13.5px] font-semibold break-words">{value}</div>
-      {hint && <div className="text-[11.5px] text-zinc-500">{hint}</div>}
-    </div>
   );
 }
 

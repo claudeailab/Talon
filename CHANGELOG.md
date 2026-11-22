@@ -1,3 +1,8 @@
+## 1.0.112
+- Activity: one list for Talon and the system logs; choose what to show from the list
+- OS updates: progress while checking, automatic install of all updates, restart screen that reconnects
+- Navigation: new Files section (Browser, OneDrive, USB Backup); simpler Antivirus page with install progress
+
 ## 1.0.111
 - New USB Backup page: copy shared folders to a USB disk when plugged in or every day
 - Earlier versions that only store what changed; restore from Files

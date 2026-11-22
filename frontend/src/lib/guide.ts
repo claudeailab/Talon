@@ -264,7 +264,7 @@ export const GUIDE: Topic[] = [
           {
             list: [
               "Each volume shows its used and free space and whether it survives disk failures.",
-              "**⋯ → Browse files** opens the volume on the [Files](/files) page.",
+              "**⋯ → Browse files** opens the volume on the [Browser](/files) page.",
               "**Expand filesystem** appears after the RAID array under the volume has grown.",
               "**Delete volume** erases everything on it.",
             ],
@@ -277,16 +277,16 @@ export const GUIDE: Topic[] = [
 
   {
     id: "files",
-    title: "Files",
+    title: "Browser",
     group: "Storage",
     summary: "Browse, upload and download files on volumes, other disks and OneDrive.",
-    page: { to: "/files", label: "Open Files" },
+    page: { to: "/files", label: "Open Browser" },
     sections: [
       {
         id: "browse",
         title: "Browse",
         blocks: [
-          { img: "files", alt: "Files page" },
+          { img: "files", alt: "Browser page" },
           {
             list: [
               "Choose where to browse with the button at the top left: your **Volumes**, **Other disks** (USB disks and other disks with a filesystem that are not part of a volume or RAID) and **OneDrive** when it is connected.",
@@ -406,7 +406,7 @@ export const GUIDE: Topic[] = [
           {
             list: [
               "**Visible in network browsing**: when off, people must type the share name to connect.",
-              "**Recycle bin**: on for new shared folders. Files deleted from Windows or macOS are kept for 30 days; restore them in [Files → Recycle bin](" + t("files") + "). Not available together with **Time Machine backups**, which removes old backups itself.",
+              "**Recycle bin**: on for new shared folders. Files deleted from Windows or macOS are kept for 30 days; restore them in [Browser → Recycle bin](" + t("files") + "). Not available together with **Time Machine backups**, which removes old backups itself.",
               "**Time Machine backups**: advertises the share as a macOS Time Machine destination. Use a separate shared folder for it.",
             ],
           },
@@ -603,7 +603,7 @@ export const GUIDE: Topic[] = [
         title: "Versions and restoring",
         blocks: [
           { p: "On disks formatted as ext4, XFS, Btrfs or NTFS, every backup is a dated version; files that did not change take no extra space. Versions older than the number of days you chose are removed, and the newest is always kept. FAT32 and exFAT cannot do this: there the backup is one copy, kept up to date." },
-          { p: "**Restore** lists the versions. Choosing one opens it in [Files](/files), where you can download a file or move it back to a volume." },
+          { p: "**Restore** lists the versions. Choosing one opens it in [Browser](/files), where you can download a file or move it back to a volume." },
           { p: "**⋯ → Edit** changes the folders or the schedule; **Delete** removes the backup task but keeps the backups on the disk." },
         ],
       },
@@ -653,7 +653,7 @@ export const GUIDE: Topic[] = [
           {
             list: [
               "**Delete on Talon what I delete on OneDrive** (or **Delete on OneDrive what I delete on Talon** for a backup to OneDrive): when a file is deleted on one side it is also deleted on the other. Off means nothing is ever deleted (safer).",
-              "When a backup from OneDrive replaces or deletes a file on the NAS, the old copy is kept for 30 days. Restore it from **Previous versions** or the **Recycle bin** in [Files](" + t("files") + "). A two-way sync keeps them the same way. A backup to OneDrive needs no copy of its own: OneDrive keeps earlier versions of its files.",
+              "When a backup from OneDrive replaces or deletes a file on the NAS, the old copy is kept for 30 days. Restore it from **Previous versions** or the **Recycle bin** in [Browser](" + t("files") + "). A two-way sync keeps them the same way. A backup to OneDrive needs no copy of its own: OneDrive keeps earlier versions of its files.",
               "**More options**: **If it fails** (try a failed run again up to 5 times, 2 minutes apart) and a **Speed limit**, so backups do not slow down your internet.",
             ],
           },
@@ -822,7 +822,7 @@ export const GUIDE: Topic[] = [
         id: "install",
         title: "Install ClamAV",
         blocks: [
-          { p: "Talon uses **ClamAV**, a free, open-source antivirus by Cisco Talos. It is not installed until you want it: on the [Antivirus](/antivirus) page, click **Install ClamAV**. It downloads about 300 MB, including the virus definitions, which then update automatically several times a day." },
+          { p: "Talon uses **ClamAV**, a free, open-source antivirus by Cisco Talos. It is not installed until you want it: on the [Antivirus](/antivirus) page, click **Install ClamAV**. It downloads about 300 MB, including the virus definitions, with a progress bar. The virus definitions then update automatically every hour; ClamAV itself updates with the [operating system updates](" + t("settings") + ")." },
           { p: "A scan loads the virus definitions into memory while it runs, about 1.5 GB, and frees it afterwards. ClamAV needs at least 2 GB of memory and recommends 3 GB or more; Talon tells you when the NAS has too little." },
         ],
       },
@@ -862,15 +862,8 @@ export const GUIDE: Topic[] = [
         blocks: [
           { img: "activity", alt: "Activity" },
           { p: "The **Activity Log** lists everything that happens in Talon: every change made in the web interface, sign-ins, OneDrive and scheduled task runs with their results, alerts and emails, updates and restarts, with who did it and when. **Details** next to a background task, such as creating a RAID array or wiping a disk, shows each step it ran, also after a restart." },
-          { p: "Narrow it down by **operation** (for example OneDrive, Scheduled or Files), show **Warnings and errors** or **Errors only**, and **Search** for words in the message or a user name. Choose how many entries to show per page and use **Previous** and **Next**. The newest 20,000 entries are kept." },
-        ],
-      },
-      {
-        id: "system-logs",
-        title: "System logs",
-        blocks: [
-          { p: "The **System logs** tab shows what the operating system and its services wrote to the system journal: Samba, NFS, SSH, disks (S.M.A.R.T. and RAID), the kernel and Talon's own service. Choose a source, show **Warnings and errors** or **Errors only**, and **Search** for words. Tap a message to read it in full; **Older** and **Newer** page through the newest 5,000 messages." },
-          { p: "Useful when something does not work, for example a computer that cannot connect to a shared folder (Samba) or failed SSH sign-ins." },
+          { p: "It also shows the **system logs**: what the operating system and its services wrote to the system journal, such as Samba, NFS, SSH, disks (S.M.A.R.T. and RAID), the kernel and Talon's own service. **Everything** shows both, newest first." },
+          { p: "Choose what to show in the first list: **Everything**, **All Talon activity** or one kind of operation (for example OneDrive or Scheduled), or **All system logs** or one service (for example Samba when a computer cannot connect to a shared folder). Show **Warnings and errors** or **Errors only**, and **Search** for words. Tap an entry to read it in full; **Newer** and **Older** page through the list. The newest 20,000 Talon entries are kept." },
         ],
       },
     ],
@@ -940,11 +933,11 @@ export const GUIDE: Topic[] = [
         id: "os-update",
         title: "Operating system updates",
         blocks: [
-          { p: "[Settings → Update](/settings?tab=update&os=1) has two tabs: **Talon** and **Operating system**. The operating system (Debian, Ubuntu or Raspberry Pi OS) is checked once a day; **Check now** checks straight away. Security updates are listed first; **Other** shows the rest." },
+          { p: "[Settings → Update](/settings?tab=update&os=1) has two tabs: **Talon** and **Operating system**. The operating system (Debian, Ubuntu or Raspberry Pi OS) is checked once a day; **Check now** checks straight away, with a progress bar. Security updates are listed first; **Other** shows the rest." },
           { p: "**Install all updates** installs them with a progress bar. Shared folders keep working, and configuration files you changed are kept. When an update needs a restart, for example a new Linux kernel, **Restart to finish** appears here and on the Dashboard." },
           {
             list: [
-              "**Install security updates automatically**: every night, with an email when something was installed (set up SMTP first).",
+              "**Install updates automatically**: **Off**, **Security only** or **All updates**. They install every night, with an email when something was installed (set up SMTP first).",
               "**Restart automatically when needed**: only when an update needs it, at the time you choose (04:00 by default).",
             ],
           },

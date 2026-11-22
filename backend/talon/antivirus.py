@@ -29,6 +29,7 @@ DB_DIR = "/var/lib/clamav"
 ENV = {"DEBIAN_FRONTEND": "noninteractive", "NEEDRESTART_MODE": "l", "NEEDRESTART_SUSPEND": "1"}
 FOUND_RE = re.compile(r"^(.*): (.+) FOUND$")
 SCHEDULES = ("off", "daily", "weekly")
+DEFINITIONS_MB = 230                # main + daily + bytecode, roughly
 
 
 def parse_version(text: str) -> dict:
@@ -51,6 +52,7 @@ class Antivirus:
         self.state = nas.state
         self.demo = demo
         self.progress: dict = {"state": "idle"}
+        self.setup: dict = {"state": "idle"}            # installing or removing ClamAV
         self._proc: Optional[subprocess.Popen] = None
         self._stop_scan = False
         self._lock = threading.Lock()
@@ -83,7 +85,7 @@ class Antivirus:
                 "ram": ram, "ram_ok": ram >= MIN_RAM, "ram_warning": MIN_RAM <= ram < WARN_RAM,
                 "progress": self.progress, "settings": self.settings(),
                 "last_scan": self._saved().get("last_scan"), "quarantine": self._saved().get("quarantine") or [],
-                "installing": self._saved().get("installing_job")}
+                "setup": self.setup, "updates": self.update_frequency() if inst else None}
 
     def _version(self) -> dict:
         if self.demo:
@@ -100,49 +102,77 @@ class Antivirus:
         return any(n.startswith("main.") for n in names) and any(n.startswith("daily.") for n in names)
 
     # ------------------------------------------------------------ install / remove
-    def install(self, user: str):
+    def install(self, user: str) -> dict:
+        """Install ClamAV and its virus definitions in the background, with progress."""
         if self.installed():
             raise UserError("ClamAV is already installed")
         if self._ram() < MIN_RAM:
             raise UserError("ClamAV needs at least 2 GB of memory; this NAS has less")
+        return self._setup(user, remove=False)
 
-        def work(log):
-            if self.demo:
-                for step in ("Installing clamav", "Downloading the virus definitions"):
-                    log(step)
-                    time.sleep(1.5)
-                self.state.update(lambda d: d.setdefault("antivirus", {}).__setitem__("demo_installed", True))
-                return
-            run(["apt-get", "update", "-q"], check=False, timeout=600, log=log, env=ENV)
-            run(["apt-get", "install", "-y", "-q", "-o", "DPkg::Lock::Timeout=120", "clamav", "clamav-freshclam"],
-                timeout=1800, log=log, env=ENV)
-            # the definitions: freshclam runs as a service; wait for the first download
-            log("Downloading the virus definitions (about 250 MB)")
-            run(["systemctl", "enable", "--now", "clamav-freshclam"], check=False, log=log)
-            for _ in range(180):
-                if self._has_definitions():
-                    break
-                time.sleep(5)
-            if not self._has_definitions():
-                run(["systemctl", "stop", "clamav-freshclam"], check=False, log=log)
-                run(["freshclam", "--quiet"], check=False, timeout=1800, log=log)
-                run(["systemctl", "start", "clamav-freshclam"], check=False, log=log)
-
-        job = self.nas.jobs.submit("Install ClamAV antivirus", user, work)
-        self.state.update(lambda d: d.setdefault("antivirus", {}).__setitem__("installing_job", job.id))
-        return job
-
-    def remove(self, user: str):
+    def remove(self, user: str) -> dict:
         if self.progress.get("state") == "running":
             raise UserError("Stop the scan first")
+        return self._setup(user, remove=True)
 
-        def work(log):
+    def _setup(self, user: str, remove: bool) -> dict:
+        with self._lock:
+            if self.setup.get("state") == "running":
+                raise UserError("Please wait for the current installation to finish")
+            self.setup = {"state": "running", "action": "remove" if remove else "install", "percent": 0,
+                          "text": "Removing ClamAV" if remove else "Preparing", "started": time.time()}
+        self.state.log_activity(user, ("Removing" if remove else "Installing") + " ClamAV antivirus", "info", "antivirus")
+        threading.Thread(target=self._setup_bg, args=(user, remove), daemon=True, name="clamav-setup").start()
+        return self.info()
+
+    def _setup_bg(self, user: str, remove: bool) -> None:
+        st = self.setup
+        try:
             if self.demo:
-                self.state.update(lambda d: d.setdefault("antivirus", {}).__setitem__("demo_installed", False))
-                return
-            run(["apt-get", "remove", "-y", "-q", "clamav", "clamav-freshclam", "clamav-base"], timeout=900, log=log, env=ENV)
+                steps = [(30, "Downloading ClamAV"), (60, "Unpacking clamav"), (80, "Downloading the virus definitions · 120 of 230 MB"),
+                         (100, "Downloading the virus definitions · 230 of 230 MB")] if not remove else [(50, "Removing ClamAV"), (100, "Removing ClamAV")]
+                for pct, text in steps:
+                    st.update(percent=pct, text=text)
+                    time.sleep(0.8)
+                self.state.update(lambda d: d.setdefault("antivirus", {}).__setitem__("demo_installed", not remove))
+            elif remove:
+                rc, err = _apt(["remove", "clamav", "clamav-freshclam", "clamav-base"], st, 0, 100)
+                if rc != 0:
+                    raise UserError(err or "apt-get remove failed")
+            else:
+                st.update(text="Updating the package lists")
+                run(["apt-get", "update", "-q"], check=False, timeout=600, env=ENV)
+                rc, err = _apt(["install", "clamav", "clamav-freshclam"], st, 5, 65)
+                if rc != 0:
+                    raise UserError(err or "apt-get install failed")
+                self._download_definitions(st)
+            st.update(state="success", percent=100, finished=time.time())
+            self.state.log_activity(user, "ClamAV " + ("removed" if remove else "installed"), "info", "antivirus")
+        except Exception as e:   # noqa: BLE001 - shown in the page
+            st.update(state="error", error=str(e), finished=time.time())
+            self.state.log_activity(user, f"{'Removing' if remove else 'Installing'} ClamAV failed: {e}", "error", "antivirus")
 
-        return self.nas.jobs.submit("Remove ClamAV antivirus", user, work)
+    def _download_definitions(self, st: dict) -> None:
+        """freshclam (a service) downloads the definitions; the progress is how much has arrived."""
+        run(["systemctl", "enable", "--now", "clamav-freshclam"], check=False)
+        expected = DEFINITIONS_MB * 1024 * 1024
+        for _ in range(720):                                   # up to an hour on a slow line
+            if self._has_definitions():
+                return
+            size = _dir_size(DB_DIR)
+            pct = min(99.0, 65 + 35 * size / expected)
+            st.update(percent=round(pct, 1),
+                      text=f"Downloading the virus definitions · {size // 1024 ** 2} of about {DEFINITIONS_MB} MB")
+            time.sleep(5)
+        raise UserError("The virus definitions did not download; check the internet connection and try again")
+
+    def update_frequency(self) -> str:
+        """How often freshclam looks for new definitions (Checks per day in freshclam.conf)."""
+        if self.demo:
+            return "every hour"
+        m = re.search(r"^Checks\s+(\d+)", _read("/etc/clamav/freshclam.conf"), re.M)
+        n = int(m.group(1)) if m else 24
+        return "every hour" if n == 24 else f"{n} times a day"
 
     # ------------------------------------------------------------ settings
     def save_settings(self, data: dict, user: str) -> dict:
@@ -350,3 +380,41 @@ def _count_files(path: str) -> int:
     for _root, _dirs, files in os.walk(path):
         n += len(files)
     return n
+
+
+def _read(path: str) -> str:
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+def _dir_size(path: str) -> int:
+    total = 0
+    try:
+        for e in os.scandir(path):
+            if e.is_file():
+                total += e.stat().st_size
+    except OSError:
+        pass
+    return total
+
+
+def _apt(args: List[str], st: dict, lo: float, hi: float):
+    """apt-get with its progress mapped onto lo..hi percent of the page's progress bar."""
+    from .osupdate import APT_OPTS, _first_error, _stream, parse_status
+
+    mid = (lo + hi) / 2                        # downloading: the first half, installing: the second
+
+    def on_line(line: str) -> None:
+        p = parse_status(line)
+        if not p:
+            return
+        if p["phase"] == "download":
+            st.update(percent=round(lo + (mid - lo) * p["percent"] / 100, 1), text="Downloading ClamAV")
+        else:
+            st.update(percent=round(mid + (hi - mid) * p["percent"] / 100, 1), text=p["text"].split(" (")[0])
+
+    rc, err = _stream(["apt-get", "-y", "-q", *APT_OPTS, "-o", "APT::Status-Fd=1", *args], on_line)
+    return rc, _first_error(err)

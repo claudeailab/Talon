@@ -77,3 +77,15 @@ def test_journal_search_is_literal():
     from talon.syslog import _escape, _level
     assert _escape("a.b (c)") == r"a\.b \(c\)"
     assert (_level("3"), _level(4), _level("6"), _level(None)) == ("error", "warning", "info", "info")
+
+
+def test_activity_everything_and_system(client):
+    allp = client.get("/api/activity", params={"source": "all", "limit": 50}).json()
+    kinds = {e["kind"] for e in allp["items"]}
+    assert kinds == {"talon", "system"} and allp["more"]
+    ts = [e["ts"] for e in allp["items"]]
+    assert ts == sorted(ts, reverse=True)
+    sysp = client.get("/api/activity", params={"source": "system", "system": "ssh", "limit": 20}).json()
+    assert sysp["items"] and all(e["kind"] == "system" and e["source"] == "ssh" for e in sysp["items"])
+    tal = client.get("/api/activity", params={"limit": 5}).json()
+    assert tal["total"] is not None and all(e["kind"] == "talon" for e in tal["items"]) and tal["sources"]

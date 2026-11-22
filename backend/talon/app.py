@@ -182,6 +182,7 @@ def create_app(cfg, platform) -> FastAPI:
     sessions = Sessions(cfg.session_hours, cfg.sessions_file)
 
     syslog_reader = SystemLog(cfg.demo)
+    server = {"started": time.time()}
     webdav = WebDav(nas, platform, cfg.demo)
     updater = (DemoUpdater if cfg.demo else Updater)(cfg, nas.state)
 
@@ -352,7 +353,8 @@ def create_app(cfg, platform) -> FastAPI:
     # ------------------------------------------------------------ updates
     @app.get("/api/health")
     def health():
-        return health_info(updater)
+        # "started" changes when Talon (or the NAS) restarts: the restart screen waits for it
+        return {**health_info(updater), "started": server["started"]}
 
     @app.get("/api/update")
     def update_info(_u: str = Depends(current_user)):
@@ -406,11 +408,11 @@ def create_app(cfg, platform) -> FastAPI:
 
     @app.post("/api/antivirus/install")
     def antivirus_install(user: str = Depends(current_user)):
-        return nas.antivirus.install(user).to_dict()
+        return nas.antivirus.install(user)
 
     @app.post("/api/antivirus/remove")
     def antivirus_remove(user: str = Depends(current_user)):
-        return nas.antivirus.remove(user).to_dict()
+        return nas.antivirus.remove(user)
 
     @app.put("/api/antivirus/settings")
     def antivirus_settings(body: dict = Body(...), user: str = Depends(current_user)):
@@ -441,7 +443,7 @@ def create_app(cfg, platform) -> FastAPI:
 
     @app.post("/api/os-update/check")
     def os_update_check(_u: str = Depends(current_user)):
-        return nas.osupdate.check()
+        return nas.osupdate.start_check()
 
     @app.post("/api/os-update/install")
     def os_update_install(user: str = Depends(current_user)):
@@ -1005,12 +1007,34 @@ def create_app(cfg, platform) -> FastAPI:
     def power(action: str = Body(..., embed=True), user: str = Depends(current_user)):
         nas.state.log_activity(user, f"System {action} requested", "warning")
         platform.power(action)
+        if cfg.demo and action == "reboot":            # a simulated restart of about 8 seconds
+            updater.restarting_until = time.time() + 8
+            server["started"] = time.time() + 8
+            nas.state.update(lambda d: d.setdefault("os_updates", {}).__setitem__("demo_restart", False))
         return {"ok": True}
 
     @app.get("/api/activity")
     def activity_log(offset: int = 0, limit: int = 10, category: str = "", level: str = "",
-                     q: str = "", _u: str = Depends(current_user)):
-        return nas.state.activity.query(offset, limit, category, level, q)
+                     q: str = "", source: str = "talon", system: str = "", _u: str = Depends(current_user)):
+        """source: talon (Talon's activity log), system (the system journal) or all (both, newest first)."""
+        sources = syslog_reader.sources()
+        if source == "system":
+            r = syslog_reader.query(offset, limit, system, level, q)
+            items = [{**e, "kind": "system"} for e in r["items"]]
+            return {"items": items, "total": None, "more": r["more"], "offset": offset, "limit": limit,
+                    "categories": activity.categories(), "sources": sources}
+        if source == "all":
+            n = max(0, offset) + max(1, min(limit, 100)) + 1
+            a = nas.state.activity.query(0, n, "", level, q, cap=n)["items"]
+            s = syslog_reader.query(0, n, "", level, q, cap=n)["items"]
+            merged = sorted([{**e, "kind": "talon"} for e in a] + [{**e, "kind": "system"} for e in s],
+                            key=lambda e: e.get("ts", 0), reverse=True)
+            page = merged[offset:offset + limit]
+            return {"items": page, "total": None, "more": len(merged) > offset + limit, "offset": offset,
+                    "limit": limit, "categories": activity.categories(), "sources": sources}
+        r = nas.state.activity.query(offset, limit, category, level, q)
+        r["items"] = [{**e, "kind": "talon"} for e in r["items"]]
+        return {**r, "more": r["offset"] + len(r["items"]) < r["total"], "sources": sources}
 
     @app.get("/api/syslog")
     def system_log(offset: int = 0, limit: int = 25, source: str = "", level: str = "",

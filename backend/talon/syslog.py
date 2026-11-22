@@ -57,8 +57,9 @@ class SystemLog:
     def sources(self) -> List[dict]:
         return [{"id": k, "label": v["label"]} for k, v in SOURCES.items()]
 
-    def query(self, offset: int = 0, limit: int = 25, source: str = "", level: str = "", q: str = "") -> dict:
-        offset, limit = max(0, int(offset)), max(1, min(200, int(limit)))
+    def query(self, offset: int = 0, limit: int = 25, source: str = "", level: str = "", q: str = "",
+              cap: int = 200) -> dict:
+        offset, limit = max(0, int(offset)), max(1, min(cap, int(limit)))
         want = min(MAX_SCAN, offset + limit + 1)
         entries = self._sample_entries(source, level, q) if self.demo else self._journal(want, source, level, q)
         page = entries[offset:offset + limit]

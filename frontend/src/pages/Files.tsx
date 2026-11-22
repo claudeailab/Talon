@@ -195,7 +195,7 @@ export default function FilesPage() {
   if (!locs.data) return <PageLoader />;
   const header = (
     <PageHeader
-      title="Files"
+      title="Browser"
       description="Browse, upload and download files on your system"
       actions={
         volume ? (

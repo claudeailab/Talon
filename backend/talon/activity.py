@@ -34,6 +34,10 @@ CATEGORIES = {
     "system": "System",
 }
 
+def categories() -> list:
+    return [{"id": k, "label": v} for k, v in CATEGORIES.items()]
+
+
 # the category of a message logged outside a web request (background work)
 _RULES = [
     (r"\bOneDrive\b|EntraID", "onedrive"),
@@ -122,7 +126,7 @@ class ActivityLog:
         return out
 
     def query(self, offset: int = 0, limit: int = 10, category: str = "", level: str = "",
-              q: str = "") -> dict:
+              q: str = "", cap: int = 100) -> dict:
         items = self.entries()
         if category:
             cats = set(category.split(","))
@@ -135,7 +139,7 @@ class ActivityLog:
             words = q.lower().split()
             items = [e for e in items
                      if all(w in (e["message"] + " " + e.get("user", "")).lower() for w in words)]
-        offset, limit = max(offset, 0), min(max(limit, 1), 100)
+        offset, limit = max(offset, 0), min(max(limit, 1), cap)
         page = items[offset:offset + limit]
         for e in page:
             e.setdefault("category", categorize(e["message"]))

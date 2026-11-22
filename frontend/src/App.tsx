@@ -37,6 +37,7 @@ import { ConfirmDialog, IconButton, Menu, MenuItem, PageLoader } from "./compone
 import { useAction } from "./lib/hooks";
 import { JobDialog } from "./components/jobs";
 import { Reconnecting, UpdateOverlay, UpdatePill } from "./components/update";
+import { RestartOverlay, restartNas } from "./components/restart";
 import Login from "./pages/Login";
 import DashboardPage from "./pages/Dashboard";
 import FilesPage from "./pages/Files";
@@ -65,7 +66,12 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
       { to: "/disks", label: "Disks", icon: HardDrive, page: DisksPage },
       { to: "/raid", label: "RAID", icon: Layers, page: RaidPage },
       { to: "/volumes", label: "Volumes", icon: Database, page: VolumesPage },
-      { to: "/files", label: "Files", icon: FolderTree, page: FilesPage },
+    ],
+  },
+  {
+    section: "Files",
+    items: [
+      { to: "/files", label: "Browser", icon: FolderTree, page: FilesPage },
       { to: "/onedrive", label: "OneDrive", icon: Cloud, page: OneDrivePage },
       { to: "/usb-backup", label: "USB Backup", icon: Usb, page: UsbBackupPage },
     ],
@@ -82,9 +88,9 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
     items: [
       { to: "/activity", label: "Activity", icon: ActivityIcon, page: ActivityPage },
       { to: "/settings", label: "Settings", icon: SettingsIcon, page: SettingsPage },
+      { to: "/antivirus", label: "Antivirus", icon: ShieldCheck, page: AntivirusPage },
       { to: "/services", label: "Services", icon: Server, page: ServicesPage },
       { to: "/scheduled", label: "Scheduled", icon: Clock, page: ScheduledPage },
-      { to: "/antivirus", label: "Antivirus", icon: ShieldCheck, page: AntivirusPage },
       { to: "/notifications", label: "Notifications", icon: Mail, page: NotificationsPage },
       { to: "/documentation", label: "Documentation", icon: BookOpen, page: DocumentationPage },
     ],
@@ -128,8 +134,8 @@ function Shell({ me }: { me: Me }) {
   const [mobileNav, setMobileNav] = useState(false);
   const [openJob, setOpenJob] = useState<string | null>(null);
   const [power, setPower] = useState<"reboot" | "poweroff" | null>(null);
-  const doPower = useAction((action: string) => api.post("/system/power", { action }), {
-    success: (_r, a) => (a === "reboot" ? "Restarting… this page reconnects when the NAS is back." : "Shutting down…"),
+  const doPower = useAction((action: string) => (action === "reboot" ? restartNas() : api.post("/system/power", { action })), {
+    success: (_r, a) => (a === "reboot" ? "" : "Shutting down…"),
     onSuccess: () => setPower(null),
   });
   const jobs = useQuery({ queryKey: ["jobs"], queryFn: () => api.get<Job[]>("/jobs"), refetchInterval: 3000 });
@@ -343,6 +349,7 @@ function Shell({ me }: { me: Me }) {
         }
       />
       <UpdateOverlay />
+      <RestartOverlay />
     </div>
   );
 }

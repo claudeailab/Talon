@@ -301,7 +301,13 @@ def test_ramlog_script_never_blocks_the_boot():
 
 def test_os_updates(client):
     import time
-    info = client.post("/api/os-update/check").json()
+    client.post("/api/os-update/check")
+    for _ in range(100):
+        info = client.get("/api/os-update").json()
+        if info["checking"]["state"] != "running":
+            break
+        time.sleep(0.1)
+    assert info["checking"]["state"] == "success" and info["checking"]["percent"] == 100
     assert info["packages"] and info["security"] == 3 and info["packages"][0]["security"]
     assert any(p["restart"] for p in info["packages"])
     assert client.post("/api/os-update/install").status_code == 200
@@ -312,12 +318,13 @@ def test_os_updates(client):
             break
         time.sleep(0.1)
     assert info["progress"]["state"] == "success" and not info["packages"] and info["restart_needed"]
-    auto = client.put("/api/os-update/auto", json={"security": True, "restart": True, "restart_time": "04:00"}).json()["auto"]
-    assert auto == {"security": True, "restart": True, "restart_time": "04:00"}
+    auto = client.put("/api/os-update/auto", json={"mode": "all", "restart": True, "restart_time": "04:00"}).json()["auto"]
+    assert auto == {"mode": "all", "restart": True, "restart_time": "04:00"}
+    assert client.put("/api/os-update/auto", json={"mode": "everything"}).status_code == 400
     assert client.put("/api/os-update/auto", json={"restart_time": "25:00"}).status_code == 400
     msgs = [a["message"] for a in client.get("/api/activity", params={"category": "updates"}).json()["items"]]
     assert any("Installed 8 operating system update(s)" in m for m in msgs)
-    assert any("automatic security updates" in m for m in msgs)
+    assert any("Automatic updates: all updates" in m for m in msgs)
 
 
 def test_apt_parsing():

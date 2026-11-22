@@ -4,7 +4,8 @@ import { ChevronDown, Package, RefreshCw, RotateCcw, ShieldCheck } from "lucide-
 import { api } from "../lib/api";
 import { ago, cx } from "../lib/format";
 import { useAction } from "../lib/hooks";
-import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Input, PageLoader, Progress, Switch } from "../components/ui";
+import { restartNas } from "../components/restart";
+import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Input, PageLoader, Progress, Segmented, Switch } from "../components/ui";
 
 type Pkg = { name: string; old: string; new: string; security: boolean; restart: boolean };
 type OsInfo = {
@@ -15,7 +16,8 @@ type OsInfo = {
   security: number;
   restart_needed: boolean;
   progress: { state: "idle" | "running" | "success" | "error"; phase?: string; package?: string; percent?: number; done?: number; total?: number; error?: string };
-  auto: { security: boolean; restart: boolean; restart_time: string };
+  auto: { mode: "off" | "security" | "all"; restart: boolean; restart_time: string };
+  checking: { state: "idle" | "running" | "success" | "error"; percent?: number; text?: string; error?: string };
   last_install: { at: number; ok: boolean; count: number; error?: string } | null;
 };
 
@@ -24,18 +26,13 @@ export default function OsUpdateTab() {
   const q = useQuery({
     queryKey: ["os-update"],
     queryFn: () => api.get<OsInfo>("/os-update"),
-    refetchInterval: (query) => (query.state.data?.progress.state === "running" ? 1000 : 30000),
+    refetchInterval: (query) =>
+      query.state.data?.progress.state === "running" || query.state.data?.checking.state === "running" ? 1000 : 30000,
   });
-  const check = useAction(() => api.post<OsInfo>("/os-update/check"), {
-    invalidate: ["os-update"],
-    success: (r) => (r.error ? "" : r.packages.length ? `${r.packages.length} update${r.packages.length === 1 ? "" : "s"} available` : "The operating system is up to date"),
-  });
+  const check = useAction(() => api.post<OsInfo>("/os-update/check"), { invalidate: ["os-update"] });
   const install = useAction(() => api.post<OsInfo>("/os-update/install"), { invalidate: ["os-update"], onSuccess: () => setConfirm(false) });
   const auto = useAction((body: Partial<OsInfo["auto"]>) => api.put<OsInfo>("/os-update/auto", body), { invalidate: ["os-update"], success: "Saved" });
-  const reboot = useAction(() => api.post("/system/power", { action: "reboot" }), {
-    success: "Restarting the NAS. This page reconnects when it is back.",
-    onSuccess: () => setRestart(false),
-  });
+  const reboot = useAction(() => restartNas(), { onSuccess: () => setRestart(false) });
   const [confirm, setConfirm] = useState(false);
   const [restart, setRestart] = useState(false);
   const [showOther, setShowOther] = useState(false);
@@ -46,6 +43,7 @@ export default function OsUpdateTab() {
   if (!q.data) return <PageLoader />;
   const d = q.data;
   const running = d.progress.state === "running";
+  const checking = d.checking.state === "running";
   const sec = d.packages.filter((p) => p.security);
   const other = d.packages.filter((p) => !p.security);
   const needsRestart = d.packages.some((p) => p.restart);
@@ -71,16 +69,28 @@ export default function OsUpdateTab() {
           title="Operating System"
           subtitle={`${d.os}${d.checked_at ? ` · checked ${ago(d.checked_at)}` : ""}`}
           actions={
-            <Button size="sm" icon={<RefreshCw className="size-3.5" />} loading={check.isPending} disabled={running} onClick={() => check.mutate()}>
+            <Button size="sm" icon={<RefreshCw className="size-3.5" />} disabled={running || checking} onClick={() => check.mutate()}>
               Check now
             </Button>
           }
         />
         <div className="space-y-4 px-5 pb-5">
-          {d.error && <Callout tone="warning" title="Could not check for updates">{d.error}</Callout>}
+          {checking && (
+            <div className="rounded-2xl bg-zinc-50 p-4 dark:bg-white/[0.03]">
+              <div className="flex items-baseline justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold">Checking for updates</div>
+                  <div className="text-[13px] break-words text-zinc-500">{d.checking.text}</div>
+                </div>
+                <span className="tabular text-sm font-semibold text-zinc-500">{Math.round(d.checking.percent ?? 0)}%</span>
+              </div>
+              <Progress value={d.checking.percent ?? 0} className="mt-3 h-2" />
+            </div>
+          )}
+          {d.error && !checking && <Callout tone="warning" title="Could not check for updates">{d.error}</Callout>}
           {d.progress.state === "error" && !running && <Callout tone="danger" title="Installing the updates failed">{d.progress.error}</Callout>}
 
-          {running ? (
+          {checking ? null : running ? (
             <div className="rounded-2xl bg-zinc-50 p-4 dark:bg-white/[0.03]">
               <div className="flex items-baseline justify-between gap-3">
                 <div className="min-w-0">
@@ -144,16 +154,26 @@ export default function OsUpdateTab() {
       </Card>
 
       <Card>
-        <CardHeader icon={<ShieldCheck className="size-4.5" />} title="Automatic Updates" subtitle="Security updates without you having to look" />
+        <CardHeader icon={<ShieldCheck className="size-4.5" />} title="Automatic Updates" subtitle="Updates without you having to look" />
         <div className="divide-y divide-zinc-100 px-5 pb-2 dark:divide-white/5">
-          <div className="flex items-start justify-between gap-4 pb-4">
-            <div className="min-w-0">
-              <div className="text-[13.5px] font-medium">Install security updates automatically</div>
-              <div className="text-[13px] text-zinc-500">Every night. You get an email when something was installed (set up SMTP first).</div>
+          <div className="space-y-2 pb-4">
+            <div className="text-[13.5px] font-medium">Install updates automatically</div>
+            <Segmented
+              value={d.auto.mode}
+              onChange={(v) => auto.mutate({ mode: v })}
+              options={[
+                { value: "off", label: "Off" },
+                { value: "security", label: "Security only" },
+                { value: "all", label: "All updates" },
+              ]}
+            />
+            <div className="text-[13px] text-zinc-500">
+              {d.auto.mode === "off"
+                ? "Nothing installs by itself; you are told about security updates."
+                : `Every night, ${d.auto.mode === "all" ? "all updates" : "security updates"} install by themselves. You get an email when something was installed (set up SMTP first).`}
             </div>
-            <Switch checked={d.auto.security} onChange={(v) => auto.mutate({ security: v })} label="Install security updates automatically" />
           </div>
-          <div className={cx("flex flex-wrap items-start justify-between gap-4 py-4", !d.auto.security && "opacity-50")}>
+          <div className={cx("flex flex-wrap items-start justify-between gap-4 py-4", d.auto.mode === "off" && "opacity-50")}>
             <div className="min-w-0 flex-1">
               <div className="text-[13.5px] font-medium">Restart automatically when needed</div>
               <div className="text-[13px] text-zinc-500">Only if an update needs it, at the time below. Shared folders are unavailable for a minute or two.</div>
@@ -169,7 +189,7 @@ export default function OsUpdateTab() {
                 </div>
               )}
             </div>
-            <Switch checked={d.auto.restart} disabled={!d.auto.security} onChange={(v) => auto.mutate({ restart: v })} label="Restart automatically when needed" />
+            <Switch checked={d.auto.restart} disabled={d.auto.mode === "off"} onChange={(v) => auto.mutate({ restart: v })} label="Restart automatically when needed" />
           </div>
         </div>
       </Card>

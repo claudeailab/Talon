@@ -122,8 +122,7 @@ function Body({ metric, d, label, vol, setVol }: { metric: HistoryMetric; d: His
       <Chart points={p} step={d.step} label={label} max={info.size} fmt={(x) => bytes(x)} lines={[{ key: `vol:${v}`, label: "Used", color: "#7c3aed", area: true }]} />
       <Stats
         items={[
-          ["Used now", bytes(last(p, `vol:${v}`))],
-          ["Size", bytes(info.size)],
+          ["Used", `${bytes(last(p, `vol:${v}`))} of ${bytes(info.size)}`],
           ["Growth", f ? `${f.per_month >= 0 ? "+" : "−"}${bytes(Math.abs(f.per_month))} a month` : "—"],
           ["Full in", !f ? "Not enough history" : f.full_in_days == null ? "Not growing" : fullIn(f.full_in_days)],
         ]}
@@ -171,7 +170,8 @@ function peakText(p: Pt[], k: string, fmt: (v: number) => string): string {
 
 function Stats({ items }: { items: [string, string][] | string[][] }) {
   return (
-    <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+    // one row of up to three; more wrap in rows of three
+    <div className="mt-4 grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(items.length, 3)}, minmax(0, 1fr))` }}>
       {items.map(([k, v]) => (
         <div key={k} className="min-w-0 rounded-xl bg-zinc-50 px-3 py-2 dark:bg-white/[0.04]">
           <div className="text-xs text-zinc-500">{k}</div>

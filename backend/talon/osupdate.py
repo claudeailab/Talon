@@ -28,6 +28,7 @@ UU_LOG = "/var/log/unattended-upgrades/unattended-upgrades.log"
 RESTART_PACKAGES = re.compile(r"^(linux-image|linux-headers|raspberrypi-kernel|linux-.*rpi|libc6$|systemd$|dbus$|firmware-)")
 INST_RE = re.compile(r"^Inst (\S+)(?: \[([^\]]+)\])? \((\S+) ([^\[)]*?)(?: \[[^\]]*\])?\)")
 CHECK_HOURS = 24
+AUTO_MODES = {"off": "off", "security": "security updates only", "all": "all updates"}
 
 
 def parse_simulation(text: str) -> List[dict]:
@@ -61,6 +62,7 @@ class OsUpdate:
         self.demo = demo
         self._lock = threading.Lock()
         self.progress: dict = {"state": "idle"}
+        self.checking: dict = {"state": "idle"}       # Check now: downloading the package lists
 
     # ------------------------------------------------------------ status
     def _saved(self) -> dict:
@@ -71,7 +73,7 @@ class OsUpdate:
         pk = s.get("packages") or []
         return {"os": self._os_name(), "checked_at": s.get("checked_at"), "error": s.get("error"),
                 "packages": pk, "security": sum(1 for p in pk if p["security"]),
-                "restart_needed": self.restart_needed(), "progress": self.progress,
+                "restart_needed": self.restart_needed(), "progress": self.progress, "checking": self.checking,
                 "auto": self.auto_settings(), "last_install": s.get("last_install")}
 
     def _os_name(self) -> str:
@@ -96,18 +98,50 @@ class OsUpdate:
         return bool(same) and _vkey(max(same, key=_vkey)) > _vkey(running)
 
     # ------------------------------------------------------------ check
+    def start_check(self) -> dict:
+        """Check now: runs in the background; the page shows its progress."""
+        with self._lock:
+            if self.checking.get("state") == "running" or self.progress.get("state") == "running":
+                return self.info()
+            self.checking = {"state": "running", "percent": 0, "text": "Contacting the package servers", "started": time.time()}
+        threading.Thread(target=self._check_bg, daemon=True, name="os-update-check-now").start()
+        return self.info()
+
+    def _check_bg(self) -> None:
+        try:
+            self.check()
+            self.checking.update(state="success", percent=100, finished=time.time())
+        except Exception as e:   # noqa: BLE001 - shown in the page
+            self.checking.update(state="error", error=str(e), finished=time.time())
+
     def check(self) -> dict:
         if self.progress.get("state") == "running":
             return self.info()
+        c = self.checking
         if self.demo:
+            for n in range(1, 6):
+                c.update(percent=n * 17, text=f"Downloading package lists · {n} of 5")
+                time.sleep(0.25)
+            c.update(percent=95, text="Working out what can be updated")
             pk = [] if self._saved().get("demo_installed") else DEMO_PACKAGES
             self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}),
                                                                      "checked_at": time.time(), "packages": pk, "error": None}))
             return self.info()
-        cp = run(["apt-get", "update", "-q", "-o", "DPkg::Lock::Timeout=120"], check=False, timeout=600, env=ENV)
+
+        def on_line(line: str) -> None:
+            st = parse_status(line)
+            if st and st["phase"] == "download":
+                m = re.search(r"file (\d+) of (\d+)", st["text"])
+                frac = int(m.group(1)) / max(int(m.group(2)), 1) if m else 0
+                pct = max(st["percent"], frac * 100)
+                c.update(percent=round(min(90, pct * 0.9), 1),
+                         text=f"Downloading package lists · {m.group(1)} of {m.group(2)}" if m else "Downloading package lists")
+
+        rc, err = _stream(["apt-get", "update", "-q", "-o", "DPkg::Lock::Timeout=120", "-o", "APT::Status-Fd=1"], on_line)
         error = None
-        if cp.returncode != 0:
-            error = _first_error(cp.stderr or cp.stdout) or "apt-get update failed"
+        if rc != 0:
+            error = _first_error(err) or "apt-get update failed"
+        c.update(percent=92, text="Working out what can be updated")
         sim = run(["apt-get", "-s", "-q", "full-upgrade"], check=False, timeout=300, env=ENV)
         pk = parse_simulation(sim.stdout or "") if sim.returncode == 0 else []
         if sim.returncode != 0 and not error:
@@ -116,7 +150,7 @@ class OsUpdate:
         self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}),
                                                                  "checked_at": time.time(), "packages": pk, "error": error}))
         new_security = [p["name"] for p in pk if p["security"] and p["name"] not in old]
-        if new_security and self.notifier and not self.auto_settings()["security"]:
+        if new_security and self.notifier and self.auto_settings()["mode"] == "off":
             self.notifier.send("os_updates", f"{len(new_security)} security update(s) for the operating system",
                                "Security updates are waiting: " + ", ".join(new_security) +
                                "\nInstall them in Talon under Settings → Update → Operating system.")
@@ -167,6 +201,8 @@ class OsUpdate:
                 rc, err = _stream(["apt-get", "-y", "-q", *APT_OPTS, "-o", "APT::Status-Fd=1", "full-upgrade"], on_line)
             if rc != 0:
                 raise UserError(_first_error(err) or _first_error("\n".join(p["log"])) or f"apt-get failed (exit code {rc})")
+            # everything is installed: no list until the next check says otherwise
+            self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}), "packages": []}))
             p.update(state="success", percent=100, finished=time.time())
             self.state.log_activity(actor, f"Installed {total} operating system update(s)", "info", "updates")
         except Exception as e:   # noqa: BLE001 - reported in the page and the activity log
@@ -176,7 +212,7 @@ class OsUpdate:
             self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}),
                                                                      "last_install": {"at": time.time(), "ok": p["state"] == "success",
                                                                                       "count": total, "error": p.get("error")}}))
-            if not self.demo:
+            if not self.demo and p["state"] != "success":
                 try:
                     self.check()
                 except Exception:   # noqa: BLE001
@@ -185,37 +221,44 @@ class OsUpdate:
     # ------------------------------------------------------------ automatic security updates
     def auto_settings(self) -> dict:
         a = self._saved().get("auto") or {}
-        return {"security": bool(a.get("security")), "restart": bool(a.get("restart")),
+        mode = a.get("mode") or ("security" if a.get("security") else "off")      # earlier versions: a switch
+        return {"mode": mode if mode in AUTO_MODES else "off", "restart": bool(a.get("restart")),
                 "restart_time": a.get("restart_time", "04:00")}
 
     def set_auto(self, data: dict, actor: str) -> dict:
         cur = self.auto_settings()
-        security = bool(data.get("security", cur["security"]))
-        restart = bool(data.get("restart", cur["restart"])) and security
+        mode = data.get("mode", cur["mode"])
+        if mode not in AUTO_MODES:
+            raise UserError("Invalid choice")
+        restart = bool(data.get("restart", cur["restart"])) and mode != "off"
         t = str(data.get("restart_time", cur["restart_time"]))
         if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", t):
             raise UserError("Enter the time as hh:mm (24-hour)")
         if not self.demo:
-            self._apply_auto(security, restart, t)
+            self._apply_auto(mode, restart, t)
         self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}),
-                                                                 "auto": {"security": security, "restart": restart, "restart_time": t}}))
-        if security != cur["security"]:
-            self.state.log_activity(actor, ("Turned on" if security else "Turned off") + " automatic security updates", "info", "updates")
+                                                                 "auto": {"mode": mode, "restart": restart, "restart_time": t}}))
+        if mode != cur["mode"]:
+            self.state.log_activity(actor, f"Automatic updates: {AUTO_MODES[mode]}", "info", "updates")
         if restart != cur["restart"] or (restart and t != cur["restart_time"]):
             self.state.log_activity(actor, f"Automatic restart after updates: {'at ' + t if restart else 'off'}", "info", "updates")
         return self.info()
 
-    def _apply_auto(self, security: bool, restart: bool, t: str) -> None:
-        if security and run(["sh", "-c", "command -v unattended-upgrade"], check=False).returncode != 0:
+    def _apply_auto(self, mode: str, restart: bool, t: str) -> None:
+        if mode != "off" and run(["sh", "-c", "command -v unattended-upgrade"], check=False).returncode != 0:
             cp = run(["apt-get", "install", "-y", "-q", *APT_OPTS, "unattended-upgrades"], check=False, timeout=900, env=ENV)
             if cp.returncode != 0:
                 raise UserError("Could not install unattended-upgrades: " + (_first_error(cp.stderr) or "apt-get failed"))
-        on = "1" if security else "0"
+        on = "0" if mode == "off" else "1"
         write_atomic(AUTO_FILE, f'APT::Periodic::Update-Package-Lists "{on}";\nAPT::Periodic::Unattended-Upgrade "{on}";\n')
-        write_atomic(TALON_FILE, "// Talon: Settings → Update → Operating system\n"
-                                 f'Unattended-Upgrade::Automatic-Reboot "{"true" if restart else "false"}";\n'
-                                 f'Unattended-Upgrade::Automatic-Reboot-Time "{t}";\n'
-                                 'Unattended-Upgrade::Automatic-Reboot-WithUsers "true";\n')
+        lines = ["// Talon: Settings → Update → Operating system",
+                 f'Unattended-Upgrade::Automatic-Reboot "{"true" if restart else "false"}";',
+                 f'Unattended-Upgrade::Automatic-Reboot-Time "{t}";',
+                 'Unattended-Upgrade::Automatic-Reboot-WithUsers "true";']
+        if mode == "all":
+            # every repository, like Install all updates; the distribution's defaults only take security updates
+            lines += ['Unattended-Upgrade::Origins-Pattern { "origin=*"; };']
+        write_atomic(TALON_FILE, "\n".join(lines) + "\n")
 
     def report_automatic(self) -> None:
         """Log (and email) what unattended-upgrades installed since the last look."""
@@ -233,11 +276,11 @@ class OsUpdate:
                 newest = max(newest, ts)
         self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}), "uu_seen": newest}))
         if found:
-            msg = f"Installed security update(s) automatically: {', '.join(found)}"
+            msg = f"Installed update(s) automatically: {', '.join(found)}"
             self.state.log_activity("system", msg, "info", "updates")
             if self.notifier:
                 extra = "\nThe NAS needs a restart to finish." if self.restart_needed() else ""
-                self.notifier.send("os_updates", "Security updates were installed", msg + extra)
+                self.notifier.send("os_updates", "Updates were installed automatically", msg + extra)
 
     def background_loop(self, stop: threading.Event) -> None:
         stop.wait(120)
