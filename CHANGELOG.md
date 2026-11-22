@@ -1,3 +1,6 @@
+## 1.0.88
+- EntraID setup guide: clearer steps; shows which permissions are for OneDrive sync and which for EntraID users
+
 ## 1.0.87
 - Faster builds: tests run in parallel and release notes sync in one request
 - Demo starts faster
