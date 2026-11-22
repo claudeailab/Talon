@@ -4,6 +4,7 @@ import { MoreHorizontal, Pencil, Plus, ShieldCheck, Trash2, UserPlus, Users as U
 import { api } from "../lib/api";
 import { cx, sameSet } from "../lib/format";
 import { useAction } from "../lib/hooks";
+import { navigate } from "../lib/router";
 import type { Group, User } from "../lib/types";
 import {
   Badge,
@@ -28,7 +29,7 @@ type Person = { id: string; name: string; upn: string; email: string; enabled: b
 
 export default function UsersPage() {
   const [tab, setTab] = useState<"local" | "entra">("local");
-  const entra = useQuery({ queryKey: ["entra-users"], queryFn: () => api.get<{ ready: boolean; users: EntraUser[] }>("/entra/users") });
+  const entra = useQuery({ queryKey: ["entra-users"], queryFn: () => api.get<{ ready: boolean; configured: boolean; users: EntraUser[] }>("/entra/users") });
   const [addEntra, setAddEntra] = useState(false);
   const users = useQuery({ queryKey: ["users"], queryFn: () => api.get<User[]>("/users") });
   const groups = useQuery({ queryKey: ["groups"], queryFn: () => api.get<Group[]>("/groups") });
@@ -41,8 +42,9 @@ export default function UsersPage() {
     invalidate: ["users"],
   });
   if (!users.data || !groups.data || !entra.data) return <PageLoader />;
-  // EntraID Users appear once the EntraID app is set up for your organization
-  const view = entra.data.ready ? tab : "local";
+  // the EntraID Users tab appears once the EntraID app is set up; choosing people
+  // needs the app to be set up for one organization (see EntraSetupNeeded)
+  const view = entra.data.configured ? tab : "local";
 
   return (
     <>
@@ -50,7 +52,7 @@ export default function UsersPage() {
         title="Users & Groups"
         description="Accounts for shared folders and this web interface."
         actions={
-          view === "local" ? (
+          view === "local" || !entra.data.ready ? (
             <Button variant="primary" icon={<UserPlus className="size-4" />} onClick={() => setUserDlg({ user: null })}>
               Add user
             </Button>
@@ -61,7 +63,7 @@ export default function UsersPage() {
           )
         }
       />
-      {entra.data.ready && (
+      {entra.data.configured && (
         <div className="mb-5">
           <Tabs
             value={view}
@@ -74,7 +76,12 @@ export default function UsersPage() {
         </div>
       )}
 
-      {view === "entra" && <EntraUsersTab users={entra.data.users} me={me.data?.user} onAdd={() => setAddEntra(true)} />}
+      {view === "entra" &&
+        (entra.data.ready ? (
+          <EntraUsersTab users={entra.data.users} me={me.data?.user} onAdd={() => setAddEntra(true)} />
+        ) : (
+          <EntraSetupNeeded />
+        ))}
       {addEntra && <AddEntraDialog onClose={() => setAddEntra(false)} />}
 
       {view === "local" && (
@@ -463,5 +470,30 @@ function AddEntraDialog({ onClose }: { onClose: () => void }) {
         </ul>
       )}
     </Modal>
+  );
+}
+
+/** The EntraID app is set up for personal or any accounts: there is no directory
+ * of people to choose from until it is set up for one organization. */
+function EntraSetupNeeded() {
+  return (
+    <Card className="p-5">
+      <div className="text-[15px] font-semibold">Set up the EntraID app for your organization</div>
+      <p className="mt-1 text-sm text-zinc-500">To choose people from your organization's directory, Talon needs two changes:</p>
+      <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm">
+        <li>
+          In <b>Settings → EntraID</b>, set <b>Supported account types</b> to <b>Only my organization</b> and enter your <b>Directory (tenant) ID</b>{" "}
+          (on the app's Overview page in the Entra portal). Then click <b>Save</b>.
+        </li>
+        <li>
+          In the Entra portal, open the app's <b>API permissions → Add a permission → Microsoft Graph → Application permissions</b>, add <b>User.Read.All</b>{" "}
+          and click <b>Grant admin consent</b>.
+        </li>
+      </ol>
+      <p className="mt-3 text-[13px] text-zinc-500">OneDrive keeps working with a work or school account. Personal Microsoft accounts cannot be used with &quot;Only my organization&quot;.</p>
+      <div className="mt-4">
+        <Button variant="primary" onClick={() => navigate("/settings?tab=entra")}>Open Settings → EntraID</Button>
+      </div>
+    </Card>
   );
 }

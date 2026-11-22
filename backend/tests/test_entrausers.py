@@ -8,12 +8,13 @@ def _setup(client, tenant=TENANT):
 
 
 def test_needs_the_app_for_one_organization(client):
-    assert client.get("/api/entra/users").json()["ready"] is False
+    assert client.get("/api/entra/users").json()["configured"] is False
     _setup(client, "common")                                       # personal accounts: no directory
-    assert client.get("/api/entra/users").json()["ready"] is False
+    r = client.get("/api/entra/users").json()
+    assert r["configured"] is True and r["ready"] is False         # the tab shows what to change
     assert client.get("/api/entra/directory").status_code == 400
     _setup(client)
-    assert client.get("/api/entra/users").json() == {"ready": True, "users": []}
+    assert client.get("/api/entra/users").json() == {"ready": True, "configured": True, "users": []}
 
 
 def test_add_users_and_give_web_access(client):

@@ -49,6 +49,10 @@ class EntraUsers:
     def _entra(self) -> dict:
         return self.state.get("entra") or {}
 
+    def configured(self) -> bool:
+        """The EntraID app is set up (for OneDrive at least)."""
+        return entra.configured(self._entra())
+
     def ready(self) -> bool:
         """The EntraID app is set up for one organization (a tenant ID): only then
         is there a directory of users to choose from."""

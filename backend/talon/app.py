@@ -272,7 +272,8 @@ def create_app(cfg, platform) -> FastAPI:
     # EntraID users (entrausers.py)
     @app.get("/api/entra/users")
     def entra_users(_u: str = Depends(current_user)):
-        return {"ready": nas.entra_users.ready(), "users": nas.entra_users.list()}
+        return {"ready": nas.entra_users.ready(), "configured": nas.entra_users.configured(),
+                "users": nas.entra_users.list()}
 
     @app.get("/api/entra/directory")
     def entra_directory(q: str = "", _u: str = Depends(current_user)):

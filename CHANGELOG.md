@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.0.84
+- Users: the EntraID Users tab shows once the EntraID app is set up, with the steps still needed
+
 ## 1.0.83
 - EntraID Users: add people from your directory and give them web access with Sign in with Microsoft
 - The sign-in page shows the password form only while an enabled local administrator exists
