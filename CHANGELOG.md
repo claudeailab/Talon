@@ -1,3 +1,6 @@
+## 1.0.99
+- README: data loss and backup notice
+
 ## 1.0.98
 - Notifications subtitle: "Choose when Talon warns you"
 

@@ -11,6 +11,11 @@ RAID, shared folders, users, OneDrive backup and alerts. One command installs it
 
 [![Dashboard](docs/screenshots/dashboard.png)](https://claudeailab.github.io/Talon/screenshots.html#dashboard)
 
+> [!WARNING]
+> **Use at your own risk.** Talon is free software, provided as is, without any warranty. The authors are not responsible for any data loss.
+>
+> **Always keep a backup** of your important files on another device or in the cloud. **RAID is not a backup:** it keeps the NAS running when a disk fails, but it does not protect against deleted files, ransomware, theft, fire or a failed NAS.
+
 ## Install
 
 ```bash
