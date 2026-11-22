@@ -1,3 +1,6 @@
+## 1.0.114
+- Removed the old /files redirect
+
 ## 1.0.113
 - The Browser page is at /browser; old /files links still work
 

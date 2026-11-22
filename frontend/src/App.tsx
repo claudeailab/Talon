@@ -31,7 +31,7 @@ import {
 import { api, setUnauthorizedHandler } from "./lib/api";
 import { cx } from "./lib/format";
 import { useTheme } from "./lib/hooks";
-import { Link, navigate, redirect, usePath } from "./lib/router";
+import { Link, navigate, usePath } from "./lib/router";
 import type { Alert, Job, OneDriveStatus, UpdateInfo } from "./lib/types";
 import { ConfirmDialog, IconButton, Menu, MenuItem, PageLoader } from "./components/ui";
 import { useAction } from "./lib/hooks";
@@ -129,10 +129,6 @@ function Logo() {
 
 function Shell({ me }: { me: Me }) {
   const path = usePath();
-  // the Browser page used to be /files: old links and bookmarks still work
-  useEffect(() => {
-    if (path === "/files") redirect("/browser" + location.search);
-  }, [path]);
   const qc = useQueryClient();
   const [dark, toggleTheme] = useTheme();
   const [mobileNav, setMobileNav] = useState(false);
