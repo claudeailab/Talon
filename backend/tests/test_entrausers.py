@@ -70,3 +70,47 @@ def test_people_without_web_access_cannot_sign_in(client):
     nas.state.update(lambda d: d["entra_users"][people[0]["id"]].__setitem__("web", False))
     page = client.get(f"/api/onedrive/callback?code=demo&state={state}").text
     assert "login_error=" in page
+
+
+def test_organization_by_email_domain(monkeypatch):
+    import pytest
+    from talon import entra
+    from talon.util import UserError
+    calls = []
+
+    def fake(url, *a, **k):
+        calls.append(url)
+        if "contoso.com" in url:
+            return 200, '{"issuer": "https://login.microsoftonline.com/72f988bf-86f1-41af-91ab-2d7cd011db47/v2.0"}'
+        return 400, '{"error": "invalid_tenant"}'
+    monkeypatch.setattr(entra, "_request", fake)
+    assert entra.resolve_tenant("contoso.com") == "72f988bf-86f1-41af-91ab-2d7cd011db47"
+    assert entra.resolve_tenant("me@contoso.com") == "72f988bf-86f1-41af-91ab-2d7cd011db47"
+    assert entra.resolve_tenant("consumers") == "consumers" and entra.resolve_tenant(TENANT) == TENANT
+    with pytest.raises(UserError):
+        entra.resolve_tenant("nowhere.example")
+    with pytest.raises(UserError):
+        entra.resolve_tenant("not a domain")
+
+
+def test_settings_need_an_account_type_and_take_a_domain(client):
+    body = {"client_id": GUID, "client_secret": "s"}
+    assert client.put("/api/settings/entra", json={**body, "tenant": ""}).status_code == 400
+    assert client.put("/api/settings/entra", json={**body, "tenant": "contoso.com"}).json()["tenant"] == TENANT  # demo lookup
+    assert client.put("/api/settings/entra", json={**body, "tenant": "consumers"}).json()["tenant"] == "consumers"
+
+
+def test_old_account_types_move_to_the_one_that_fits(client):
+    import base64, json
+    cloud = client.app.state.nas.cloud
+    payload = base64.urlsafe_b64encode(json.dumps({"tid": TENANT}).encode()).decode().rstrip("=")
+    client.app.state.nas.state.update(lambda d: (
+        d.__setitem__("entra", {"tenant": "common", "client_id": GUID, "client_secret": "s"}),
+        d["onedrive"].__setitem__("token", {"access_token": f"x.{payload}.y"}),
+        d["onedrive"].__setitem__("account", {"drive_type": "business"})))
+    cloud.migrate_tenant()
+    assert client.app.state.nas.state.get("entra")["tenant"] == TENANT
+    client.app.state.nas.state.update(lambda d: (
+        d["entra"].__setitem__("tenant", "common"), d["onedrive"].__setitem__("account", {"drive_type": "personal"})))
+    cloud.migrate_tenant()
+    assert client.app.state.nas.state.get("entra")["tenant"] == "consumers"

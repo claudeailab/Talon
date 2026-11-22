@@ -127,7 +127,7 @@ class CloudSync:
     # ------------------------------------------------------------ EntraID settings
     def entra_public(self) -> dict:
         e = self._entra()
-        return {"tenant": e.get("tenant", "common"), "client_id": e.get("client_id", ""),
+        return {"tenant": e.get("tenant", "common"), "domain": e.get("domain", ""), "client_id": e.get("client_id", ""),
                 "secret_set": bool(e.get("client_secret")), "configured": entra.configured(e),
                 "secret_expires": e.get("secret_expires", ""),
                 "remind_days": e.get("remind_days", REMIND_DEFAULT),
@@ -137,9 +137,13 @@ class CloudSync:
     def entra_save(self, data: dict, user: str) -> dict:
         from .notify import parse_recipients
         old = self._entra()
-        merged = {**data, "client_secret": data.get("client_secret") or old.get("client_secret", "")}
+        tenant = self._tenant(data.get("tenant"))
+        merged = {**data, "tenant": tenant, "client_secret": data.get("client_secret") or old.get("client_secret", "")}
         clean = entra.validate(merged)
-        clean["tenant"] = (data.get("tenant") or "common").strip()
+        clean["tenant"] = tenant
+        # keep the domain the organization was entered with, to show it again
+        raw = str(data.get("tenant") or "").strip().lower().split("@")[-1]
+        clean["domain"] = raw if entra.GUID_RE.match(tenant) and not entra.GUID_RE.match(raw) else ""
         expires = str(data.get("secret_expires") or "").strip()
         if expires:
             try:                                    # yyyy-mm-dd from the UI, or dd-mm-yyyy
@@ -209,9 +213,21 @@ class CloudSync:
         self.state.update(lambda d: d["entra"].__setitem__(
             "reminded", sorted(set(d["entra"].get("reminded", [])) | {stage})))
 
+    def _tenant(self, value) -> str:
+        """The account type from Settings: "consumers" (personal), or a work or
+        school organization by tenant ID or email domain (turned into the ID)."""
+        tenant = str(value or "").strip()
+        if not tenant:
+            raise UserError("Choose the account type")
+        if self.demo and tenant not in ("consumers", "common", "organizations") and not entra.GUID_RE.match(tenant):
+            return "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        return entra.resolve_tenant(tenant)
+
     def entra_test(self, data: dict, origin: str) -> list:
         old = self._entra()
         merged = {**old, **{k: v for k, v in data.items() if v not in (None, "")}}
+        if merged.get("tenant"):
+            merged["tenant"] = self._tenant(merged["tenant"])
         if self.demo:
             entra.validate(merged)
             entra.redirect_uri(origin)
@@ -773,7 +789,30 @@ class CloudSync:
             return now >= today and last < today and t["created"] < today
         return False
 
+    def migrate_tenant(self) -> None:
+        """Earlier versions offered "personal and work accounts" and "any work or
+        school account". Settings now offers work or school (one organization) or
+        personal: move such setups to the one that fits the connected OneDrive."""
+        e = self._entra()
+        if e.get("tenant") not in ("common", "organizations"):
+            return
+        od = self._od()
+        account = od.get("account") or {}
+        new = None
+        if account.get("drive_type") == "personal":
+            new = "consumers"
+        elif od.get("token", {}).get("access_token"):
+            new = entra.tenant_from_token(od["token"]["access_token"])
+        if new:
+            self.state.update(lambda d: d["entra"].__setitem__("tenant", new))
+            self.state.log_activity("talon", "EntraID app: account type set to "
+                                    + ("personal" if new == "consumers" else "work or school"), "info", "settings")
+
     def start(self) -> None:
+        try:
+            self.migrate_tenant()
+        except Exception:   # noqa: BLE001 - only a convenience
+            pass
         threading.Thread(target=self._scheduler, daemon=True, name="cloudsync").start()
         threading.Thread(target=self._resume, daemon=True, name="cloud-resume").start()
 

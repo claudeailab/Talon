@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.85
+- EntraID: choose Work or school or Personal account; enter your email domain and Talon finds the tenant ID
+- Setup guide asks which account you use and shows only the matching steps
+- Existing setups are moved to the matching account type automatically
+
 ## 1.0.84
 - Users: the EntraID Users tab shows once the EntraID app is set up, with the steps still needed
 

@@ -37,6 +37,39 @@ def tenant_of(cfg: dict) -> str:
     return t if t in ACCOUNT_TYPES or GUID_RE.match(t) else "common"
 
 
+DOMAIN_RE = re.compile(r"^(?=.{3,253}$)[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$")
+
+
+def resolve_tenant(text: str) -> str:
+    """Work or school: the tenant ID, or the organization's email domain (for
+    example contoso.com), which Microsoft's public sign-in metadata turns into
+    the tenant ID. Personal accounts: "consumers"."""
+    t = (text or "").strip().lower()
+    if t in ("consumers", "common", "organizations") or GUID_RE.match(t):
+        return t
+    if "@" in t:
+        t = t.split("@", 1)[1]
+    if not DOMAIN_RE.match(t):
+        raise UserError("Enter your organization's email domain (for example contoso.com) or its tenant ID")
+    status, text_ = _request(f"{LOGIN}/{t}/v2.0/.well-known/openid-configuration")
+    m = re.search(r"/([0-9a-fA-F-]{36})/v2\.0", _json(text_).get("issuer", "")) if status == 200 else None
+    if not m:
+        raise UserError(f"Microsoft does not know an organization with the domain {t}. "
+                        "Check the domain, or enter the tenant ID from the app's Overview page.")
+    return m.group(1).lower()
+
+
+def tenant_from_token(access_token: str) -> Optional[str]:
+    """The tenant ID inside a work or school access token (a JWT); personal
+    account tokens are not readable and give None."""
+    try:
+        part = access_token.split(".")[1]
+        tid = json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4))).get("tid")
+    except (IndexError, ValueError):
+        return None
+    return tid.lower() if isinstance(tid, str) and GUID_RE.match(tid) else None
+
+
 def redirect_uri(origin: str) -> str:
     origin = (origin or "").rstrip("/")
     if not ORIGIN_RE.match(origin):

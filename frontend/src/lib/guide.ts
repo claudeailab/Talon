@@ -612,19 +612,18 @@ export const GUIDE: Topic[] = [
         id: "steps",
         title: "Step by step",
         blocks: [
-          { p: "Talon shows the same steps under **Settings → EntraID → Setup guide**, with your exact redirect address and a **Copy** button." },
+          { p: "Talon shows the same steps under **Settings → EntraID → Setup guide**, with your exact redirect address and a **Copy** button. First choose the kind of Microsoft account you use with OneDrive: a **work or school account** (from your company or school) or a **personal account** (outlook.com, hotmail.com, live.com)." },
           {
             steps: [
-              "Go to **entra.microsoft.com** and sign in with an account that can register apps.",
-              "**App registrations → New registration**, name it **Talon NAS**. For account types, pick the option that includes **personal Microsoft accounts**. Redirect URI: platform **Web**, paste the address from Talon's **Redirect URI** field, then click **Register**.",
+              "Go to **entra.microsoft.com** and sign in.",
+              "**App registrations → New registration**, name it **Talon NAS**. Supported account types: **Single tenant** for a work or school account, or **Personal Microsoft accounts only** for a personal account. Redirect URI: platform **Web**, paste the address from Talon's **Redirect URI** field, then click **Register**.",
               "Copy the **Application (client) ID** from the app's **Overview** page into Talon.",
               "**Certificates & secrets → New client secret**, expiry **24 months**. Copy the secret **Value** (not the Secret ID) into Talon. It is shown only once. Enter its **Expires** date in Talon under **Secret expires on**.",
-              "**API permissions → Add a permission → Microsoft Graph → Delegated**. Add **Files.ReadWrite** and **offline_access**. Work accounts: click **Grant admin consent**.",
-              "In Talon, choose the **Supported account types** you picked in step 2, click **Save**, then **Test**.",
+              "**API permissions → Add a permission → Microsoft Graph → Delegated permissions**: add **Files.ReadWrite** and **offline_access**. Work or school: also add the **Application permission** **User.Read.All** (for [EntraID Users](" + t("users") + ")) and click **Grant admin consent**.",
+              "In Talon, set **Account type**. Work or school: enter your work email domain (for example contoso.com) under **Your organization**; Talon finds the tenant ID. Click **Save**, then **Test**.",
             ],
           },
           { img: "entra-guide", alt: "EntraID setup guide" },
-          { p: "**Directory (tenant) ID** is only needed for **Only my organization**. Leave it empty for personal accounts." },
         ],
       },
       {
@@ -635,7 +634,7 @@ export const GUIDE: Topic[] = [
             list: [
               "**Redirect URI**: it must match the address you use to open Talon exactly, including https:// and the name or IP address. Using several addresses? Add each one's redirect URI in Entra.",
               "**Client secret**: paste the secret **Value**, not the Secret ID. Expired secrets must be replaced with a new one.",
-              "**Account types**: the choice in Talon must match the app registration.",
+              "**Account type**: the choice in Talon must match the app registration: **Work or school account** with **Single tenant**, **Personal account** with **Personal Microsoft accounts only**.",
             ],
           },
           { warn: "Client secrets expire (after 24 months with the recommended setting). Create a new one in Entra before then and save it in Talon, or OneDrive tasks stop." },
@@ -662,11 +661,11 @@ export const GUIDE: Topic[] = [
         id: "sso",
         title: "EntraID Users and Sign in with Microsoft",
         blocks: [
-          { p: "With the app set up for one organization, people from your EntraID directory can use Talon and sign in with their Microsoft account. See [EntraID Users](" + t("users") + ")." },
+          { p: "With a **work or school account**, people from your organization can use Talon and sign in with their Microsoft account. See [EntraID Users](" + t("users") + "). Personal accounts have no organization, so this is not available for them." },
           {
             steps: [
-              "Under **Supported account types**, choose **Only my organization** and enter your **Directory (tenant) ID** from the app's **Overview** page.",
-              "In the Entra portal, open the app's **API permissions → Add a permission → Microsoft Graph → Application permissions**, add **User.Read.All**, and click **Grant admin consent**. Talon uses it to list your organization's users.",
+              "In Talon, **Account type** is **Work or school account** and **Your organization** has your work email domain.",
+              "In the Entra portal, the app has the **Application permission** **User.Read.All** with **Grant admin consent** (step 5 above).",
               "Click **Test**: **Directory users** should pass.",
             ],
           },

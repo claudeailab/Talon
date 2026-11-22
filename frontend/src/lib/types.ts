@@ -270,6 +270,7 @@ export interface EntraConfig {
   tenant: string;
   client_id: string;
   secret_set: boolean;
+  domain: string;
   configured: boolean;
   secret_expires: string;
   remind_days: number;
