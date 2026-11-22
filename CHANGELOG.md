@@ -1,3 +1,6 @@
+## 1.0.100
+- Website: data loss and backup notice on the home page
+
 ## 1.0.99
 - README: data loss and backup notice
 
