@@ -53,7 +53,7 @@
       ]
      },
      {
-      "p": "Administrators can also sign in with a Microsoft account. See [EntraID](/documentation?topic=entra)."
+      "p": "People from your organization's EntraID can also sign in with their Microsoft account. See [Users & Groups](/documentation?topic=users)."
      },
      {
       "p": "Other people can sign in once they are marked as **Administrator** on the [Users & Groups](/users) page."
@@ -605,7 +605,7 @@
       "steps": [
        "On the [Users & Groups](/users) page, click **Add user**.",
        "Enter a **User name**, optionally a **Full name**, and a **Password** twice. This password is also used to open shared folders.",
-       "Optionally add the user to **Groups**. Turn on **Administrator** only for people who should manage the NAS in this web interface.",
+       "Turn on **Administrator** only for people who should manage the NAS in this web interface.",
        "Click **Create user**, then give the user access on the [Shared Folders](/shares) page."
       ]
      },
@@ -614,16 +614,35 @@
       "alt": "Users and groups"
      },
      {
-      "p": "In a user's **⋯** menu you can **Edit** them (name, password, groups), **Disable** or **Enable** them and **Delete** them. Files a deleted user created stay on the volumes."
+      "p": "In a user's **⋯** menu you can **Edit** them (name and password), **Disable** or **Enable** them and **Delete** them. Files a deleted user created stay on the volumes."
+     },
+     {
+      "p": "At least one user must always be able to sign in to the web interface: a local administrator or an EntraID user with web access. The sign-in page shows the user name and password only while an enabled local administrator exists."
      }
     ]
    },
    {
-    "id": "groups",
-    "title": "Groups",
+    "id": "entra-users",
+    "title": "EntraID Users",
     "blocks": [
      {
-      "p": "Groups give several users the same access, for example a group family with Read/Write to Photos. Click **Add group**, enter a **Group name**, select its members and click **Create group**. Then give the group access on the [Shared Folders](/shares) page."
+      "p": "Once the [EntraID](/documentation?topic=entra) app is set up for your organization, the page has two tabs: **Local Users** and **EntraID Users**."
+     },
+     {
+      "steps": [
+       "Open **EntraID Users** and click **Add EntraID users**.",
+       "Search your organization's directory, tick the people you want and click **Add**.",
+       "Choose **Edit** in a person's **⋯** menu and turn on **Web interface** if they may sign in to this web interface with **Sign in with Microsoft** and manage the NAS."
+      ]
+     },
+     {
+      "p": "Their name and password stay in EntraID and cannot be changed in Talon. **Remove** takes away their access to Talon; their EntraID account is not changed."
+     },
+     {
+      "p": "Once an EntraID user has web access, you can disable the local administrator: the sign-in page then shows only **Sign in with Microsoft**. Enable a local administrator again and the user name and password come back."
+     },
+     {
+      "warn": "Locked out (for example the client secret expired)? On the NAS, run `sudo talon enable-local-login`. It enables the local administrators again."
      }
     ]
    }
@@ -815,27 +834,17 @@
    },
    {
     "id": "sso",
-    "title": "Sign in to Talon with Microsoft",
+    "title": "EntraID Users and Sign in with Microsoft",
     "blocks": [
      {
-      "p": "Administrators can sign in to Talon with their Microsoft account instead of a user name and password. It uses the same EntraID app, so no other setup in the Entra portal is needed."
+      "p": "With the app set up for one organization, people from your EntraID directory can use Talon and sign in with their Microsoft account. See [EntraID Users](/documentation?topic=users)."
      },
      {
       "steps": [
-       "Set up the EntraID app on this page and click **Test** until it passes.",
-       "Under **Microsoft Sign-In**, turn on **Sign in with Microsoft**.",
-       "Click **Link my Microsoft account** and sign in with Microsoft. That account now signs in to Talon as you. Every administrator links their own account.",
-       "The sign-in page now shows **Sign in with Microsoft** below the user name and password."
+       "Under **Supported account types**, choose **Only my organization** and enter your **Directory (tenant) ID** from the app's **Overview** page.",
+       "In the Entra portal, open the app's **API permissions → Add a permission → Microsoft Graph → Application permissions**, add **User.Read.All**, and click **Grant admin consent**. Talon uses it to list your organization's users.",
+       "Click **Test**: **Directory users** should pass."
       ]
-     },
-     {
-      "p": "Once an account is linked, you can turn off **Sign in with a user name and password**: the sign-in page then shows only **Sign in with Microsoft**. Unlinking the last account turns password sign-in back on."
-     },
-     {
-      "p": "Talon recognises the Microsoft account itself, not its email address, and it must still belong to an administrator. Sign-ins with Microsoft appear in the [Activity](/documentation?topic=activity) log."
-     },
-     {
-      "warn": "Locked out (for example the client secret expired)? On the NAS, run `sudo talon enable-local-login` to turn password sign-in back on."
      },
      {
       "tip": "Open Talon at the same address as the **Redirect URI** you registered. A different address (for example a Cloudflare domain) needs its own Redirect URI in the Entra portal."

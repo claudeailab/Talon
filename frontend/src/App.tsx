@@ -236,7 +236,7 @@ function Shell({ me }: { me: Me }) {
             </div>
           )}
           {update.data?.available && update.data.status.state !== "running" && (
-            <UpdatePill version={update.data.latest!} onClick={() => navigate("/settings")} />
+            <UpdatePill version={update.data.latest!} onClick={() => navigate("/settings?tab=update")} />
           )}
           {running.length > 0 && (
             <Menu

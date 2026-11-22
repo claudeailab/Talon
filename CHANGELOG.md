@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.83
+- EntraID Users: add people from your directory and give them web access with Sign in with Microsoft
+- The sign-in page shows the password form only while an enabled local administrator exists
+- The update button opens Settings → Update and checks for an even newer version
+
 ## 1.0.82
 - Sign in to Talon with a Microsoft account (Settings → EntraID → Microsoft Sign-In)
 - Password sign-in can be turned off once a Microsoft account is linked

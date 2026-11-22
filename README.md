@@ -57,7 +57,7 @@ https://<nas-ip>/
 - **OneDrive:** backup or two-way sync, verified after each run
 - **Shared Folders:** SMB, NFS and Time Machine with per-user permissions
 - **Users & Groups:** accounts for shared folders and the web interface
-- **Sign-in:** password or Microsoft account (single sign-on)
+- **EntraID Users:** people from your organization sign in with Microsoft
 - **Discovery:** appears in Windows Network and macOS Finder
 - **Activity:** a searchable log of everything that happens
 - **Networking:** DHCP or static IP, HTTPS on or off

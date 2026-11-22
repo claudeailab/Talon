@@ -11,8 +11,8 @@ from . import __version__, config
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="talon")
     ap.add_argument("command", nargs="?", default="serve", choices=["serve", "apply", "enable-local-login"],
-                    help="serve the web UI (default), re-apply share configuration, or turn sign-in "
-                         "with a user name and password back on")
+                    help="serve the web UI (default), re-apply share configuration, or enable the "
+                         "local administrators again (if Sign in with Microsoft stops working)")
     ap.add_argument("--demo", action="store_true",
                     help="run with simulated disks (no changes to the system)")
     ap.add_argument("--port", type=int)
@@ -31,18 +31,12 @@ def main(argv=None) -> int:
     platform = get_platform(cfg)
 
     if args.command == "enable-local-login":
-        # recovery when Microsoft sign-in no longer works: stop Talon, change the
-        # setting, start it again (a running Talon would keep its own copy)
-        import subprocess
-        from .mslogin import enable_local_login
-        from .state import State
-        active = subprocess.run(["systemctl", "is-active", "--quiet", "talon"]).returncode == 0
-        if active:
-            subprocess.run(["systemctl", "stop", "talon"], check=False)
-        enable_local_login(State(cfg.state_file))
-        if active:
-            subprocess.run(["systemctl", "start", "talon"], check=False)
-        print("Sign-in with a user name and password is on again.")
+        # recovery when Sign in with Microsoft no longer works: enable the local
+        # administrators again, so the user name and password form comes back
+        from .entrausers import enable_local_admins
+        names = enable_local_admins(platform, cfg)
+        print(("Enabled " + ", ".join(names) + ". " if names else "")
+              + "Sign in with a local administrator's user name and password.")
         return 0
 
     if args.command == "apply":

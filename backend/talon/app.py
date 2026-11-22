@@ -91,9 +91,9 @@ class GroupIn(BaseModel):
 ACTIONS = {
     "POST /api/auth/login": ("signin", None),
     "POST /api/auth/logout": ("signin", "Signed out"),
-    "POST /api/auth/microsoft/link": ("signin", None),
-    "PUT /api/settings/signin": ("signin", None),
-    "DELETE /api/settings/signin/links/{oid}": ("signin", None),
+    "POST /api/entra/users": ("users", None),
+    "PUT /api/entra/users/{oid}": ("users", None),
+    "DELETE /api/entra/users/{oid}": ("users", None),
     "POST /api/update/check": ("updates", "Checked for updates"),
     "PUT /api/update/settings": ("updates", None),
     "POST /api/update/install": ("updates", "Started installing an update"),
@@ -260,36 +260,44 @@ def create_app(cfg, platform) -> FastAPI:
     @app.get("/api/auth/methods")
     def auth_methods():
         """Public: which sign-in options the sign-in page shows."""
-        return nas.mslogin.methods()
+        return nas.entra_users.methods()
 
     @app.get("/api/auth/microsoft")
     def auth_microsoft(request: Request):
         try:
-            return RedirectResponse(nas.mslogin.start(origin_of(request), "login"), status_code=302)
+            return RedirectResponse(nas.entra_users.start(origin_of(request)), status_code=302)
         except UserError as e:
             return RedirectResponse("/?login_error=" + urllib.parse.quote(str(e)), status_code=302)
 
-    @app.post("/api/auth/microsoft/link")
-    def auth_microsoft_link(body: dict = Body(...), user: str = Depends(current_user)):
-        return {"url": nas.mslogin.start(body.get("origin", ""), "link", user)}
+    # EntraID users (entrausers.py)
+    @app.get("/api/entra/users")
+    def entra_users(_u: str = Depends(current_user)):
+        return {"ready": nas.entra_users.ready(), "users": nas.entra_users.list()}
 
-    @app.get("/api/settings/signin")
-    def signin_settings(_u: str = Depends(current_user)):
-        return nas.mslogin.settings()
+    @app.get("/api/entra/directory")
+    def entra_directory(q: str = "", _u: str = Depends(current_user)):
+        return nas.entra_users.directory(q)
 
-    @app.put("/api/settings/signin")
-    def signin_settings_save(body: dict = Body(...), user: str = Depends(current_user)):
-        return nas.mslogin.save(body, user)
+    @app.post("/api/entra/users")
+    def entra_users_add(body: dict = Body(...), user: str = Depends(current_user)):
+        return {"added": nas.entra_users.add(list(body.get("ids") or []), user)}
 
-    @app.delete("/api/settings/signin/links/{oid}")
-    def signin_unlink(oid: str, user: str = Depends(current_user)):
-        return nas.mslogin.unlink(oid, user)
+    @app.put("/api/entra/users/{oid}")
+    def entra_user_update(oid: str, body: dict = Body(...), user: str = Depends(current_user)):
+        u = nas.entra_users.set_web(oid, bool(body.get("web")), user)
+        if not u["web"]:
+            sessions.drop_user(u["upn"])
+        return u
+
+    @app.delete("/api/entra/users/{oid}")
+    def entra_user_remove(oid: str, user: str = Depends(current_user)):
+        u = nas.entra_users.remove(oid, user)
+        sessions.drop_user(u["upn"])
+        return {"ok": True}
 
     @app.post("/api/auth/login")
     def login(body: LoginIn, request: Request, response: Response):
         ip = client_ip(request)
-        if not nas.mslogin.methods()["local"]:
-            raise HTTPException(403, "Sign-in with a user name and password is turned off. Use Sign in with Microsoft.")
         if sessions.blocked(ip):
             raise HTTPException(429, "Too many failed attempts. Try again in 5 minutes.")
         user = body.username.strip()
@@ -708,21 +716,15 @@ def create_app(cfg, platform) -> FastAPI:
     @app.get("/api/onedrive/callback", response_class=HTMLResponse)
     def onedrive_callback(request: Request, code: str = "", state: str = "", error: str = "",
                           error_description: str = ""):
-        # Microsoft redirects here after signing in to Talon (mslogin.py) ...
-        mode = nas.mslogin.mode_of(state)
-        if mode:
+        # Microsoft redirects here after Sign in with Microsoft (entrausers.py) ...
+        if nas.entra_users.owns(state):
             try:
-                r = nas.mslogin.finish(code, state, error, error_description)
-                if r["mode"] == "link":
-                    return HTMLResponse(go_page("/settings?tab=entra&linked=" + urllib.parse.quote(r["email"])))
-                if r["user"] not in platform.group_members(cfg.admin_group):
-                    raise UserError(f"{r['user']} is no longer an administrator")
+                user = nas.entra_users.finish(code, state, error, error_description)
                 page = HTMLResponse(go_page("/"))
-                start_session(request, page, r["user"], f" with Microsoft ({r['email']})")
+                start_session(request, page, user, " with Microsoft")
                 return page
             except UserError as e:
-                dest = "/settings?tab=entra&link_error=" if mode == "link" else "/?login_error="
-                return HTMLResponse(go_page(dest + urllib.parse.quote(str(e))))
+                return HTMLResponse(go_page("/?login_error=" + urllib.parse.quote(str(e))))
         # ... and after connecting OneDrive (in a popup). The unguessable, single-use
         # state value (created by a signed-in administrator) authorises the call.
         try:

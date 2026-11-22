@@ -23,22 +23,26 @@ import {
   ToggleRow,
 } from "../components/ui";
 
+type EntraUser = { oid: string; name: string; upn: string; email: string; web: boolean; added: number; added_by: string };
+type Person = { id: string; name: string; upn: string; email: string; enabled: boolean; added: boolean };
+
 export default function UsersPage() {
-  const [tab, setTab] = useState<"users" | "groups">("users");
+  const [tab, setTab] = useState<"local" | "entra">("local");
+  const entra = useQuery({ queryKey: ["entra-users"], queryFn: () => api.get<{ ready: boolean; users: EntraUser[] }>("/entra/users") });
+  const [addEntra, setAddEntra] = useState(false);
   const users = useQuery({ queryKey: ["users"], queryFn: () => api.get<User[]>("/users") });
   const groups = useQuery({ queryKey: ["groups"], queryFn: () => api.get<Group[]>("/groups") });
   const me = useQuery({ queryKey: ["me"], queryFn: () => api.get<{ user: string }>("/auth/me") });
   const [userDlg, setUserDlg] = useState<{ user: User | null } | null>(null);
-  const [groupDlg, setGroupDlg] = useState<{ group: Group | null } | null>(null);
   const [delUser, setDelUser] = useState<User | null>(null);
-  const [delGroup, setDelGroup] = useState<Group | null>(null);
   const removeUser = useAction((n: string) => api.del(`/users/${n}`), { success: "User deleted", invalidate: ["users", "groups"], onSuccess: () => setDelUser(null) });
-  const removeGroup = useAction((n: string) => api.del(`/groups/${n}`), { success: "Group deleted", invalidate: ["groups", "users"], onSuccess: () => setDelGroup(null) });
   const toggle = useAction((u: User) => api.put(`/users/${u.name}`, { disabled: !u.disabled }), {
     success: (_r, u) => (u.disabled ? `${u.name} enabled` : `${u.name} disabled`),
     invalidate: ["users"],
   });
-  if (!users.data || !groups.data) return <PageLoader />;
+  if (!users.data || !groups.data || !entra.data) return <PageLoader />;
+  // EntraID Users appear once the EntraID app is set up for your organization
+  const view = entra.data.ready ? tab : "local";
 
   return (
     <>
@@ -46,29 +50,34 @@ export default function UsersPage() {
         title="Users & Groups"
         description="Accounts for shared folders and this web interface."
         actions={
-          tab === "users" ? (
+          view === "local" ? (
             <Button variant="primary" icon={<UserPlus className="size-4" />} onClick={() => setUserDlg({ user: null })}>
               Add user
             </Button>
           ) : (
-            <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setGroupDlg({ group: null })}>
-              Add group
+            <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setAddEntra(true)}>
+              Add EntraID users
             </Button>
           )
         }
       />
-      <div className="mb-5">
-        <Tabs
-          value={tab}
-          onChange={setTab}
-          tabs={[
-            { value: "users", label: <>Users <Badge>{users.data.length}</Badge></> },
-            { value: "groups", label: <>Groups <Badge>{groups.data.length}</Badge></> },
-          ]}
-        />
-      </div>
+      {entra.data.ready && (
+        <div className="mb-5">
+          <Tabs
+            value={view}
+            onChange={setTab}
+            tabs={[
+              { value: "local", label: <>Local Users <Badge>{users.data.length}</Badge></> },
+              { value: "entra", label: <>EntraID Users <Badge>{entra.data.users.length}</Badge></> },
+            ]}
+          />
+        </div>
+      )}
 
-      {tab === "users" && (
+      {view === "entra" && <EntraUsersTab users={entra.data.users} me={me.data?.user} onAdd={() => setAddEntra(true)} />}
+      {addEntra && <AddEntraDialog onClose={() => setAddEntra(false)} />}
+
+      {view === "local" && (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -160,53 +169,7 @@ export default function UsersPage() {
         </Card>
       )}
 
-      {tab === "groups" &&
-        (groups.data.length === 0 ? (
-          <Card>
-            <Empty
-              icon={<UsersIcon className="size-6" />}
-              title="No groups"
-              text="Give several users the same access to shared folders."
-              action={
-                <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setGroupDlg({ group: null })}>
-                  Add group
-                </Button>
-              }
-            />
-          </Card>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {groups.data.map((g) => (
-              <Card key={g.name} className="p-5">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-xl bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
-                      <UsersIcon className="size-5" />
-                    </div>
-                    <div>
-                      <div className="font-semibold">@{g.name}</div>
-                      <div className="text-xs text-zinc-500">{g.members.length} member(s)</div>
-                    </div>
-                  </div>
-                  <div className="flex">
-                    <IconButton label="Edit" onClick={() => setGroupDlg({ group: g })}>
-                      <Pencil className="size-4" />
-                    </IconButton>
-                    <IconButton label="Delete" onClick={() => setDelGroup(g)}>
-                      <Trash2 className="size-4" />
-                    </IconButton>
-                  </div>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                  {g.members.length ? g.members.map((m) => <Badge key={m}>{m}</Badge>) : <span className="text-xs text-zinc-400">No members</span>}
-                </div>
-              </Card>
-            ))}
-          </div>
-        ))}
-
       {userDlg && <UserDialog user={userDlg.user} groups={groups.data} isSelf={userDlg.user?.name === me.data?.user} onClose={() => setUserDlg(null)} />}
-      {groupDlg && <GroupDialog group={groupDlg.group} users={users.data} onClose={() => setGroupDlg(null)} />}
       <ConfirmDialog
         open={!!delUser}
         onClose={() => setDelUser(null)}
@@ -216,16 +179,6 @@ export default function UsersPage() {
         title={`Delete user ${delUser?.name}?`}
         confirmText="Delete user"
         message="The account is removed and its share permissions are revoked. Files the user created stay on the volumes."
-      />
-      <ConfirmDialog
-        open={!!delGroup}
-        onClose={() => setDelGroup(null)}
-        onConfirm={() => delGroup && removeGroup.mutate(delGroup.name)}
-        loading={removeGroup.isPending}
-        danger
-        title={`Delete group @${delGroup?.name}?`}
-        confirmText="Delete group"
-        message="Members lose any share access granted through this group."
       />
     </>
   );
@@ -319,59 +272,196 @@ function UserDialog({ user, groups, isSelf, onClose }: { user: User | null; grou
   );
 }
 
-function GroupDialog({ group, users, onClose }: { group: Group | null; users: User[]; onClose: () => void }) {
-  const isNew = !group;
-  const [name, setName] = useState(group?.name ?? "");
-  const [members, setMembers] = useState<string[]>(group?.members ?? []);
-  const err = name && !/^[a-z_][a-z0-9_-]{0,31}$/.test(name) ? "Lowercase letters, digits, - and _" : null;
-  const save = useAction(() => (isNew ? api.post("/groups", { name, members }) : api.put(`/groups/${group!.name}`, { members })), {
-    success: isNew ? `Group ${name} created` : "Group saved",
-    invalidate: ["groups", "users"],
+
+/** People from EntraID who may use Talon. Their name and password stay in EntraID;
+ * here you only choose whether they may sign in to this web interface. */
+function EntraUsersTab({ users, me, onAdd }: { users: EntraUser[]; me?: string; onAdd: () => void }) {
+  const [edit, setEdit] = useState<EntraUser | null>(null);
+  const [del, setDel] = useState<EntraUser | null>(null);
+  const remove = useAction((oid: string) => api.del(`/entra/users/${oid}`), {
+    success: "EntraID user removed",
+    invalidate: ["entra-users"],
+    onSuccess: () => setDel(null),
+  });
+  if (!users.length)
+    return (
+      <Card>
+        <Empty
+          icon={<UsersIcon className="size-6" />}
+          title="No EntraID users yet"
+          text="Choose people from your organization's EntraID directory."
+          action={
+            <Button variant="primary" icon={<Plus className="size-4" />} onClick={onAdd}>
+              Add EntraID users
+            </Button>
+          }
+        />
+      </Card>
+    );
+  return (
+    <>
+      <Card className="overflow-hidden">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-zinc-100 text-left text-xs font-medium text-zinc-500 dark:border-white/5">
+              <th className="px-5 py-3">User</th>
+              <th className="px-3 py-3">Web interface</th>
+              <th className="w-12 px-3 py-3" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-zinc-100 dark:divide-white/5">
+            {users.map((u) => (
+              <tr key={u.oid}>
+                <td className="px-5 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-sky-500 to-indigo-500 text-sm font-semibold text-white uppercase">
+                      {(u.name || u.upn)[0]}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate font-medium">
+                        {u.name} {u.upn === me && <span className="text-xs text-zinc-400">(you)</span>}
+                      </div>
+                      <div className="truncate text-xs text-zinc-500">{u.upn}</div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-3 py-3">
+                  {u.web ? (
+                    <Badge tone="violet">
+                      <ShieldCheck className="size-3" /> Can sign in
+                    </Badge>
+                  ) : (
+                    <Badge>No access</Badge>
+                  )}
+                </td>
+                <td className="px-3 py-3">
+                  <Menu
+                    trigger={
+                      <IconButton label={`Actions for ${u.upn}`}>
+                        <MoreHorizontal className="size-5" />
+                      </IconButton>
+                    }
+                  >
+                    <MenuItem icon={<Pencil />} onClick={() => setEdit(u)}>
+                      Edit
+                    </MenuItem>
+                    <MenuItem icon={<Trash2 />} danger disabled={u.upn === me} onClick={() => setDel(u)}>
+                      Remove
+                    </MenuItem>
+                  </Menu>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+      {edit && <EntraUserDialog user={edit} isSelf={edit.upn === me} onClose={() => setEdit(null)} />}
+      <ConfirmDialog
+        open={!!del}
+        onClose={() => setDel(null)}
+        onConfirm={() => del && remove.mutate(del.oid)}
+        loading={remove.isPending}
+        danger
+        title={`Remove ${del?.name}?`}
+        confirmText="Remove"
+        message="They can no longer use Talon. Their account in EntraID is not changed."
+      />
+    </>
+  );
+}
+
+function EntraUserDialog({ user, isSelf, onClose }: { user: EntraUser; isSelf: boolean; onClose: () => void }) {
+  const [web, setWeb] = useState(user.web);
+  const save = useAction(() => api.put(`/entra/users/${user.oid}`, { web }), {
+    success: "Saved",
+    invalidate: ["entra-users"],
     onSuccess: onClose,
   });
   return (
     <Modal
       open
       onClose={onClose}
-      title={isNew ? "Add group" : `Edit @${group!.name}`}
+      title={user.name}
+      description={user.upn}
       footer={
         <>
-          <Button variant="ghost" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            disabled={!name || !!err || (!isNew && sameSet(members, group!.members))}
-            loading={save.isPending}
-            onClick={() => save.mutate()}
-          >
-            {isNew ? "Create group" : "Save"}
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" disabled={web === user.web} loading={save.isPending} onClick={() => save.mutate()}>
+            Save
           </Button>
         </>
       }
     >
-      <div className="space-y-4">
-        <Field label="Group name" error={err}>
-          <Input value={name} disabled={!isNew} onChange={(e) => setName(e.target.value.toLowerCase())} />
-        </Field>
-        <div>
-          <div className="mb-2 text-[13px] font-medium">Members</div>
-          <div className="divide-y divide-zinc-100 rounded-xl ring-1 ring-zinc-200 dark:divide-white/5 dark:ring-white/10">
-            {users.map((u) => (
-              <label key={u.name} className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-zinc-50 dark:hover:bg-white/[0.02]">
-                <input
-                  type="checkbox"
-                  className="size-4 rounded accent-brand-600"
-                  checked={members.includes(u.name)}
-                  onChange={(e) => setMembers(e.target.checked ? [...members, u.name] : members.filter((m) => m !== u.name))}
-                />
-                <span className="text-sm font-medium">{u.name}</span>
-                <span className="text-xs text-zinc-500">{u.full_name}</span>
+      <p className="mb-2 text-[13px] text-zinc-500">The name and password are managed in EntraID.</p>
+      <ToggleRow
+        title="Web interface"
+        description="Can sign in to this web interface with Sign in with Microsoft and manage the NAS"
+        checked={web}
+        disabled={isSelf}
+        onChange={setWeb}
+      />
+    </Modal>
+  );
+}
+
+/** Browse the EntraID directory and add people to Talon. */
+function AddEntraDialog({ onClose }: { onClose: () => void }) {
+  const [search, setSearch] = useState("");
+  const [sel, setSel] = useState<Set<string>>(new Set());
+  const dir = useQuery({ queryKey: ["entra-directory"], queryFn: () => api.get<Person[]>("/entra/directory") });
+  const add = useAction(() => api.post<{ added: number }>("/entra/users", { ids: [...sel] }), {
+    success: (r) => `${r.added} user${r.added === 1 ? "" : "s"} added`,
+    invalidate: ["entra-users", "entra-directory"],
+    onSuccess: onClose,
+  });
+  const words = search.toLowerCase().split(/\s+/).filter(Boolean);
+  const people = (dir.data ?? []).filter((p) => words.every((w) => `${p.name} ${p.upn} ${p.email}`.toLowerCase().includes(w)));
+  const toggle = (id: string) =>
+    setSel((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      size="lg"
+      title="Add EntraID users"
+      description="Choose people from your organization's directory"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" disabled={!sel.size} loading={add.isPending} onClick={() => add.mutate()}>
+            Add{sel.size ? ` ${sel.size}` : ""}
+          </Button>
+        </>
+      }
+    >
+      <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name or email" aria-label="Search" className="mb-3" />
+      {dir.isLoading ? (
+        <PageLoader />
+      ) : dir.error ? (
+        <p className="text-sm text-rose-600 dark:text-rose-400">{(dir.error as Error).message}</p>
+      ) : people.length === 0 ? (
+        <p className="py-6 text-center text-sm text-zinc-500">Nobody found.</p>
+      ) : (
+        <ul className="divide-y divide-zinc-100 rounded-xl ring-1 ring-zinc-200 dark:divide-white/5 dark:ring-white/10">
+          {people.map((p) => (
+            <li key={p.id}>
+              <label className={cx("flex items-center gap-3 px-3.5 py-2.5", p.added ? "opacity-60" : "cursor-pointer hover:bg-zinc-50 dark:hover:bg-white/[0.03]")}>
+                <input type="checkbox" className="size-4 shrink-0 accent-brand-600" disabled={p.added} checked={p.added || sel.has(p.id)} onChange={() => toggle(p.id)} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">{p.name}</span>
+                  <span className="block truncate text-xs text-zinc-500">{p.upn}</span>
+                </span>
+                {p.added ? <Badge>Added</Badge> : !p.enabled ? <Badge tone="amber">Disabled in EntraID</Badge> : null}
               </label>
-            ))}
-          </div>
-        </div>
-      </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </Modal>
   );
 }

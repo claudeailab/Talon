@@ -51,8 +51,9 @@ class Nas:
         self.files = FileBrowser(self, demo)
         from .restore import Restore
         self.restore = Restore(self)
-        from .mslogin import MicrosoftLogin
-        self.mslogin = MicrosoftLogin(self.state, demo)
+        from .entrausers import EntraUsers
+        self.entra_users = EntraUsers(
+            self.state, lambda: [u["name"] for u in self.users() if u["admin"] and not u["disabled"]], demo)
         self._purged = 0.0
         self.scheduler = Scheduler(cfg, self.state, self, demo)
         self.network = Network(platform, self.state, demo)
@@ -824,8 +825,8 @@ class Nas:
             if not data["admin"]:
                 if name == actor:
                     raise UserError("You cannot remove your own administrator rights")
-                if len([x for x in self.users() if x["admin"]]) <= 1:
-                    raise UserError("At least one administrator is required")
+                if not u["disabled"] and self.entra_users.web_access_count() <= 1:
+                    raise UserError("At least one user must be able to sign in to the web interface")
             self.p.set_group_membership(name, self.cfg.admin_group, bool(data["admin"]))
         if "groups" in data:
             managed = self.state.get("groups")
@@ -836,6 +837,8 @@ class Nas:
         if "disabled" in data and bool(data["disabled"]) != u["disabled"]:
             if name == actor:
                 raise UserError("You cannot disable your own account")
+            if data["disabled"] and u["admin"] and self.entra_users.web_access_count() <= 1:
+                raise UserError("At least one user must be able to sign in to the web interface")
             self.p.set_disabled(name, bool(data["disabled"]))
         if data.get("password"):
             self._check_password(data["password"])
@@ -848,8 +851,8 @@ class Nas:
             raise UserError("You cannot delete your own account")
         if u["uid"] < 1000:
             raise UserError("System accounts cannot be deleted here")
-        if u["admin"] and len([x for x in self.users() if x["admin"]]) <= 1:
-            raise UserError("At least one administrator is required")
+        if u["admin"] and not u["disabled"] and self.entra_users.web_access_count() <= 1:
+            raise UserError("At least one user must be able to sign in to the web interface")
         self.p.delete_user(name)
 
         def upd(d):

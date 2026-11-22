@@ -146,6 +146,14 @@ def test(cfg: dict, origin: str) -> list:
                    "detail": redirect if ok else explain(codes, f"Microsoft returned HTTP {status}")})
     checks.append({"name": "Account types", "ok": True, "detail": ACCOUNT_TYPES.get(
         tenant, "Accounts of one organization")})
+    # 3. One organization: may the app read its users (Users → EntraID Users)?
+    if GUID_RE.match(tenant):
+        try:
+            directory_users(app_token(cfg)["access_token"], limit=1)
+            checks.append({"name": "Directory users (EntraID Users)", "ok": True,
+                           "detail": "The app can read your organization's users"})
+        except UserError as e:
+            checks.append({"name": "Directory users (EntraID Users)", "ok": False, "detail": str(e)})
     return checks
 
 
@@ -209,6 +217,39 @@ def login_identity(cfg: dict, code: str, redirect: str, verifier: str, nonce: st
     return {"tid": claims["tid"], "oid": claims["oid"],
             "email": claims.get("email") or claims.get("preferred_username") or "",
             "name": claims.get("name") or ""}
+
+
+def app_token(cfg: dict) -> dict:
+    """A token for the app itself (client credentials), to read the directory's
+    users. Needs a tenant ID and the Application permission User.Read.All with
+    admin consent."""
+    data = {"client_id": cfg["client_id"], "client_secret": cfg["client_secret"],
+            "grant_type": "client_credentials", "scope": "https://graph.microsoft.com/.default"}
+    status, text = _request(f"{LOGIN}/{tenant_of(cfg)}/oauth2/v2.0/token", data)
+    payload = _json(text)
+    if status != 200 or "access_token" not in payload:
+        raise UserError(explain(_error_codes(payload, text),
+                                payload.get("error_description", "Could not read the directory").split("\r\n")[0]))
+    return payload
+
+
+def directory_users(token: str, limit: int = 5000) -> list:
+    """The directory's users: [{id, name, upn, email, enabled}]."""
+    url = GRAPH + "/users?$select=id,displayName,userPrincipalName,mail,accountEnabled&$top=999"
+    out = []
+    while url and len(out) < limit:
+        status, text = _request(url, token=token)
+        payload = _json(text)
+        if status == 403:
+            raise UserError("The EntraID app may not read the directory. In the Entra portal add the "
+                            "Application permission User.Read.All (Microsoft Graph) and click Grant admin consent.")
+        if status != 200:
+            raise UserError(f"EntraID: {(payload.get('error') or {}).get('message') or f'HTTP {status}'}")
+        for u in payload.get("value", []):
+            out.append({"id": u["id"], "name": u.get("displayName") or "", "upn": u.get("userPrincipalName") or "",
+                        "email": u.get("mail") or "", "enabled": u.get("accountEnabled", True)})
+        url = payload.get("@odata.nextLink")
+    return out
 
 
 def refresh(cfg: dict, refresh_token: str) -> dict:

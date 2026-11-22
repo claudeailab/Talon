@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { CheckCircle2, Download, Info, KeyRound, Mail, Network, RefreshCw, Server, SlidersHorizontal, Sparkles } from "lucide-react";
 import { api } from "../lib/api";
@@ -6,6 +6,7 @@ import { ago, bytes, date } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Settings, SysInfo, UpdateInfo } from "../lib/types";
 import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Field, Input, PageHeader, PageLoader, Select, Switch, Tabs } from "../components/ui";
+import { useSearch } from "../lib/router";
 import EntraTab from "./SettingsEntra";
 import NetworkTab from "./SettingsNetwork";
 import SmtpTab from "./SettingsSmtp";
@@ -23,6 +24,12 @@ const TABS: { value: TabId; label: string; icon: React.ReactNode }[] = [
 export default function SettingsPage() {
   const initial = new URLSearchParams(location.search).get("tab") as TabId | null;
   const [tab, setTab] = useState<TabId>(TABS.some((t) => t.value === initial) ? initial! : "general");
+  // a link to another tab while Settings is open (the update button opens ?tab=update)
+  const search = useSearch();
+  useEffect(() => {
+    const t = new URLSearchParams(search).get("tab") as TabId | null;
+    if (t && TABS.some((x) => x.value === t)) setTab(t);
+  }, [search]);
   const change = (t: TabId) => {
     setTab(t);
     history.replaceState(null, "", t === "general" ? location.pathname : `${location.pathname}?tab=${t}`);
@@ -173,6 +180,11 @@ function SoftwareUpdate() {
     invalidate: ["update"],
     success: (r) => (r.error ? "" : r.available ? `Talon ${r.latest} is available` : "Talon is up to date"),
   });
+  // opening this tab checks for an even newer version straight away (quietly)
+  const qc = useQueryClient();
+  useEffect(() => {
+    api.post("/update/check").then(() => qc.invalidateQueries({ queryKey: ["update"] }), () => {});
+  }, [qc]);
   const interval = useAction((h: number) => api.put<UpdateInfo>("/update/settings", { interval_hours: h }), {
     invalidate: ["update"],
     success: "Saved",

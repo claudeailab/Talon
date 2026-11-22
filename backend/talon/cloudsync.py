@@ -221,7 +221,10 @@ class CloudSync:
                      "detail": "Accepted by Microsoft (demo)"},
                     {"name": "Redirect URI", "ok": True, "detail": entra.redirect_uri(origin)},
                     {"name": "Account types", "ok": True,
-                     "detail": entra.ACCOUNT_TYPES.get(entra.tenant_of(merged), "One organization")}]
+                     "detail": entra.ACCOUNT_TYPES.get(entra.tenant_of(merged), "One organization")}] + (
+                [{"name": "Directory users (EntraID Users)", "ok": True,
+                  "detail": "The app can read your organization's users (demo)"}]
+                if entra.GUID_RE.match(entra.tenant_of(merged)) else [])
         return entra.test(merged, origin)
 
     # ------------------------------------------------------------ rclone

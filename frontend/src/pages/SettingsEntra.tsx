@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
-import { BookOpen, Copy, KeyRound, LogIn, PlugZap, Trash2 } from "lucide-react";
+import { BookOpen, Copy, KeyRound, PlugZap } from "lucide-react";
 import { api } from "../lib/api";
-import { dateTime, dmyToIso, isoToDmy } from "../lib/format";
+import { dmyToIso, isoToDmy } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { EntraCheck, EntraConfig } from "../lib/types";
 import { TestResult } from "../components/testresult";
-import { Badge, Button, Callout, Card, CardHeader, DateInput, Field, IconButton, Input, Modal, PageLoader, Select, ToggleRow, useToast } from "../components/ui";
+import { Badge, Button, Card, CardHeader, DateInput, Field, Input, Modal, PageLoader, Select, useToast } from "../components/ui";
 
 const ACCOUNT_TYPES = [
   { value: "common", label: "Personal and work accounts" },
@@ -160,7 +160,6 @@ export default function EntraTab() {
       {checks && <TestResult checks={checks} />}
       {guide && <SetupGuide onClose={() => setGuide(false)} />}
     </Card>
-    <MicrosoftSignIn />
     </div>
   );
 }
@@ -248,104 +247,3 @@ export function SetupGuide({ onClose }: { onClose: () => void }) {
   );
 }
 
-type SignIn = {
-  enabled: boolean;
-  local: boolean;
-  entra_configured: boolean;
-  links: { user: string; email: string; name: string; oid: string; linked: number }[];
-};
-
-/** Sign in to Talon with a Microsoft account, through this EntraID app. */
-function MicrosoftSignIn() {
-  const toast = useToast();
-  const q = useQuery({ queryKey: ["signin"], queryFn: () => api.get<SignIn>("/settings/signin") });
-  // coming back from linking an account
-  useEffect(() => {
-    const p = new URLSearchParams(location.search);
-    if (p.get("linked")) toast("success", `Linked ${p.get("linked")}`);
-    if (p.get("link_error")) toast("error", p.get("link_error")!);
-    if (p.get("linked") || p.get("link_error")) history.replaceState(null, "", "/settings?tab=entra");
-  }, [toast]);
-  const save = useAction((b: { enabled: boolean; local: boolean }) => api.put<SignIn>("/settings/signin", b), {
-    success: "Saved",
-    invalidate: ["signin"],
-  });
-  const link = useAction(() => api.post<{ url: string }>("/auth/microsoft/link", { origin: location.origin }), {
-    onSuccess: (r) => {
-      location.href = r.url;
-    },
-  });
-  const unlink = useAction((oid: string) => api.del<SignIn>(`/settings/signin/links/${oid}`), {
-    success: "Unlinked",
-    invalidate: ["signin"],
-  });
-  if (!q.data) return null;
-  const d = q.data;
-  return (
-    <Card>
-      <CardHeader
-        icon={<LogIn className="size-4.5" />}
-        title={
-          <span className="flex items-center gap-2">
-            Microsoft Sign-In {d.enabled ? <Badge tone="green" dot>On</Badge> : <Badge dot>Off</Badge>}
-          </span>
-        }
-        subtitle="Sign in to Talon with a Microsoft account"
-      />
-      <div className="px-5 pb-5">
-        {!d.entra_configured && <Callout tone="info" className="mb-3">Set up the EntraID app above first.</Callout>}
-        <div className="divide-y divide-zinc-100 dark:divide-white/5">
-          <ToggleRow
-            title="Sign in with Microsoft"
-            description="Shows a Sign in with Microsoft button on the sign-in page"
-            checked={d.enabled}
-            disabled={!d.entra_configured}
-            onChange={(v) => save.mutate({ enabled: v, local: v ? d.local : true })}
-          />
-          <div className="py-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-medium">Linked accounts</div>
-                <div className="text-xs text-zinc-500">Each administrator links their own Microsoft account while signed in</div>
-              </div>
-              <Button size="sm" icon={<LogIn className="size-3.5" />} disabled={!d.enabled} loading={link.isPending} onClick={() => link.mutate()}>
-                Link my Microsoft account
-              </Button>
-            </div>
-            {d.links.length > 0 && (
-              <ul className="mt-3 divide-y divide-zinc-100 rounded-xl ring-1 ring-zinc-200 dark:divide-white/5 dark:ring-white/10">
-                {d.links.map((l) => (
-                  <li key={l.oid} className="flex items-center gap-3 px-3.5 py-2.5">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">{l.email || l.name}</div>
-                      <div className="truncate text-xs text-zinc-500">Signs in as {l.user} · linked {dateTime(l.linked)}</div>
-                    </div>
-                    <IconButton label={`Unlink ${l.email}`} onClick={() => unlink.mutate(l.oid)}>
-                      <Trash2 className="size-4" />
-                    </IconButton>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <ToggleRow
-            title="Sign in with a user name and password"
-            description={
-              d.enabled && d.links.length
-                ? "Off: only Sign in with Microsoft is shown on the sign-in page"
-                : "Can be turned off once a Microsoft account is linked"
-            }
-            checked={d.local}
-            disabled={!(d.enabled && d.links.length)}
-            onChange={(v) => save.mutate({ enabled: d.enabled, local: v })}
-          />
-        </div>
-        {!d.local && (
-          <p className="mt-3 text-xs text-zinc-500">
-            Locked out? On the NAS, run <code className="rounded bg-zinc-100 px-1 py-0.5 dark:bg-white/10">sudo talon enable-local-login</code> to turn password sign-in back on.
-          </p>
-        )}
-      </div>
-    </Card>
-  );
-}

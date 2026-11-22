@@ -23,6 +23,21 @@ export function usePath(): string {
   return path;
 }
 
+/** The query string, updated on navigation (for example ?tab=update). */
+export function useSearch(): string {
+  const [search, setSearch] = useState(location.search);
+  useEffect(() => {
+    const update = () => setSearch(location.search);
+    listeners.add(update);
+    window.addEventListener("popstate", update);
+    return () => {
+      listeners.delete(update);
+      window.removeEventListener("popstate", update);
+    };
+  }, []);
+  return search;
+}
+
 export function Link({ to, onClick, ...rest }: AnchorHTMLAttributes<HTMLAnchorElement> & { to: string }) {
   return (
     <a
