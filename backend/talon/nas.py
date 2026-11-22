@@ -51,6 +51,8 @@ class Nas:
         self.files = FileBrowser(self, demo)
         from .restore import Restore
         self.restore = Restore(self)
+        from .mslogin import MicrosoftLogin
+        self.mslogin = MicrosoftLogin(self.state, demo)
         self._purged = 0.0
         self.scheduler = Scheduler(cfg, self.state, self, demo)
         self.network = Network(platform, self.state, demo)

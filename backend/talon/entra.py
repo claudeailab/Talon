@@ -23,6 +23,7 @@ from .util import UserError
 LOGIN = "https://login.microsoftonline.com"
 GRAPH = "https://graph.microsoft.com/v1.0"
 SCOPES = "offline_access User.Read Files.ReadWrite"
+LOGIN_SCOPES = "openid profile email User.Read"      # signing in to Talon itself
 GUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 ACCOUNT_TYPES = {"common": "Personal and work or school accounts",
                  "organizations": "Work or school accounts",
@@ -163,9 +164,9 @@ def authorize_url(cfg: dict, redirect: str, state: str, challenge: str) -> str:
     return f"{LOGIN}/{tenant_of(cfg)}/oauth2/v2.0/authorize?{q}"
 
 
-def _token(cfg: dict, data: dict) -> dict:
+def _token(cfg: dict, data: dict, scope: str = SCOPES) -> dict:
     data = {"client_id": cfg["client_id"], "client_secret": cfg["client_secret"],
-            "scope": SCOPES, **data}
+            "scope": scope, **data}
     status, text = _request(f"{LOGIN}/{tenant_of(cfg)}/oauth2/v2.0/token", data)
     payload = _json(text)
     if status != 200 or "access_token" not in payload:
@@ -177,6 +178,37 @@ def _token(cfg: dict, data: dict) -> dict:
 def redeem_code(cfg: dict, code: str, redirect: str, verifier: str) -> dict:
     return _token(cfg, {"grant_type": "authorization_code", "code": code,
                         "redirect_uri": redirect, "code_verifier": verifier})
+
+
+def login_url(cfg: dict, redirect: str, state: str, challenge: str, nonce: str) -> str:
+    """Sign in to Talon with a Microsoft account (OpenID Connect)."""
+    q = urllib.parse.urlencode({
+        "client_id": cfg["client_id"], "response_type": "code", "redirect_uri": redirect,
+        "response_mode": "query", "scope": LOGIN_SCOPES, "state": state, "nonce": nonce,
+        "prompt": "select_account", "code_challenge": challenge, "code_challenge_method": "S256"})
+    return f"{LOGIN}/{tenant_of(cfg)}/oauth2/v2.0/authorize?{q}"
+
+
+def login_identity(cfg: dict, code: str, redirect: str, verifier: str, nonce: str) -> dict:
+    """Redeem a sign-in code and return who signed in: {tid, oid, email, name}.
+
+    The ID token comes straight from Microsoft's token endpoint over TLS, in
+    exchange for the code and the app's client secret, so its signature does not
+    need checking (OpenID Connect Core 3.1.3.7); audience and nonce are checked."""
+    t = _token(cfg, {"grant_type": "authorization_code", "code": code,
+                     "redirect_uri": redirect, "code_verifier": verifier}, LOGIN_SCOPES)
+    try:
+        part = t["id_token"].split(".")[1]
+        claims = json.loads(base64.urlsafe_b64decode(part + "=" * (-len(part) % 4)))
+    except (KeyError, IndexError, ValueError):
+        raise UserError("Microsoft did not return who signed in") from None
+    if claims.get("aud") != cfg["client_id"] or claims.get("nonce") != nonce:
+        raise UserError("The Microsoft sign-in could not be verified. Try again.")
+    if not claims.get("tid") or not claims.get("oid"):
+        raise UserError("Microsoft did not return who signed in")
+    return {"tid": claims["tid"], "oid": claims["oid"],
+            "email": claims.get("email") or claims.get("preferred_username") or "",
+            "name": claims.get("name") or ""}
 
 
 def refresh(cfg: dict, refresh_token: str) -> dict:

@@ -10,8 +10,9 @@ from . import __version__, config
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="talon")
-    ap.add_argument("command", nargs="?", default="serve", choices=["serve", "apply"],
-                    help="serve the web UI (default) or re-apply share configuration")
+    ap.add_argument("command", nargs="?", default="serve", choices=["serve", "apply", "enable-local-login"],
+                    help="serve the web UI (default), re-apply share configuration, or turn sign-in "
+                         "with a user name and password back on")
     ap.add_argument("--demo", action="store_true",
                     help="run with simulated disks (no changes to the system)")
     ap.add_argument("--port", type=int)
@@ -28,6 +29,21 @@ def main(argv=None) -> int:
 
     from .platform import get_platform
     platform = get_platform(cfg)
+
+    if args.command == "enable-local-login":
+        # recovery when Microsoft sign-in no longer works: stop Talon, change the
+        # setting, start it again (a running Talon would keep its own copy)
+        import subprocess
+        from .mslogin import enable_local_login
+        from .state import State
+        active = subprocess.run(["systemctl", "is-active", "--quiet", "talon"]).returncode == 0
+        if active:
+            subprocess.run(["systemctl", "stop", "talon"], check=False)
+        enable_local_login(State(cfg.state_file))
+        if active:
+            subprocess.run(["systemctl", "start", "talon"], check=False)
+        print("Sign-in with a user name and password is on again.")
+        return 0
 
     if args.command == "apply":
         from .nas import Nas

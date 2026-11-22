@@ -75,6 +75,7 @@ export const GUIDE: Topic[] = [
               "Installed from your own account (asked for your password to get root access): that account is the administrator; sign in with its user name and Linux password.",
             ],
           },
+          { p: "Administrators can also sign in with a Microsoft account. See [EntraID](" + t("entra") + ")." },
           { p: "Other people can sign in once they are marked as **Administrator** on the [Users & Groups](/users) page." },
           { p: "The first time, the browser warns that the connection is not private. This is expected: Talon uses its own certificate. Choose **Advanced** and continue to the site. (With HTTPS turned off in [Settings → Networking](/settings?tab=network), the address starts with http:// and there is no warning.)" },
         ],
@@ -586,7 +587,7 @@ export const GUIDE: Topic[] = [
     id: "entra",
     title: "EntraID (Microsoft sign-in)",
     group: "Cloud and alerts",
-    summary: "The one-time Microsoft app registration that OneDrive needs to sign in.",
+    summary: "The one-time Microsoft app registration that OneDrive, and signing in with Microsoft, need.",
     page: { to: "/settings?tab=entra", label: "Open Settings → EntraID" },
     sections: [
       {
@@ -644,6 +645,25 @@ export const GUIDE: Topic[] = [
           { img: "settings-entra", alt: "EntraID settings with the client secret expiry" },
           { p: "Talon sends one email when the reminder period starts and one more if the secret expires. The dashboard also shows the expiry as an issue. Emails need [SMTP](" + t("email") + ") to be set up." },
           { p: "After you create a new secret, paste its Value and its new expiry date and click **Save**; the reminders start again for the new date." },
+        ],
+      },
+      {
+        id: "sso",
+        title: "Sign in to Talon with Microsoft",
+        blocks: [
+          { p: "Administrators can sign in to Talon with their Microsoft account instead of a user name and password. It uses the same EntraID app, so no other setup in the Entra portal is needed." },
+          {
+            steps: [
+              "Set up the EntraID app on this page and click **Test** until it passes.",
+              "Under **Microsoft Sign-In**, turn on **Sign in with Microsoft**.",
+              "Click **Link my Microsoft account** and sign in with Microsoft. That account now signs in to Talon as you. Every administrator links their own account.",
+              "The sign-in page now shows **Sign in with Microsoft** below the user name and password.",
+            ],
+          },
+          { p: "Once an account is linked, you can turn off **Sign in with a user name and password**: the sign-in page then shows only **Sign in with Microsoft**. Unlinking the last account turns password sign-in back on." },
+          { p: "Talon recognises the Microsoft account itself, not its email address, and it must still belong to an administrator. Sign-ins with Microsoft appear in the [Activity](" + t("activity") + ") log." },
+          { warn: "Locked out (for example the client secret expired)? On the NAS, run `sudo talon enable-local-login` to turn password sign-in back on." },
+          { tip: "Open Talon at the same address as the **Redirect URI** you registered. A different address (for example a Cloudflare domain) needs its own Redirect URI in the Entra portal." },
         ],
       },
     ],

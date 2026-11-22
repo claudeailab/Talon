@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.82
+- Sign in to Talon with a Microsoft account (Settings → EntraID → Microsoft Sign-In)
+- Password sign-in can be turned off once a Microsoft account is linked
+- Recovery: sudo talon enable-local-login
+
 ## 1.0.81
 - New website: home page, screenshots and the full documentation online
 - The online documentation is generated from the guide built into Talon

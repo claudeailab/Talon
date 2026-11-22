@@ -40,6 +40,17 @@ height:100vh;margin:0;background:#fafafa"><div style="text-align:center;padding:
 setTimeout(function(){{window.close()}},{1200 if ok else 6000});</script></body></html>"""
 
 
+def go_page(path: str) -> str:
+    """Continue to a page of Talon. A script navigation (not a redirect) so the
+    browser counts it as same-site and sends the SameSite=Strict session cookie."""
+    target = json.dumps(path)
+    return f"""<!doctype html><html><head><meta charset="utf-8"><title>Talon</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="font-family:system-ui,sans-serif;background:#09090b;color:#a1a1aa">
+<script>location.replace({target})</script>
+<noscript><a href="{htmllib.escape(path)}">Continue</a></noscript></body></html>"""
+
+
 class LoginIn(BaseModel):
     username: str
     password: str
@@ -80,6 +91,9 @@ class GroupIn(BaseModel):
 ACTIONS = {
     "POST /api/auth/login": ("signin", None),
     "POST /api/auth/logout": ("signin", "Signed out"),
+    "POST /api/auth/microsoft/link": ("signin", None),
+    "PUT /api/settings/signin": ("signin", None),
+    "DELETE /api/settings/signin/links/{oid}": ("signin", None),
     "POST /api/update/check": ("updates", "Checked for updates"),
     "PUT /api/update/settings": ("updates", None),
     "POST /api/update/install": ("updates", "Started installing an update"),
@@ -229,9 +243,53 @@ def create_app(cfg, platform) -> FastAPI:
         return request.client.host if request.client else "?"
 
     # ------------------------------------------------------------ auth
+    def start_session(request: Request, response: Response, user: str, how: str) -> None:
+        token = sessions.create(user)
+        # Secure cookies only travel over HTTPS: the browser's view counts, so a
+        # proxy such as Cloudflare that serves HTTPS in front of plain HTTP keeps them.
+        https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+        secure = https and not cfg.demo
+        response.set_cookie(COOKIE if secure else COOKIE_HTTP, token, httponly=True, samesite="strict",
+                            secure=secure, max_age=cfg.session_hours * 3600, path="/")
+        nas.state.log_activity(user, f"Signed in{how} from {client_ip(request)}", "info", "signin")
+
+    def origin_of(request: Request) -> str:
+        proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+        return f"{proto}://{request.headers.get('host') or request.url.netloc}"
+
+    @app.get("/api/auth/methods")
+    def auth_methods():
+        """Public: which sign-in options the sign-in page shows."""
+        return nas.mslogin.methods()
+
+    @app.get("/api/auth/microsoft")
+    def auth_microsoft(request: Request):
+        try:
+            return RedirectResponse(nas.mslogin.start(origin_of(request), "login"), status_code=302)
+        except UserError as e:
+            return RedirectResponse("/?login_error=" + urllib.parse.quote(str(e)), status_code=302)
+
+    @app.post("/api/auth/microsoft/link")
+    def auth_microsoft_link(body: dict = Body(...), user: str = Depends(current_user)):
+        return {"url": nas.mslogin.start(body.get("origin", ""), "link", user)}
+
+    @app.get("/api/settings/signin")
+    def signin_settings(_u: str = Depends(current_user)):
+        return nas.mslogin.settings()
+
+    @app.put("/api/settings/signin")
+    def signin_settings_save(body: dict = Body(...), user: str = Depends(current_user)):
+        return nas.mslogin.save(body, user)
+
+    @app.delete("/api/settings/signin/links/{oid}")
+    def signin_unlink(oid: str, user: str = Depends(current_user)):
+        return nas.mslogin.unlink(oid, user)
+
     @app.post("/api/auth/login")
     def login(body: LoginIn, request: Request, response: Response):
         ip = client_ip(request)
+        if not nas.mslogin.methods()["local"]:
+            raise HTTPException(403, "Sign-in with a user name and password is turned off. Use Sign in with Microsoft.")
         if sessions.blocked(ip):
             raise HTTPException(429, "Too many failed attempts. Try again in 5 minutes.")
         user = body.username.strip()
@@ -244,14 +302,7 @@ def create_app(cfg, platform) -> FastAPI:
             nas.notifier.login_failed(user or "?", ip)
             raise HTTPException(401, "Invalid user name or password, or not an administrator")
         sessions.succeeded(ip)
-        token = sessions.create(user)
-        # Secure cookies only travel over HTTPS: the browser's view counts, so a
-        # proxy such as Cloudflare that serves HTTPS in front of plain HTTP keeps them.
-        https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
-        secure = https and not cfg.demo
-        response.set_cookie(COOKIE if secure else COOKIE_HTTP, token, httponly=True, samesite="strict",
-                            secure=secure, max_age=cfg.session_hours * 3600, path="/")
-        nas.state.log_activity(user, f"Signed in from {ip}")
+        start_session(request, response, user, "")
         return {"user": user}
 
     @app.post("/api/auth/logout")
@@ -655,9 +706,24 @@ def create_app(cfg, platform) -> FastAPI:
         return {"url": nas.cloud.connect_start(body.get("origin", ""))}
 
     @app.get("/api/onedrive/callback", response_class=HTMLResponse)
-    def onedrive_callback(code: str = "", state: str = "", error: str = "",
+    def onedrive_callback(request: Request, code: str = "", state: str = "", error: str = "",
                           error_description: str = ""):
-        # Microsoft redirects the sign-in popup here. The unguessable, single-use
+        # Microsoft redirects here after signing in to Talon (mslogin.py) ...
+        mode = nas.mslogin.mode_of(state)
+        if mode:
+            try:
+                r = nas.mslogin.finish(code, state, error, error_description)
+                if r["mode"] == "link":
+                    return HTMLResponse(go_page("/settings?tab=entra&linked=" + urllib.parse.quote(r["email"])))
+                if r["user"] not in platform.group_members(cfg.admin_group):
+                    raise UserError(f"{r['user']} is no longer an administrator")
+                page = HTMLResponse(go_page("/"))
+                start_session(request, page, r["user"], f" with Microsoft ({r['email']})")
+                return page
+            except UserError as e:
+                dest = "/settings?tab=entra&link_error=" if mode == "link" else "/?login_error="
+                return HTMLResponse(go_page(dest + urllib.parse.quote(str(e))))
+        # ... and after connecting OneDrive (in a popup). The unguessable, single-use
         # state value (created by a signed-in administrator) authorises the call.
         try:
             acct = nas.cloud.callback(code, state, error, error_description)
