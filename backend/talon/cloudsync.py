@@ -1407,6 +1407,10 @@ class CloudSync:
         # "time<TAB>LEVEL<TAB>file<TAB>message": the web interface shows each part
         # on its own (time, highlighted level, wrapped path), so it reads on a phone
         when = str(d.get("time", ""))[11:19]
+        # rclone reports the summary of a check as notices; good news is shown as good news
+        m = re.match(r"^(\d+) (matching files|differences found)$", str(d.get("msg", "")).strip())
+        if m and (m.group(2) == "matching files" or m.group(1) == "0"):
+            d = {**d, "level": "success"}
         r["log"].append("\t".join((when, str(d.get("level", "info")).upper(),
                                     str(d.get("object", "")), str(d.get("msg", "")).strip())))
 

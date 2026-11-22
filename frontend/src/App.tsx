@@ -168,7 +168,11 @@ function Shell({ me }: { me: Me }) {
   const all = NAV.flatMap((s) => s.items);
   // the OneDrive link is shown only while the OneDrive service is enabled
   const onedriveOn = !!onedrive.data?.enabled;
-  const visible = (to: string) => to !== "/onedrive" || onedriveOn || path === "/onedrive";
+  // optional services appear in the menu once they are turned on under Services
+  const services = useQuery({ queryKey: ["services"], queryFn: () => api.get<{ id: string; enabled: boolean }[]>("/services"), refetchInterval: 30000 });
+  const antivirusOn = !!services.data?.find((s) => s.id === "antivirus")?.enabled;
+  const visible = (to: string) =>
+    (to !== "/onedrive" || onedriveOn || path === "/onedrive") && (to !== "/antivirus" || antivirusOn || path === "/antivirus");
   const current = all.find((i) => i.to === path) ?? (path === "/" ? all[0] : null);
   const Page = current?.page ?? (() => <NotFound />);
 

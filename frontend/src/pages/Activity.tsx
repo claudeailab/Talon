@@ -37,7 +37,7 @@ function parseShow(v: string): Record<string, string> {
 
 /** Everything that happens: Talon's own activity and the system logs, in one list. */
 export default function ActivityPage() {
-  const [perPage, setPerPage] = useState(25);
+  const [perPage, setPerPage] = useState(10);
   const [page, setPage] = useState(0);
   const [open, setOpen] = useState<string | null>(null);
   const [show, setShow] = useState(() => (new URLSearchParams(location.search).get("show") ?? "all"));

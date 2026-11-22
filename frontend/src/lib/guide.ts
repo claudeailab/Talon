@@ -822,7 +822,7 @@ export const GUIDE: Topic[] = [
         id: "install",
         title: "Install ClamAV",
         blocks: [
-          { p: "Talon uses **ClamAV**, a free, open-source antivirus by Cisco Talos. It is not installed until you want it: on the [Antivirus](/antivirus) page, click **Install ClamAV**. It downloads about 300 MB, including the virus definitions, with a progress bar. The virus definitions then update automatically every hour; ClamAV itself updates with the [operating system updates](" + t("settings") + ")." },
+          { p: "Talon uses **ClamAV**, a free, open-source antivirus by Cisco Talos. It is off until you want it: on the [Services](/services) page, turn on **Antivirus**. Talon installs ClamAV and the **Antivirus** page appears in the menu. It downloads about 300 MB, including the virus definitions, with a progress bar. The virus definitions then update automatically every hour; ClamAV itself updates with the [operating system updates](" + t("settings") + ")." },
           { p: "A scan loads the virus definitions into memory while it runs, about 1.5 GB, and frees it afterwards. ClamAV needs at least 2 GB of memory and recommends 3 GB or more; Talon tells you when the NAS has too little." },
         ],
       },
@@ -832,8 +832,8 @@ export const GUIDE: Topic[] = [
         blocks: [
           {
             steps: [
-              "Under **Scan Now**, keep **All volumes** or choose some, then click **Scan now**. The whole volume is scanned, also folders that are not shared. A progress bar shows how many files are done; **Stop** ends the scan.",
-              "Under **Scheduled Scan**, choose **Daily** or **Weekly**, the time and the volumes, then click **Save**.",
+              "Keep **All volumes** or choose some, then click **Scan now**. The whole volume is scanned, also folders that are not shared. A progress bar shows how many files are done; **Stop** ends the scan.",
+              "Under **Scheduled scan**, choose **Daily** or **Weekly** and the time. It scans the volumes chosen above; changes save by themselves.",
             ],
           },
           { p: "Scans run at low priority, so shared folders stay responsive. A scan that finds something is in the [Activity](/activity) log and you get an email (**Virus found** in [Notifications](/notifications))." },
@@ -843,7 +843,7 @@ export const GUIDE: Topic[] = [
         id: "quarantine",
         title: "Quarantine",
         blocks: [
-          { p: "Infected files move to the volume's quarantine, outside every shared folder, so nobody opens them by accident. In **Quarantine**, each file's **⋯** menu can **Delete** it for good or **Restore** it to its folder; only restore a file you are sure is a false alarm." },
+          { p: "Infected files move to the volume's quarantine, outside every shared folder, so nobody opens them by accident. In the **Quarantine** list (shown when it holds files), each file's **⋯** menu can **Delete** it for good or **Restore** it to its folder; only restore a file you are sure is a false alarm." },
           { p: "**⋯ → Remove ClamAV** uninstalls it. Files in the quarantine stay until you restore or delete them." },
         ],
       },
@@ -975,10 +975,12 @@ export const GUIDE: Topic[] = [
               "**Bonjour (mDNS)**: shows the NAS in macOS Finder and makes **<hostname>.local** work.",
               "**SSH**: command-line access for advanced users.",
               "**OneDrive**: backup and sync with Microsoft OneDrive. See [OneDrive](" + t("onedrive") + ").",
+              "**WebDAV**: shared folders over HTTPS for apps and remote access.",
+              "**Antivirus**: virus scans of volumes with ClamAV. See [Antivirus](" + t("antivirus") + ").",
             ],
           },
           { p: "Turn a service on or off with its switch; it then also starts, or no longer starts, at boot. **Restart** restarts a running service." },
-          { p: "After installing Talon, **NFS**, **Bonjour (mDNS)**, **OneDrive** and **WebDAV** are off: turn on the ones you need." },
+          { p: "After installing Talon, **NFS**, **Bonjour (mDNS)**, **OneDrive**, **WebDAV** and **Antivirus** are off: turn on the ones you need." },
         ],
       },
     ],

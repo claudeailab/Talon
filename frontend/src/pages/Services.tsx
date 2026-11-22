@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Apple, Cloud, Copy, FolderSync, Globe, Monitor, Network, RotateCw, Server, Settings2, Terminal } from "lucide-react";
+import { Apple, Cloud, Copy, FolderSync, ShieldCheck, Globe, Monitor, Network, RotateCw, Server, Settings2, Terminal } from "lucide-react";
 import { api } from "../lib/api";
 import { useAction } from "../lib/hooks";
 import { navigate } from "../lib/router";
@@ -15,15 +15,17 @@ const ICONS: Record<string, React.ReactNode> = {
   ssh: <Terminal className="size-5" />,
   onedrive: <Cloud className="size-5" />,
   webdav: <FolderSync className="size-5" />,
+  antivirus: <ShieldCheck className="size-5" />,
 };
 
 export default function ServicesPage() {
   const { data } = useQuery({ queryKey: ["services"], queryFn: () => api.get<Service[]>("/services"), refetchInterval: 10000 });
   const act = useAction(({ id, action }: { id: string; action: string }) => api.post(`/services/${id}/${action}`), {
     success: (_r, v) => `Service ${v.action === "enable" ? "enabled" : v.action === "disable" ? "disabled" : "restarted"}`,
-    invalidate: ["services", "onedrive"],
+    invalidate: ["services", "onedrive", "antivirus"],
     onSuccess: (_r, v) => {
       if (v.id === "onedrive" && v.action === "enable") navigate("/onedrive"); // straight to setup
+      if (v.id === "antivirus" && v.action === "enable") navigate("/antivirus"); // the installation's progress
     },
   });
   const toast = useToast();
@@ -76,7 +78,7 @@ export default function ServicesPage() {
                   Copy address
                 </Button>
               ) : s.app ? (
-                <Button size="sm" variant="ghost" icon={<Settings2 className="size-3.5" />} disabled={!s.enabled} onClick={() => navigate("/onedrive")}>
+                <Button size="sm" variant="ghost" icon={<Settings2 className="size-3.5" />} disabled={!s.enabled} onClick={() => navigate(`/${s.id}`)}>
                   Configure
                 </Button>
               ) : (

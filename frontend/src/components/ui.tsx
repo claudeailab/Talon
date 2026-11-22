@@ -495,7 +495,9 @@ export function SubTabs<T extends string>({
           onClick={() => onChange(t.value)}
           className={cx(
             "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-center text-[13px] font-semibold transition",
-            value === t.value ? "bg-white text-zinc-900 shadow-sm dark:bg-white/10 dark:text-white" : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200",
+            value === t.value
+              ? "bg-white text-zinc-900 shadow-sm dark:bg-white/10 dark:text-white"
+              : "text-zinc-500 hover:bg-white/60 hover:text-zinc-800 dark:hover:bg-white/5 dark:hover:text-zinc-200",
           )}
         >
           {t.label}
@@ -532,7 +534,7 @@ export function Segmented<T extends string>({
                   "bg-white shadow-sm dark:bg-zinc-700/80",
                   o.tone ?? "text-zinc-900 dark:text-white",
                 )
-              : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200",
+              : "text-zinc-500 hover:bg-white/60 hover:text-zinc-800 dark:text-zinc-400 dark:hover:bg-white/5 dark:hover:text-zinc-200",
           )}
         >
           {o.label}
@@ -605,10 +607,10 @@ export function Tabs<T extends string>({
             type="button"
             onClick={() => onChange(t.value)}
             className={cx(
-              "flex items-center gap-2 border-b-2 px-2.5 py-2.5 text-sm font-medium whitespace-nowrap transition sm:px-3",
+              "flex items-center gap-2 rounded-t-lg border-b-2 px-2.5 py-2.5 text-sm font-medium whitespace-nowrap transition sm:px-3",
               value === t.value
-                ? "border-brand-600 text-brand-700 dark:border-brand-400 dark:text-brand-300"
-                : "border-transparent text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200",
+                ? "border-brand-600 bg-brand-50/50 text-brand-700 dark:border-brand-400 dark:bg-brand-500/10 dark:text-brand-300"
+                : "border-transparent text-zinc-500 hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-800 dark:text-zinc-400 dark:hover:border-white/20 dark:hover:bg-white/5 dark:hover:text-zinc-200",
             )}
           >
             {t.label}

@@ -1432,14 +1432,14 @@ function LogLine({ line }: { line: string }) {
   if (parts.length !== 4)
     return <li className="px-3 py-2 font-mono text-[12px] text-zinc-600 [overflow-wrap:anywhere] dark:text-zinc-300">{line}</li>;
   const [when, level, file, msg] = parts;
-  const tone = level === "ERROR" ? "red" : level === "NOTICE" || level === "WARNING" ? "amber" : null;
+  const tone = level === "ERROR" ? "red" : level === "NOTICE" || level === "WARNING" ? "amber" : level === "SUCCESS" ? "green" : null;
   return (
     <li className="px-3 py-2">
       <div className="flex items-baseline gap-2 text-[13px]">
         {when && <span className="tabular shrink-0 text-xs text-zinc-400">{when}</span>}
         {tone && (
           <Badge tone={tone} className="shrink-0">
-            {level === "ERROR" ? "Error" : "Warning"}
+            {level === "ERROR" ? "Error" : level === "SUCCESS" ? "OK" : "Warning"}
           </Badge>
         )}
         <span className={cx("min-w-0 font-medium break-words", tone === "red" && "text-rose-600 dark:text-rose-400")}>{msg}</span>

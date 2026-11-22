@@ -57,6 +57,23 @@ class Antivirus:
         self._stop_scan = False
         self._lock = threading.Lock()
 
+    # ------------------------------------------------------------ the service (Services page)
+    def enabled(self) -> bool:
+        return bool(self._saved().get("enabled"))
+
+    def service_info(self) -> dict:
+        on = self.enabled()
+        return {"id": "antivirus", "unit": None, "installed": True, "active": on and self.installed(), "enabled": on,
+                "label": "Antivirus", "description": "Scan volumes for viruses with ClamAV", "app": True}
+
+    def set_enabled(self, on: bool, user: str) -> None:
+        self.state.update(lambda d: d.setdefault("antivirus", {}).__setitem__("enabled", bool(on)))
+        self.state.log_activity(user, f"Antivirus {'enabled' if on else 'disabled'}", "info", "services")
+        if on and not self.installed() and self.setup.get("state") != "running" and self._ram() >= MIN_RAM:
+            self.install(user)                   # the Antivirus page shows the progress
+        if not on:
+            self.stop()
+
     # ------------------------------------------------------------ status
     def _saved(self) -> dict:
         return self.state.get("antivirus") or {}
@@ -206,6 +223,8 @@ class Antivirus:
         return vols
 
     def scan(self, user: str, names: Optional[List[str]] = None) -> dict:
+        if not self.enabled():
+            raise UserError("Turn on the Antivirus service first")
         if not self.installed():
             raise UserError("Install ClamAV first")
         with self._lock:
@@ -360,7 +379,7 @@ class Antivirus:
         while not stop.wait(30):
             try:
                 s = self.settings()
-                if s["schedule"] == "off" or not self.installed():
+                if s["schedule"] == "off" or not self.enabled() or not self.installed():
                     continue
                 now = time.localtime()
                 if time.strftime("%H:%M", now) != s["time"]:

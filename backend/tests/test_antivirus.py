@@ -15,8 +15,10 @@ def _wait_scan(client):
 def test_install_scan_quarantine(client):
     info = client.get("/api/antivirus").json()
     assert not info["installed"] and info["ram_ok"]
-    assert client.post("/api/antivirus/scan").status_code == 400          # not installed
-    assert client.post("/api/antivirus/install").status_code == 200
+    svc = next(s for s in client.get("/api/services").json() if s["id"] == "antivirus")
+    assert not svc["enabled"]                                               # off by default
+    assert client.post("/api/antivirus/scan").status_code == 400
+    assert client.post("/api/services/antivirus/enable").status_code == 200  # installs ClamAV
     for _ in range(100):
         info = client.get("/api/antivirus").json()
         if info["setup"]["state"] != "running":

@@ -628,10 +628,15 @@ def create_app(cfg, platform) -> FastAPI:
     # ------------------------------------------------------------ services & system
     @app.get("/api/services")
     def services(_u: str = Depends(current_user)):
-        return platform.services() + [nas.cloud.service_info(), webdav.service_info()]
+        return platform.services() + [nas.cloud.service_info(), webdav.service_info(), nas.antivirus.service_info()]
 
     @app.post("/api/services/{sid}/{action}")
     def service_action(sid: str, action: str, user: str = Depends(current_user)):
+        if sid == "antivirus":
+            if action not in ("enable", "disable"):
+                raise HTTPException(400, "The antivirus can only be enabled or disabled")
+            nas.antivirus.set_enabled(action == "enable", user)
+            return {"ok": True}
         if sid == "webdav":
             if action not in ("enable", "disable"):
                 raise HTTPException(400, "WebDAV can only be enabled or disabled")

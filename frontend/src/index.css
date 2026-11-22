@@ -30,6 +30,8 @@
   ::selection { @apply bg-brand-500/25; }
   p, li, dd, h1, h2, h3 { text-wrap: pretty; }   /* no single word on the last line */
   :focus-visible { @apply outline-2 outline-offset-2 outline-brand-500; }
+  /* everything you can click shows the hand, like links */
+  button:not(:disabled), [role="button"], [role="tab"], select:not(:disabled), summary { cursor: pointer; }
   * { scrollbar-width: thin; scrollbar-color: rgb(161 161 170 / .4) transparent; }
   /* iPhone Safari zooms in on fields with text under 16px and stays zoomed, which
      makes every page pan sideways: use 16px in fields on touch screens */

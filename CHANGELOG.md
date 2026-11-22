@@ -1,3 +1,8 @@
+## 1.0.118
+- Antivirus is a service (off by default) with a single, compact page
+- Tabs show a hand and a highlight on hover; OneDrive shows matching files as OK, not as a warning
+- Activity shows 10 entries per page by default
+
 ## 1.0.117
 - Settings → General: choose the date format and 12- or 24-hour time, used everywhere including emails
 
