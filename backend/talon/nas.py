@@ -14,6 +14,7 @@ from .cloudsync import CloudSync
 from .files import FileBrowser
 from .jobs import JobRunner
 from .network import Network
+from .osupdate import OsUpdate
 from .ramlog import RamLog
 from .notify import Notifier
 from .scheduler import Scheduler
@@ -59,6 +60,7 @@ class Nas:
         self.scheduler = Scheduler(cfg, self.state, self, demo)
         self.network = Network(platform, self.state, demo)
         self.ramlog = RamLog(self.state, demo)
+        self.osupdate = OsUpdate(self.state, self.notifier, demo)
         self.history: collections.deque = collections.deque(maxlen=90)
         self._last_sample: Optional[dict] = None
         self._stop = threading.Event()
@@ -94,6 +96,7 @@ class Nas:
         threading.Thread(target=self._watcher, daemon=True, name="notify").start()
         self.cloud.start()
         self.scheduler.start()
+        threading.Thread(target=self.osupdate.background_loop, args=(self._stop,), daemon=True, name="os-update-check").start()
 
     def stop(self) -> None:
         self._stop.set()
@@ -999,6 +1002,17 @@ class Nas:
                             if exp["days"] != 1 else "expires tomorrow"),
                         "detail": "Create a new secret in Entra and save it in Settings > EntraID",
                         "link": "/settings?tab=entra"})
+        os_up = self.osupdate.info()
+        if os_up["progress"].get("state") != "running":
+            if os_up["security"]:
+                out.append({"level": "warning",
+                            "title": f"{os_up['security']} security update{'s' if os_up['security'] > 1 else ''} for the operating system",
+                            "detail": "Install them in Settings > Update > Operating system",
+                            "link": "/settings?tab=update&os=1"})
+            if os_up["restart_needed"]:
+                out.append({"level": "warning", "title": "Restart to finish the updates",
+                            "detail": "Some updates are only used after a restart",
+                            "link": "/settings?tab=update&os=1"})
         return out
 
     def dashboard(self) -> dict:

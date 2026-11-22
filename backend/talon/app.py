@@ -98,6 +98,9 @@ ACTIONS = {
     "DELETE /api/entra/users/{oid}": ("users", None),
     "POST /api/update/check": ("updates", "Checked for updates"),
     "PUT /api/update/settings": ("updates", None),
+    "POST /api/os-update/check": ("updates", None),
+    "POST /api/os-update/install": ("updates", None),
+    "PUT /api/os-update/auto": ("updates", None),
     "POST /api/update/install": ("updates", "Started installing an update"),
     "POST /api/disks/{name}/smart-test": ("storage", "Started a S.M.A.R.T. self-test on {name}"),
     "POST /api/disks/{name}/wipe": ("storage", "Wiped disk {name}"),
@@ -344,6 +347,22 @@ def create_app(cfg, platform) -> FastAPI:
     def update_check(_u: str = Depends(current_user)):
         updater.check(force=True)
         return updater.info()
+
+    @app.get("/api/os-update")
+    def os_update(_u: str = Depends(current_user)):
+        return nas.osupdate.info()
+
+    @app.post("/api/os-update/check")
+    def os_update_check(_u: str = Depends(current_user)):
+        return nas.osupdate.check()
+
+    @app.post("/api/os-update/install")
+    def os_update_install(user: str = Depends(current_user)):
+        return nas.osupdate.install(user)
+
+    @app.put("/api/os-update/auto")
+    def os_update_auto(body: dict = Body(...), user: str = Depends(current_user)):
+        return nas.osupdate.set_auto(body, user)
 
     @app.put("/api/update/settings")
     def update_settings(body: dict = Body(...), user: str = Depends(current_user)):

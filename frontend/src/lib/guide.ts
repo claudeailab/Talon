@@ -774,7 +774,7 @@ export const GUIDE: Topic[] = [
     id: "settings",
     title: "Settings and updates",
     group: "System",
-    summary: "Name, time zone, network address, Windows and macOS options, and updates.",
+    summary: "Name, time zone, network address, Windows and macOS options, and updates of Talon and the operating system.",
     page: { to: "/settings", label: "Open Settings" },
     sections: [
       {
@@ -829,6 +829,21 @@ export const GUIDE: Topic[] = [
           { img: "settings-update", alt: "Software update" },
           { p: "Talon checks for a new version every 6 hours; change this under **Check for updates** (every hour up to every week, or **Never** to check only with **Check now**). Nothing installs by itself. When a new version is available, a button at the bottom of the menu says so. Open [Settings → Update](/settings?tab=update) and click **Install now**." },
           { p: "An update takes about 1–3 minutes. The web interface restarts and reloads by itself. Shared folders stay available and volumes are not touched. If anything fails, the previous version is restored automatically." },
+        ],
+      },
+      {
+        id: "os-update",
+        title: "Operating system updates",
+        blocks: [
+          { p: "[Settings → Update](/settings?tab=update&os=1) has two tabs: **Talon** and **Operating system**. The operating system (Debian, Ubuntu or Raspberry Pi OS) is checked once a day; **Check now** checks straight away. Security updates are listed first; **Other** shows the rest." },
+          { p: "**Install all updates** installs them with a progress bar. Shared folders keep working, and configuration files you changed are kept. When an update needs a restart, for example a new Linux kernel, **Restart to finish** appears here and on the Dashboard." },
+          {
+            list: [
+              "**Install security updates automatically**: every night, with an email when something was installed (set up SMTP first).",
+              "**Restart automatically when needed**: only when an update needs it, at the time you choose (04:00 by default).",
+            ],
+          },
+          { p: "Waiting security updates show on the Dashboard, and you get an email about new ones unless they install automatically." },
         ],
       },
       {

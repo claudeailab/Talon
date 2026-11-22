@@ -1,3 +1,7 @@
+## 1.0.106
+- Settings → Update: new Operating system tab to install updates with a progress bar
+- Automatic security updates with optional restart; dashboard shows waiting security updates
+
 ## 1.0.105
 - Settings: fewer writes to the system disk, on by default for SD cards and USB flash drives
 

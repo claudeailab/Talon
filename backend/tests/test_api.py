@@ -297,3 +297,34 @@ def test_ramlog_script_never_blocks_the_boot():
     assert SCRIPT_TEXT.rstrip().endswith("exit 0") and "|| exit 0" in SCRIPT_TEXT
     assert "DefaultDependencies=no" in UNIT_TEXT and "ExecStop=" in UNIT_TEXT
     assert (flash_kind("mmcblk0"), flash_kind("sda", "usb", False), flash_kind("sda", "usb", True), flash_kind("nvme0n1")) == ("sd", "usb", "", "")
+
+
+def test_os_updates(client):
+    import time
+    info = client.post("/api/os-update/check").json()
+    assert info["packages"] and info["security"] == 3 and info["packages"][0]["security"]
+    assert any(p["restart"] for p in info["packages"])
+    assert client.post("/api/os-update/install").status_code == 200
+    assert client.post("/api/os-update/install").status_code == 400       # already running
+    for _ in range(100):
+        info = client.get("/api/os-update").json()
+        if info["progress"]["state"] != "running":
+            break
+        time.sleep(0.1)
+    assert info["progress"]["state"] == "success" and not info["packages"] and info["restart_needed"]
+    auto = client.put("/api/os-update/auto", json={"security": True, "restart": True, "restart_time": "04:00"}).json()["auto"]
+    assert auto == {"security": True, "restart": True, "restart_time": "04:00"}
+    assert client.put("/api/os-update/auto", json={"restart_time": "25:00"}).status_code == 400
+    msgs = [a["message"] for a in client.get("/api/activity", params={"category": "updates"}).json()["items"]]
+    assert any("Installed 8 operating system update(s)" in m for m in msgs)
+    assert any("automatic security updates" in m for m in msgs)
+
+
+def test_apt_parsing():
+    from talon.osupdate import parse_simulation, parse_status
+    pk = parse_simulation("Inst apt [2.8.3] (2.8.4ubuntu0.1 Ubuntu:24.04/noble-updates, Ubuntu:24.04/noble-security [amd64])\n"
+                          "Inst newpkg (1.0 Debian:13/stable [all])\nConf apt (2.8.4)")
+    assert [(p["name"], p["old"], p["new"], p["security"]) for p in pk] == [("apt", "2.8.3", "2.8.4ubuntu0.1", True), ("newpkg", "", "1.0", False)]
+    assert parse_status("pmstatus:libc6:amd64:40.0:Installing libc6:amd64") == {
+        "phase": "install", "package": "libc6", "percent": 40.0, "text": "Installing libc6:amd64"}
+    assert parse_status("random text") is None

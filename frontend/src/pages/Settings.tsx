@@ -5,11 +5,12 @@ import { api } from "../lib/api";
 import { ago, bytes, date } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Settings, SysInfo, UpdateInfo } from "../lib/types";
-import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Field, Input, PageHeader, PageLoader, Select, Switch, Tabs } from "../components/ui";
+import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Field, Input, PageHeader, PageLoader, Select, SubTabs, Switch, Tabs } from "../components/ui";
 import { useSearch } from "../lib/router";
 import EntraTab from "./SettingsEntra";
 import NetworkTab from "./SettingsNetwork";
 import SmtpTab from "./SettingsSmtp";
+import OsUpdateTab from "./SettingsOsUpdate";
 
 type TabId = "general" | "network" | "entra" | "smtp" | "update" | "about";
 const TABS: { value: TabId; label: string; icon: React.ReactNode }[] = [
@@ -44,7 +45,7 @@ export default function SettingsPage() {
       {tab === "network" && <NetworkTab />}
       {tab === "entra" && <EntraTab />}
       {tab === "smtp" && <SmtpTab />}
-      {tab === "update" && <SoftwareUpdate />}
+      {tab === "update" && <UpdateTab />}
       {tab === "about" && <AboutTab />}
     </>
   );
@@ -231,6 +232,28 @@ const CHECK_EVERY: [number, string][] = [
   [168, "Every week"],
   [0, "Never (only Check now)"],
 ];
+
+/** Talon itself, or the operating system it runs on. */
+function UpdateTab() {
+  const [view, setView] = useState<"talon" | "os">(() => (new URLSearchParams(location.search).get("os") ? "os" : "talon"));
+  return (
+    <>
+      <SubTabs
+        className="mb-4"
+        value={view}
+        onChange={(v) => {
+          setView(v);
+          history.replaceState(null, "", v === "os" ? "/settings?tab=update&os=1" : "/settings?tab=update");
+        }}
+        tabs={[
+          { value: "talon", label: "Talon" },
+          { value: "os", label: "Operating system" },
+        ]}
+      />
+      {view === "talon" ? <SoftwareUpdate /> : <OsUpdateTab />}
+    </>
+  );
+}
 
 function SoftwareUpdate() {
   const { data } = useQuery({ queryKey: ["update"], queryFn: () => api.get<UpdateInfo>("/update") });
