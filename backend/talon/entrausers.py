@@ -107,10 +107,10 @@ class EntraUsers:
             users = d.setdefault("entra_users", {})
             for p in new:
                 users[p["id"]] = {"oid": p["id"], "name": p["name"], "upn": p["upn"], "email": p["email"],
-                                  "web": False, "added": time.time(), "added_by": actor}
+                                  "web": True, "added": time.time(), "added_by": actor}
         self.state.update(upd)
         for p in new:
-            self.state.log_activity(actor, f"Added EntraID user {p['upn']}", "info", "users")
+            self.state.log_activity(actor, f"Added EntraID user {p['upn']} with web interface access", "info", "users")
         return len(new)
 
     def _get(self, oid: str) -> dict:

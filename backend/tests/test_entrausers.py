@@ -17,7 +17,7 @@ def test_needs_the_app_for_one_organization(client):
     assert client.get("/api/entra/users").json() == {"ready": True, "configured": True, "users": []}
 
 
-def test_add_users_and_give_web_access(client):
+def test_added_users_get_web_access_which_can_be_turned_off(client):
     _setup(client)
     people = client.get("/api/entra/directory").json()
     assert len(people) >= 3 and not any(p["added"] for p in people)
@@ -25,11 +25,11 @@ def test_add_users_and_give_web_access(client):
     ids = [people[0]["id"], people[1]["id"]]
     assert client.post("/api/entra/users", json={"ids": ids}).json()["added"] == 2
     users = client.get("/api/entra/users").json()["users"]
-    assert len(users) == 2 and not any(u["web"] for u in users)
-    assert client.get("/api/auth/methods").json() == {"local": True, "microsoft": False}
-    u = users[0]
-    assert client.put(f"/api/entra/users/{u['oid']}", json={"web": True}).json()["web"] is True
+    assert len(users) == 2 and all(u["web"] for u in users)          # web access by default
     assert client.get("/api/auth/methods").json() == {"local": True, "microsoft": True}
+    for u in users:
+        assert client.put(f"/api/entra/users/{u['oid']}", json={"web": False}).json()["web"] is False
+    assert client.get("/api/auth/methods").json() == {"local": True, "microsoft": False}
 
 
 def test_microsoft_only_when_the_local_admin_is_disabled(client):
@@ -64,7 +64,7 @@ def test_people_without_web_access_cannot_sign_in(client):
     _setup(client)
     people = client.get("/api/entra/directory").json()
     client.post("/api/entra/users", json={"ids": [people[0]["id"], people[1]["id"]]})
-    client.put(f"/api/entra/users/{people[0]['id']}", json={"web": True})
+    client.put(f"/api/entra/users/{people[1]['id']}", json={"web": False})
     nas = client.app.state.nas
     state = nas.entra_users.start("https://nas.local").split("state=")[1]
     nas.state.update(lambda d: d["entra_users"][people[0]["id"]].__setitem__("web", False))

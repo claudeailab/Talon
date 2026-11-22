@@ -212,6 +212,12 @@ export default function UsersPage() {
   );
 }
 
+/** An email address that wraps after the "@" on narrow screens, not mid-word. */
+function Email({ value }: { value: string }) {
+  const i = value.indexOf("@");
+  return i < 0 ? <>{value}</> : <>{value.slice(0, i + 1)}<wbr />{value.slice(i + 1)}</>;
+}
+
 /** Groups of local users: give a team access to shared folders at once. */
 function GroupsTab({ groups, onAdd, onEdit, onDelete }: { groups: Group[]; onAdd: () => void; onEdit: (g: Group) => void; onDelete: (g: Group) => void }) {
   if (!groups.length)
@@ -471,10 +477,10 @@ function EntraUsersTab({ users, me, onAdd }: { users: EntraUser[]; me?: string; 
                       {(u.name || u.upn)[0]}
                     </div>
                     <div className="min-w-0">
-                      <div className="truncate font-medium">
+                      <div className="font-medium break-words">
                         {u.name} {u.upn === me && <span className="text-xs text-zinc-400">(you)</span>}
                       </div>
-                      <div className="truncate text-xs text-zinc-500">{u.upn}</div>
+                      <div className="text-xs break-words text-zinc-500"><Email value={u.upn} /></div>
                     </div>
                   </div>
                 </td>
@@ -592,6 +598,10 @@ function AddEntraDialog({ onClose }: { onClose: () => void }) {
         </>
       }
     >
+      <p className="mb-3 text-[13px] text-zinc-500">
+        The people you add can sign in to this web interface with <b>Sign in with Microsoft</b> and manage the NAS. To turn this off for someone, choose{" "}
+        <b>Edit</b> in their <b>⋯</b> menu.
+      </p>
       <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search by name or email" aria-label="Search" className="mb-3" />
       {dir.isLoading ? (
         <PageLoader />
@@ -606,8 +616,8 @@ function AddEntraDialog({ onClose }: { onClose: () => void }) {
               <label className={cx("flex items-center gap-3 px-3.5 py-2.5", p.added ? "opacity-60" : "cursor-pointer hover:bg-zinc-50 dark:hover:bg-white/[0.03]")}>
                 <input type="checkbox" className="size-4 shrink-0 accent-brand-600" disabled={p.added} checked={p.added || sel.has(p.id)} onChange={() => toggle(p.id)} />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">{p.name}</span>
-                  <span className="block truncate text-xs text-zinc-500">{p.upn}</span>
+                  <span className="block text-sm font-medium break-words">{p.name}</span>
+                  <span className="block text-xs break-words text-zinc-500"><Email value={p.upn} /></span>
                 </span>
                 {p.added ? <Badge>Added</Badge> : !p.enabled ? <Badge tone="amber">Disabled in EntraID</Badge> : null}
               </label>

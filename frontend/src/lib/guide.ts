@@ -529,8 +529,8 @@ export const GUIDE: Topic[] = [
           {
             steps: [
               "Open **EntraID Users** and click **Add EntraID users**.",
-              "Search your organization's directory, tick the people you want and click **Add**.",
-              "Choose **Edit** in a person's **⋯** menu and turn on **Web interface** if they may sign in to this web interface with **Sign in with Microsoft** and manage the NAS.",
+              "Search your organization's directory, tick the people you want and click **Add**. They can now sign in to this web interface with **Sign in with Microsoft** and manage the NAS.",
+              "To take away someone's access without removing them, choose **Edit** in their **⋯** menu and turn off **Web interface**.",
             ],
           },
           { p: "Their name and password stay in EntraID and cannot be changed in Talon. **Remove** takes away their access to Talon; their EntraID account is not changed." },

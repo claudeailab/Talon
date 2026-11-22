@@ -1,3 +1,7 @@
+## 1.0.93
+- EntraID users get web interface access when added; turn it off with Edit
+- Email addresses wrap after the @ on phones
+
 ## 1.0.92
 - Website: menu no longer overlaps the logo on the Screenshots page
 - README: License section removed
