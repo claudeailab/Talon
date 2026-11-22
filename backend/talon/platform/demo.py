@@ -43,6 +43,7 @@ class DemoPlatform:
             ("sdh", "ST2000VN004-2E4164", 2 * TB, "hdd", "Z52A1H7K"),
             ("sdi", "ST2000VN004-2E4164", 2 * TB, "hdd", "Z52A1J2M"),
             ("sdj", "WD My Passport 2TB", 2 * TB, "usb", "WX42A81F"),
+            ("sdk", "WDC WD40EFZX-68AWUN0", 4 * TB, "hdd", "WD-WX62K9"),
         ]:
             self.disks[name] = {"name": name, "model": model, "size": size, "kind": kind,
                                 "serial": serial, "parts": [], "signature": None,
@@ -54,6 +55,8 @@ class DemoPlatform:
         ]
         self.disks["sdg"]["parts"] = [{"name": "sdg1", "size": 1 * TB, "fstype": "exfat",
                                        "mounts": []}]
+        self.disks["sdk"]["parts"] = [{"name": "sdk1", "size": 4 * TB, "fstype": "ext4", "label": "Archive",
+                                       "mounts": []}]
         self.disks["sdj"]["parts"] = [{"name": "sdj1", "size": 2 * TB, "fstype": "ext4", "label": "Backup",
                                        "mounts": []}]
         self.arrays: Dict[str, dict] = {}
@@ -64,8 +67,8 @@ class DemoPlatform:
         }
         self.groups: Dict[str, set] = {"nasusers": {"admin"}, "nasadmins": {"admin"}}
         self.services_state = {"smb": [True, True], "netbios": [False, False],
-                               "nfs": [True, True], "wsdd": [True, True],
-                               "mdns": [True, True], "ssh": [True, True]}
+                               "nfs": [False, False], "wsdd": [True, True],
+                               "mdns": [False, False], "ssh": [True, True]}
         self.smb_conf = ""
         self.nfs_conf = ""
         self._seed()

@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { HardDrive, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Square, Trash2, Usb } from "lucide-react";
+import { DatabaseBackup, HardDrive, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Square, Trash2, Usb } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, bytes, cx, rate } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import { navigate } from "../lib/router";
 import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Select, Switch } from "../components/ui";
 
-type Disk = { uuid: string; id: string; dev: string; name: string; fstype: string; fs_label: string; size: number; kind: string; versions: boolean };
+type Disk = { uuid: string; id: string; dev: string; name: string; media: string; fstype: string; fs_label: string; size: number; kind: string; versions: boolean };
 type Task = {
   id: string;
   name: string;
@@ -32,10 +32,10 @@ const whenText = (t: Pick<Task, "when" | "time">) =>
   t.when === "plug" ? "Runs when the disk is plugged in" : t.when === "daily" ? `Runs every day at ${t.time}` : `Runs when plugged in and every day at ${t.time}`;
 const snapLabel = (s: string) => (s === "Current" ? "Latest copy" : `${s.slice(8, 10)}-${s.slice(5, 7)}-${s.slice(0, 4)} ${s.slice(11, 13)}:${s.slice(13, 15)}`);
 
-export default function UsbBackupPage() {
+export default function BackupPage() {
   const q = useQuery({
-    queryKey: ["usb-backup"],
-    queryFn: () => api.get<Info>("/usb-backup"),
+    queryKey: ["backup"],
+    queryFn: () => api.get<Info>("/backup"),
     refetchInterval: (query) => (query.state.data?.tasks.some((t) => t.progress.state === "running") ? 1000 : 10000),
   });
   const [wizard, setWizard] = useState<Task | "new" | null>(null);
@@ -44,8 +44,8 @@ export default function UsbBackupPage() {
   return (
     <>
       <PageHeader
-        title="USB Backup"
-        description="Copy shared folders to a USB disk"
+        title="Backup"
+        description="Copy shared folders to another disk"
         actions={
           d.tasks.length > 0 && (
             <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setWizard("new")}>
@@ -57,9 +57,9 @@ export default function UsbBackupPage() {
       {d.tasks.length === 0 ? (
         <Card>
           <Empty
-            icon={<Usb className="size-6" />}
-            title="No USB backups yet"
-            text="Plug in a USB disk and keep a copy of your shared folders on it. RAID is not a backup."
+            icon={<DatabaseBackup className="size-6" />}
+            title="No backups yet"
+            text="Keep a copy of your shared folders on a USB or internal disk. RAID is not a backup."
             action={
               <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setWizard("new")}>
                 New backup
@@ -80,9 +80,9 @@ export default function UsbBackupPage() {
 }
 
 function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backupDir: string }) {
-  const run = useAction(() => api.post(`/usb-backup/${t.id}/run`), { invalidate: ["usb-backup"] });
-  const stop = useAction(() => api.post(`/usb-backup/${t.id}/stop`), { invalidate: ["usb-backup"] });
-  const del = useAction(() => api.del(`/usb-backup/${t.id}`), { invalidate: ["usb-backup"], success: "Backup deleted", onSuccess: () => setConfirm(false) });
+  const run = useAction(() => api.post(`/backup/${t.id}/run`), { invalidate: ["backup"] });
+  const stop = useAction(() => api.post(`/backup/${t.id}/stop`), { invalidate: ["backup"] });
+  const del = useAction(() => api.del(`/backup/${t.id}`), { invalidate: ["backup"], success: "Backup deleted", onSuccess: () => setConfirm(false) });
   const [confirm, setConfirm] = useState(false);
   const [restore, setRestore] = useState(false);
   const p = t.progress;
@@ -91,14 +91,15 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
     <Card className="flex flex-col">
       <div className="flex items-start gap-3 p-5 pb-3">
         <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
-          <Usb className="size-5" />
+          {t.disk && t.disk.kind !== "usb" ? <HardDrive className="size-5" /> : <Usb className="size-5" />}
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-semibold break-words">{t.name}</h3>
-            {t.connected ? <Badge tone="green" dot>Plugged in</Badge> : <Badge dot>Not plugged in</Badge>}
+            {t.connected ? <Badge tone="green" dot>Connected</Badge> : <Badge dot>Not connected</Badge>}
           </div>
           <p className="text-[13px] break-words text-zinc-500">
+            {t.disk ? `${t.disk.media}: ` : ""}
             {t.disk_name}
             {t.disk_size ? ` · ${bytes(t.disk_size)}` : ""} · {t.shares.length ? t.shares.join(", ") : "All shared folders"}
           </p>
@@ -206,10 +207,10 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
   const [name, setName] = useState(task?.name ?? "");
   const versions = task ? task.versions : !!d?.versions;
   const timeOk = /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
-  const fallback = !d ? "USB backup" : /backup/i.test(d.name) ? d.name : `Backup to ${d.name}`;
+  const fallback = !d ? "Backup" : /backup/i.test(d.name) ? d.name : `Backup to ${d.name}`;
   const body = { name: name.trim() || (task?.name ?? fallback), disk_uuid: disk, shares, when, time, eject, keep_days: keep };
-  const save = useAction(() => (editing ? api.put(`/usb-backup/${task!.id}`, body) : api.post("/usb-backup", { ...body, run_now: d ? true : false })), {
-    invalidate: ["usb-backup"],
+  const save = useAction(() => (editing ? api.put(`/backup/${task!.id}`, body) : api.post("/backup", { ...body, run_now: d ? true : false })), {
+    invalidate: ["backup"],
     success: editing ? "Backup saved" : "Backup created; the first run has started",
     onSuccess: onClose,
   });
@@ -225,7 +226,7 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
       open
       onClose={onClose}
       size="lg"
-      title={editing ? `Edit ${task!.name}` : "New USB backup"}
+      title={editing ? `Edit ${task!.name}` : "New backup"}
       description={`Step ${step + 1} of 4: ${steps[step]}`}
       footer={
         <>
@@ -252,9 +253,9 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
     >
       {step === 0 && (
         <div className="space-y-3">
-          <p className="text-[13px] text-zinc-500">Which disk? Plug it in now if it is not listed.</p>
+          <p className="text-[13px] text-zinc-500">Which disk? USB and internal disks with a filesystem are listed; a USB disk appears as soon as you plug it in.</p>
           {info.disks.length === 0 ? (
-            <Callout tone="info">No USB disk found. Plug one in; it appears here within a few seconds.</Callout>
+            <Callout tone="info">No disk found. Plug in a USB disk, or connect an internal disk with a filesystem; it appears here within a few seconds.</Callout>
           ) : (
             <div className="grid gap-2">
               {info.disks.map((x) => (
@@ -271,7 +272,7 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
                   <span className="min-w-0 flex-1">
                     <span className="block text-[13.5px] font-semibold break-words">{x.name}</span>
                     <span className="block text-xs text-zinc-500">
-                      {bytes(x.size)} · {x.fs_label}
+                      {x.media} · {bytes(x.size)} · {x.fs_label}
                       {!x.versions && <span className="text-amber-600 dark:text-amber-400"> · one copy, no earlier versions</span>}
                     </span>
                   </span>

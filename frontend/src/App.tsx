@@ -24,7 +24,7 @@ import {
   Settings as SettingsIcon,
   ShieldCheck,
   Sun,
-  Usb,
+  DatabaseBackup,
   Users as UsersIcon,
   X,
 } from "lucide-react";
@@ -54,7 +54,7 @@ import ActivityPage from "./pages/Activity";
 import DocumentationPage from "./pages/Documentation";
 import ScheduledPage from "./pages/Scheduled";
 import AntivirusPage from "./pages/Antivirus";
-import UsbBackupPage from "./pages/UsbBackup";
+import BackupPage from "./pages/Backup";
 
 type Me = { user: string; version: string; demo: boolean };
 
@@ -71,9 +71,9 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
   {
     section: "Files",
     items: [
+      { to: "/backup", label: "Backup", icon: DatabaseBackup, page: BackupPage },
       { to: "/browser", label: "Browser", icon: FolderTree, page: FilesPage },
       { to: "/onedrive", label: "OneDrive", icon: Cloud, page: OneDrivePage },
-      { to: "/usb-backup", label: "USB Backup", icon: Usb, page: UsbBackupPage },
     ],
   },
   {
@@ -88,8 +88,8 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
     items: [
       { to: "/activity", label: "Activity", icon: ActivityIcon, page: ActivityPage },
       { to: "/settings", label: "Settings", icon: SettingsIcon, page: SettingsPage },
-      { to: "/antivirus", label: "Antivirus", icon: ShieldCheck, page: AntivirusPage },
       { to: "/services", label: "Services", icon: Server, page: ServicesPage },
+      { to: "/antivirus", label: "Antivirus", icon: ShieldCheck, page: AntivirusPage },
       { to: "/scheduled", label: "Scheduled", icon: Clock, page: ScheduledPage },
       { to: "/notifications", label: "Notifications", icon: Mail, page: NotificationsPage },
       { to: "/documentation", label: "Documentation", icon: BookOpen, page: DocumentationPage },

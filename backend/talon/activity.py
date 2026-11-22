@@ -26,7 +26,7 @@ CATEGORIES = {
     "onedrive": "OneDrive",
     "scheduled": "Scheduled",
     "antivirus": "Antivirus",
-    "backup": "USB Backup",
+    "backup": "Backup",
     "services": "Services",
     "settings": "Settings",
     "updates": "Updates",
@@ -42,7 +42,7 @@ def categories() -> list:
 _RULES = [
     (r"\bOneDrive\b|EntraID", "onedrive"),
     (r"[Vv]irus|ClamAV|quarantine", "antivirus"),
-    (r"USB backup", "backup"),
+    (r"^Backup |^Created backup|^Updated backup|^Deleted backup", "backup"),
     (r"^(Started |Created |Updated |Deleted |Paused |Resumed |Skipped )?scheduled task|^Scheduled task|^Test run as", "scheduled"),
     (r"^Notification|^Alert|^Resolved|email", "alerts"),
     (r"Signed (in|out)|[Ff]ailed login|sign-in", "signin"),

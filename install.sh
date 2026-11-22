@@ -17,6 +17,8 @@ REPO=claudeailab/Talon
 PREFIX=/opt/talon
 CONF_DIR=/etc/talon
 STATE_DIR=/var/lib/talon
+# a first installation (no Talon state yet): optional services start switched off
+FRESH=0; [ -f "$STATE_DIR/state.json" ] || FRESH=1
 MOUNT_ROOT=/srv/nas
 ADMIN_GROUP=nasadmins
 USERS_GROUP=nasusers
@@ -271,13 +273,19 @@ mkdir -p /etc/exports.d /etc/avahi/services
 /usr/local/sbin/talon apply >/dev/null
 ok "Samba, NFS and Bonjour configuration written"
 
+unit_exists() { systemctl list-unit-files "$1.service" 2>/dev/null | grep -q "^$1.service"; }
 if has_systemd; then
-  for unit in smbd nfs-server avahi-daemon wsdd wsdd2; do
-    if systemctl list-unit-files "$unit.service" >/dev/null 2>&1 \
-       && systemctl list-unit-files "$unit.service" | grep -q "^$unit.service"; then
-      systemctl enable --now "$unit" >/dev/null 2>&1 || warn "could not start $unit"
-    fi
+  for unit in smbd wsdd wsdd2; do
+    unit_exists "$unit" && { systemctl enable --now "$unit" >/dev/null 2>&1 || warn "could not start $unit"; }
   done
+  # NFS and Bonjour are off until you turn them on under Services; a reinstall keeps your choice
+  if [ "$FRESH" = 1 ]; then
+    for unit in nfs-server avahi-daemon; do
+      unit_exists "$unit" && systemctl disable --now "$unit" >/dev/null 2>&1
+    done
+    systemctl disable --now avahi-daemon.socket >/dev/null 2>&1 || true   # it would start Bonjour again
+    ok "NFS and Bonjour are off; turn them on under Services when you need them"
+  fi
 fi
 
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then

@@ -484,7 +484,7 @@
        "**General**: enter the **Name** that people see on the network, pick the **Volume** and optionally a **Description**. A folder with this name is created on the volume.",
        "**Permissions**: **Guests** (anyone on the network, without a password) can get **Read** at most. Below are two tabs: **Users** and **Groups** (with **All NAS users** at the top). Give each **No access**, **Read** or **Read & write**. Search and **Only with access** help with many users. Someone with access directly and through a group gets the higher of the two.",
        "**SMB**: for Windows, macOS, Linux, Android and iOS. On by default. Options below.",
-       "**NFS**: for Linux, Kodi, VMware ESXi and Proxmox. Options below.",
+       "**NFS**: for Linux, Kodi, VMware ESXi and Proxmox. Options below. Turn on the **NFS** service under [Services](/services) first.",
        "Click **Create share**."
       ]
      },
@@ -715,13 +715,13 @@
   ]
  },
  {
-  "id": "usb-backup",
-  "title": "USB Backup",
+  "id": "backup",
+  "title": "Backup",
   "group": "Cloud and alerts",
-  "summary": "Copy shared folders to a USB disk when you plug it in or every day, with earlier versions.",
+  "summary": "Copy shared folders to a USB or internal disk when you plug it in or every day, with earlier versions.",
   "page": {
-   "to": "/usb-backup",
-   "label": "Open USB Backup"
+   "to": "/backup",
+   "label": "Open Backup"
   },
   "sections": [
    {
@@ -729,19 +729,19 @@
     "title": "Create a backup",
     "blocks": [
      {
-      "p": "RAID keeps the NAS running when a disk fails, but it is not a backup. A USB disk you keep elsewhere protects against deleted files, ransomware, theft or a broken NAS."
+      "p": "RAID keeps the NAS running when a disk fails, but it is not a backup. A copy on another disk protects against deleted files and a broken array; a USB disk you keep elsewhere also protects against ransomware, theft or a broken NAS."
      },
      {
       "steps": [
-       "Plug in the USB disk. On the [USB Backup](/usb-backup) page, click **New backup**.",
-       "**Disk**: choose the disk.",
+       "Plug in a USB disk, or use an internal disk (SATA or NVMe) that has a filesystem and is not used by a volume. On the [Backup](/backup) page, click **New backup**.",
+       "**Disk**: choose the disk. Each disk shows its type, for example **USB disk** or **SATA hard disk**.",
        "**Folders**: keep **All shared folders** or choose some.",
        "**When**: **Whenever I plug in the disk**, **Every day** at a time you choose, or both. Turn on **Eject the disk when done** to unplug it safely afterwards, and choose how long to **Keep earlier versions**.",
        "**Name**: check the summary and click **Create and back up now**."
       ]
      },
      {
-      "p": "The disk is recognised wherever you plug it in. Backups are in the folder **Talon Backup** on the disk, as normal files that any computer can open. You get an email when a backup completes or fails."
+      "p": "The disk is recognised wherever you connect it. Backups are in the folder **Talon Backup** on the disk, as normal files that any computer can open. You get an email when a backup completes or fails."
      }
     ]
    },
@@ -1040,7 +1040,7 @@
   "id": "antivirus",
   "title": "Antivirus",
   "group": "System",
-  "summary": "Scan shared folders for viruses with ClamAV, on demand or on a schedule.",
+  "summary": "Scan volumes for viruses with ClamAV, on demand or on a schedule.",
   "page": {
    "to": "/antivirus",
    "label": "Open Antivirus"
@@ -1064,8 +1064,8 @@
     "blocks": [
      {
       "steps": [
-       "Under **Scan Now**, keep **All shared folders** or choose some, then click **Scan now**. A progress bar shows how many files are done; **Stop** ends the scan.",
-       "Under **Scheduled Scan**, choose **Daily** or **Weekly**, the time and the shared folders, then click **Save**."
+       "Under **Scan Now**, keep **All volumes** or choose some, then click **Scan now**. The whole volume is scanned, also folders that are not shared. A progress bar shows how many files are done; **Stop** ends the scan.",
+       "Under **Scheduled Scan**, choose **Daily** or **Weekly**, the time and the volumes, then click **Save**."
       ]
      },
      {
@@ -1272,6 +1272,9 @@
      },
      {
       "p": "Turn a service on or off with its switch; it then also starts, or no longer starts, at boot. **Restart** restarts a running service."
+     },
+     {
+      "p": "After installing Talon, **NFS**, **Bonjour (mDNS)**, **OneDrive** and **WebDAV** are off: turn on the ones you need."
      }
     ]
    }

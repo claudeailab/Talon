@@ -931,6 +931,9 @@ class RealPlatform:
             run(["systemctl", "enable", "--now", unit])
         elif action == "disable":
             run(["systemctl", "disable", "--now", unit])
+        if action in ("enable", "disable") and sid == "mdns":
+            # the socket would start Bonjour again on the next request
+            run(["systemctl", action, "--now", "avahi-daemon.socket"], check=False)
         elif action in ("start", "stop", "restart"):
             run(["systemctl", action, unit])
         else:

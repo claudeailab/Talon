@@ -1,4 +1,4 @@
-"""USB Backup: copy shared folders to a USB disk, when it is plugged in or every day.
+"""Backup: copy shared folders to a USB or internal (SATA, NVMe) disk, when it is plugged in or every day.
 
 Each backup task belongs to one disk (recognised by its filesystem UUID, so it does
 not matter which port it is in) and copies the chosen shared folders into
@@ -30,6 +30,7 @@ ROOT_DIR = "Talon Backup"
 STAMP_FMT = "%Y-%m-%d_%H%M"
 STAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}_\d{4}$")
 CURRENT = "Current"                          # the single copy on FAT32 / exFAT
+MEDIA = {"usb": "USB disk", "hdd": "SATA hard disk", "ssd": "SATA SSD", "nvme": "NVMe SSD"}   # by disk kind
 LINKS_FS = {"ext2", "ext3", "ext4", "xfs", "btrfs", "ntfs", "ntfs3"}
 KEEP_CHOICES = (7, 14, 30, 90, 365)
 WHEN = ("plug", "daily", "both")
@@ -50,7 +51,7 @@ def to_prune(names: List[str], keep_days: int, now: float) -> List[str]:
     return old
 
 
-class UsbBackup:
+class Backup:
     def __init__(self, nas, demo: bool = False):
         self.nas = nas
         self.state = nas.state
@@ -78,6 +79,7 @@ class UsbBackup:
             if not u:
                 continue
             out.append({"uuid": u, "id": e["id"], "dev": e["dev"], "name": e["name"], "fstype": e["fstype"],
+                        "media": MEDIA.get(e.get("disk_kind", ""), "Disk"),
                         "fs_label": e["detail"].split(" · ")[-1], "size": e["size"], "kind": e["kind"],
                         "versions": e["fstype"] in LINKS_FS})
         return out
@@ -127,14 +129,14 @@ class UsbBackup:
     def create(self, data: dict, actor: str) -> dict:
         task = {"id": uuid.uuid4().hex[:10], **self._clean(data, None), "created": time.time(), "last": None}
         self.state.update(lambda d: d.setdefault("usb_backup", {}).__setitem__(task["id"], task))
-        self.state.log_activity(actor, f"Created USB backup {task['name']}", "info", "backup")
+        self.state.log_activity(actor, f"Created backup {task['name']}", "info", "backup")
         return task
 
     def update(self, tid: str, data: dict, actor: str) -> dict:
         old = self._get(tid)
         new = {**old, **self._clean(data, old)}
         self.state.update(lambda d: d["usb_backup"].__setitem__(tid, new))
-        self.state.log_activity(actor, f"Updated USB backup {new['name']}", "info", "backup")
+        self.state.log_activity(actor, f"Updated backup {new['name']}", "info", "backup")
         return new
 
     def delete(self, tid: str, actor: str) -> None:
@@ -142,12 +144,12 @@ class UsbBackup:
         if self.progress.get(tid, {}).get("state") == "running":
             raise UserError("Stop the backup first")
         self.state.update(lambda d: d["usb_backup"].pop(tid, None))
-        self.state.log_activity(actor, f"Deleted USB backup {t['name']} (the backups on the disk are kept)", "info", "backup")
+        self.state.log_activity(actor, f"Deleted backup {t['name']} (the backups on the disk are kept)", "info", "backup")
 
     def _get(self, tid: str) -> dict:
         t = self._tasks().get(tid)
         if not t:
-            raise UserError("USB backup not found")
+            raise UserError("Backup not found")
         return t
 
     # ------------------------------------------------------------ where on the disk
@@ -189,8 +191,8 @@ class UsbBackup:
             self._stop.discard(tid)
             self.progress[tid] = {"state": "running", "share": "", "index": 0, "total": 0, "percent": 0,
                                   "started": time.time(), "speed": None}
-        self.state.log_activity(actor, f"USB backup {task['name']} started", "info", "backup")
-        threading.Thread(target=self._run, args=(task, disk, actor), daemon=True, name=f"usb-{tid}").start()
+        self.state.log_activity(actor, f"Backup {task['name']} started", "info", "backup")
+        threading.Thread(target=self._run, args=(task, disk, actor), daemon=True, name=f"backup-{tid}").start()
         return self.info()
 
     def stop(self, tid: str) -> None:
@@ -229,17 +231,17 @@ class UsbBackup:
                 t["last"] = last
         self.state.update(upd)
         if err:
-            self.state.log_activity(actor, f"USB backup {task['name']} failed: {err}", "error", "backup")
-            self.nas.notifier.send("usb_backup", f"USB backup {task['name']} failed", f"USB backup {task['name']} failed:\n{err}")
+            self.state.log_activity(actor, f"Backup {task['name']} failed: {err}", "error", "backup")
+            self.nas.notifier.send("usb_backup", f"Backup {task['name']} failed", f"Backup {task['name']} failed:\n{err}")
         elif p["state"] == "stopped":
-            self.state.log_activity(actor, f"USB backup {task['name']} stopped", "warning", "backup")
+            self.state.log_activity(actor, f"Backup {task['name']} stopped", "warning", "backup")
         else:
             ejected = ""
             if task.get("eject"):
                 ejected = self._eject(disk)
-            self.state.log_activity(actor, f"USB backup {task['name']} completed{ejected}", "info", "backup")
-            self.nas.notifier.send("usb_backup", f"USB backup {task['name']} completed",
-                                   f"USB backup {task['name']} to {task['disk_name']} completed{ejected}.")
+            self.state.log_activity(actor, f"Backup {task['name']} completed{ejected}", "info", "backup")
+            self.nas.notifier.send("usb_backup", f"Backup {task['name']} completed",
+                                   f"Backup {task['name']} to {task['disk_name']} completed{ejected}.")
 
     def _eject(self, disk: dict) -> str:
         try:

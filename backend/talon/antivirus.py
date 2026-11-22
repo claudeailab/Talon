@@ -63,7 +63,7 @@ class Antivirus:
 
     def settings(self) -> dict:
         s = self._saved().get("settings") or {}
-        return {"shares": s.get("shares") or [], "schedule": s.get("schedule", "off"),
+        return {"volumes": s.get("volumes") or [], "schedule": s.get("schedule", "off"),
                 "time": s.get("time", "02:30"), "weekday": int(s.get("weekday", 6))}
 
     def _ram(self) -> int:
@@ -177,9 +177,8 @@ class Antivirus:
     # ------------------------------------------------------------ settings
     def save_settings(self, data: dict, user: str) -> dict:
         cur = self.settings()
-        shares = [s for s in data.get("shares", cur["shares"]) if isinstance(s, str)]
-        known = {s["name"] for s in self.nas.shares()}
-        shares = [s for s in shares if s in known]
+        known = {v["name"] for v in self.nas.volumes()}
+        volumes = [v for v in data.get("volumes", cur["volumes"]) if v in known]
         schedule = data.get("schedule", cur["schedule"])
         if schedule not in SCHEDULES:
             raise UserError("Invalid schedule")
@@ -189,7 +188,7 @@ class Antivirus:
         wd = int(data.get("weekday", cur["weekday"]))
         if not 0 <= wd <= 6:
             raise UserError("Invalid day")
-        new = {"shares": shares, "schedule": schedule, "time": t, "weekday": wd}
+        new = {"volumes": volumes, "schedule": schedule, "time": t, "weekday": wd}
         self.state.update(lambda d: d.setdefault("antivirus", {}).__setitem__("settings", new))
         if new != cur:
             when = "off" if schedule == "off" else f"{schedule} at {t}"
@@ -198,12 +197,13 @@ class Antivirus:
 
     # ------------------------------------------------------------ scan
     def _targets(self, names: List[str]) -> List[dict]:
-        shares = [s for s in self.nas.shares() if s.get("path")]
+        vols = [{"name": v["name"], "path": v["mountpoint"]} for v in self.nas.volumes()
+                if v.get("mountpoint") and (v.get("mounted") or self.demo)]
         if names:
-            shares = [s for s in shares if s["name"] in names]
-        if not shares:
-            raise UserError("There are no shared folders to scan")
-        return shares
+            vols = [v for v in vols if v["name"] in names]
+        if not vols:
+            raise UserError("There are no volumes to scan")
+        return vols
 
     def scan(self, user: str, names: Optional[List[str]] = None) -> dict:
         if not self.installed():
@@ -211,10 +211,10 @@ class Antivirus:
         with self._lock:
             if self.progress.get("state") == "running":
                 raise UserError("A scan is already running")
-            targets = self._targets(names if names is not None else self.settings()["shares"])
+            targets = self._targets(names if names is not None else self.settings()["volumes"])
             self._stop_scan = False
             self.progress = {"state": "running", "phase": "counting", "done": 0, "total": 0, "found": 0,
-                             "file": "", "started": time.time(), "shares": [t["name"] for t in targets]}
+                             "file": "", "started": time.time(), "volumes": [t["name"] for t in targets]}
         self.state.log_activity(user, "Started a virus scan of " + ", ".join(t["name"] for t in targets), "info", "antivirus")
         threading.Thread(target=self._scan, args=(user, targets), daemon=True, name="antivirus").start()
         return self.info()
@@ -236,7 +236,8 @@ class Antivirus:
                 p["total"] = sum(_count_files(t["path"]) for t in targets)
                 p["phase"] = "loading"
                 cmd = ["nice", "-n", "19", "ionice", "-c3", "clamscan", "-r", "--stdout", "--no-summary",
-                       "--cross-fs=no"] + [t["path"] for t in targets]
+                       "--cross-fs=no"] + [f"--exclude-dir=^{re.escape(t['path'].rstrip('/'))}/{QUARANTINE}"
+                                           for t in targets] + [t["path"] for t in targets]
                 self._proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, bufsize=1)
                 assert self._proc.stdout is not None
                 for line in self._proc.stdout:
@@ -258,7 +259,7 @@ class Antivirus:
             moved = [m for m in moved if m]
             stopped = self._stop_scan
             result = {"at": time.time(), "duration": round(time.time() - p["started"]), "files": p["done"],
-                      "found": len(found), "shares": p["shares"], "stopped": stopped, "error": error}
+                      "found": len(found), "volumes": p["volumes"], "stopped": stopped, "error": error}
             self.state.update(lambda d: d.setdefault("antivirus", {}).__setitem__("last_scan", result))
             p.update(state="stopped" if stopped else "error" if error else "success", finished=time.time())
             if found:
@@ -288,9 +289,9 @@ class Antivirus:
             if self._stop_scan:
                 return
             p["done"] = i + 46
-            p["file"] = f"{targets[0]['path']}/Photos/2026/IMG_{1000 + i}.jpg"
+            p["file"] = f"{targets[0]['path']}/Documents/Photos/2026/IMG_{1000 + i}.jpg"
             if i == 920:
-                found.append({"path": f"{targets[0]['path']}/Downloads/invoice.pdf.exe", "virus": "Win.Trojan.Agent-1234"})
+                found.append({"path": f"{targets[0]['path']}/Documents/Downloads/invoice.pdf.exe", "virus": "Win.Trojan.Agent-1234"})
                 p["found"] = 1
             time.sleep(0.08)
 
@@ -370,7 +371,7 @@ class Antivirus:
                 if key == last_run or self.progress.get("state") == "running":
                     continue
                 last_run = key
-                self.scan("talon", s["shares"])
+                self.scan("talon", s["volumes"])
             except Exception:   # noqa: BLE001
                 pass
 

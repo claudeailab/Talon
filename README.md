@@ -57,16 +57,22 @@ https://<nas-ip>/
 - **Disks:** S.M.A.R.T. health, temperatures, self-tests and wipe
 - **RAID:** hot spares, expansion, disk replacement and data scrub
 - **Volumes:** ext4 or XFS on a RAID array or a single disk
-- **Files:** browse volumes, USB disks and OneDrive in the browser
+- **Backup:** to a USB or internal disk when plugged in or daily, with earlier versions
+- **Browser:** browse volumes, other disks and OneDrive in the web interface
 - **Recycle bin:** restore deleted files and earlier versions for 30 days
 - **OneDrive:** backup or two-way sync, verified after each run
-- **Shared Folders:** SMB, NFS and Time Machine with per-user permissions
-- **Users & Groups:** accounts for shared folders and the web interface
+- **Shared Folders:** SMB, NFS and Time Machine, with folder permissions
+- **WebDAV:** shared folders over HTTPS for apps and remote access
+- **Users & Groups:** accounts and groups for shared folders and the web interface
 - **EntraID Users:** people from your organization sign in with Microsoft
-- **Discovery:** appears in Windows Network and macOS Finder
-- **Activity:** a searchable log of everything that happens
+- **Discovery:** appears in Windows Network, and in macOS Finder with Bonjour on
+- **Activity:** one searchable log of everything Talon and the system do
+- **Usage history:** a year of CPU, memory, network, disk and storage graphs
+- **Updates:** Talon and the operating system, optionally automatic
+- **Antivirus:** ClamAV scans of volumes with quarantine
 - **Networking:** DHCP or static IP, HTTPS on or off
 - **Scheduled:** scripts on a schedule, with live output and progress
+- **SD cards:** fewer writes to an SD or USB flash system disk
 - **Notifications:** email alerts with adjustable thresholds
 - **Mobile:** works on phones and tablets, light and dark mode
 - **Documentation:** built-in searchable guide

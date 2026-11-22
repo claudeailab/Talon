@@ -1,3 +1,8 @@
+## 1.0.116
+- Backup (formerly USB Backup) also uses internal SATA and NVMe disks and shows each disk's type
+- Antivirus scans whole volumes; NFS and Bonjour are off after a fresh install
+- Menu: Backup above Browser, Antivirus below Services; README and website list the new features
+
 ## 1.0.115
 - Removed leftover code: the old system log address and the old automatic updates switch
 

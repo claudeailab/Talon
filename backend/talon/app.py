@@ -101,11 +101,11 @@ ACTIONS = {
     "PUT /api/update/settings": ("updates", None),
     "POST /api/os-update/check": ("updates", None),
     "PUT /api/folder-perms": ("sharing", None),
-    "POST /api/usb-backup": ("backup", None),
-    "PUT /api/usb-backup/{tid}": ("backup", None),
-    "DELETE /api/usb-backup/{tid}": ("backup", None),
-    "POST /api/usb-backup/{tid}/run": ("backup", None),
-    "POST /api/usb-backup/{tid}/stop": ("backup", "Stopped a USB backup"),
+    "POST /api/backup": ("backup", None),
+    "PUT /api/backup/{tid}": ("backup", None),
+    "DELETE /api/backup/{tid}": ("backup", None),
+    "POST /api/backup/{tid}/run": ("backup", None),
+    "POST /api/backup/{tid}/stop": ("backup", "Stopped a backup"),
     "POST /api/antivirus/install": ("antivirus", None),
     "POST /api/antivirus/remove": ("antivirus", None),
     "PUT /api/antivirus/settings": ("antivirus", None),
@@ -365,33 +365,33 @@ def create_app(cfg, platform) -> FastAPI:
         updater.check(force=True)
         return updater.info()
 
-    @app.get("/api/usb-backup")
-    def usb_backup(_u: str = Depends(current_user)):
-        return nas.usb_backup.info()
+    @app.get("/api/backup")
+    def backup(_u: str = Depends(current_user)):
+        return nas.backup.info()
 
-    @app.post("/api/usb-backup")
-    def usb_backup_create(body: dict = Body(...), user: str = Depends(current_user)):
-        t = nas.usb_backup.create(body, user)
+    @app.post("/api/backup")
+    def backup_create(body: dict = Body(...), user: str = Depends(current_user)):
+        t = nas.backup.create(body, user)
         if body.get("run_now"):
-            nas.usb_backup.run_now(t["id"], user)
+            nas.backup.run_now(t["id"], user)
         return t
 
-    @app.put("/api/usb-backup/{tid}")
-    def usb_backup_update(tid: str, body: dict = Body(...), user: str = Depends(current_user)):
-        return nas.usb_backup.update(tid, body, user)
+    @app.put("/api/backup/{tid}")
+    def backup_update(tid: str, body: dict = Body(...), user: str = Depends(current_user)):
+        return nas.backup.update(tid, body, user)
 
-    @app.delete("/api/usb-backup/{tid}")
-    def usb_backup_delete(tid: str, user: str = Depends(current_user)):
-        nas.usb_backup.delete(tid, user)
+    @app.delete("/api/backup/{tid}")
+    def backup_delete(tid: str, user: str = Depends(current_user)):
+        nas.backup.delete(tid, user)
         return {"ok": True}
 
-    @app.post("/api/usb-backup/{tid}/run")
-    def usb_backup_run(tid: str, user: str = Depends(current_user)):
-        return nas.usb_backup.run_now(tid, user)
+    @app.post("/api/backup/{tid}/run")
+    def backup_run(tid: str, user: str = Depends(current_user)):
+        return nas.backup.run_now(tid, user)
 
-    @app.post("/api/usb-backup/{tid}/stop")
-    def usb_backup_stop(tid: str, _u: str = Depends(current_user)):
-        nas.usb_backup.stop(tid)
+    @app.post("/api/backup/{tid}/stop")
+    def backup_stop(tid: str, _u: str = Depends(current_user)):
+        nas.backup.stop(tid)
         return {"ok": True}
 
     @app.get("/api/folder-perms")
@@ -420,7 +420,7 @@ def create_app(cfg, platform) -> FastAPI:
 
     @app.post("/api/antivirus/scan")
     def antivirus_scan(body: dict = Body(default={}), user: str = Depends(current_user)):
-        return nas.antivirus.scan(user, body.get("shares"))
+        return nas.antivirus.scan(user, body.get("volumes"))
 
     @app.post("/api/antivirus/stop")
     def antivirus_stop(_u: str = Depends(current_user)):

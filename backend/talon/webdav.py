@@ -34,7 +34,7 @@ from starlette.responses import FileResponse, Response
 
 
 PREFIX = "/dav"
-HIDDEN = {".recycle", ".versions", ".talon-quarantine", ".talon-usb-backup"}
+HIDDEN = {".recycle", ".versions", ".talon-quarantine"}
 ORDER = {"none": 0, "ro": 1, "rw": 2}
 AUTH_CACHE_SECONDS = 300
 FAIL_LIMIT, FAIL_WINDOW = 10, 300

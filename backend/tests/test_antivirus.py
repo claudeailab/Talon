@@ -35,8 +35,8 @@ def test_install_scan_quarantine(client):
 
 
 def test_settings_and_version_parsing(client):
-    r = client.put("/api/antivirus/settings", json={"schedule": "weekly", "time": "03:15", "weekday": 6, "shares": ["nope"]}).json()
-    assert r["settings"] == {"shares": [], "schedule": "weekly", "time": "03:15", "weekday": 6}
+    r = client.put("/api/antivirus/settings", json={"schedule": "weekly", "time": "03:15", "weekday": 6, "volumes": ["nope", "tank"]}).json()
+    assert r["settings"] == {"volumes": ["tank"], "schedule": "weekly", "time": "03:15", "weekday": 6}
     assert client.put("/api/antivirus/settings", json={"schedule": "hourly"}).status_code == 400
     from talon.antivirus import parse_version
     v = parse_version("ClamAV 1.4.3/27831/Sat Nov 21 09:30:00 2026")

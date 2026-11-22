@@ -4,7 +4,7 @@ import { CalendarClock, MoreHorizontal, Play, RotateCcw, ShieldAlert, ShieldChec
 import { api } from "../lib/api";
 import { ago, bytes, cx, dateTime, duration } from "../lib/format";
 import { useAction } from "../lib/hooks";
-import type { Share } from "../lib/types";
+import type { Volume } from "../lib/types";
 import {
   Badge,
   Button,
@@ -33,9 +33,9 @@ type AvInfo = {
   ram: number;
   ram_ok: boolean;
   ram_warning: boolean;
-  progress: { state: "idle" | "running" | "success" | "error" | "stopped"; phase?: string; done?: number; total?: number; found?: number; file?: string; error?: string; shares?: string[] };
-  settings: { shares: string[]; schedule: "off" | "daily" | "weekly"; time: string; weekday: number };
-  last_scan: { at: number; duration: number; files: number; found: number; shares: string[]; stopped: boolean; error: string | null } | null;
+  progress: { state: "idle" | "running" | "success" | "error" | "stopped"; phase?: string; done?: number; total?: number; found?: number; file?: string; error?: string; volumes?: string[] };
+  settings: { volumes: string[]; schedule: "off" | "daily" | "weekly"; time: string; weekday: number };
+  last_scan: { at: number; duration: number; files: number; found: number; volumes: string[]; stopped: boolean; error: string | null } | null;
   quarantine: QItem[];
   setup: { state: "idle" | "running" | "success" | "error"; action?: "install" | "remove"; percent?: number; text?: string; error?: string };
   updates: string | null;
@@ -48,15 +48,15 @@ export default function AntivirusPage() {
     queryFn: () => api.get<AvInfo>("/antivirus"),
     refetchInterval: (query) => (query.state.data?.progress.state === "running" || query.state.data?.setup.state === "running" ? 1000 : 15000),
   });
-  const shares = useQuery({ queryKey: ["shares"], queryFn: () => api.get<Share[]>("/shares") });
+  const vols = useQuery({ queryKey: ["volumes"], queryFn: () => api.get<Volume[]>("/volumes") });
   const [remove, setRemove] = useState(false);
   const install = useAction(() => api.post<AvInfo>("/antivirus/install"), { invalidate: ["antivirus"] });
   const uninstall = useAction(() => api.post<AvInfo>("/antivirus/remove"), { invalidate: ["antivirus"], onSuccess: () => setRemove(false) });
-  if (!q.data || !shares.data) return <PageLoader />;
+  if (!q.data || !vols.data) return <PageLoader />;
   const d = q.data;
   return (
     <>
-      <PageHeader title="Antivirus" description="Scan shared folders for viruses" />
+      <PageHeader title="Antivirus" description="Scan volumes for viruses" />
       <div className="space-y-5">
         <Card>
           <CardHeader
@@ -96,7 +96,7 @@ export default function AntivirusPage() {
               <>
                 {d.setup.state === "error" && <Callout tone="danger" title="The installation failed">{d.setup.error}</Callout>}
                 <p className="text-[13px] text-zinc-600 dark:text-zinc-400">
-                  Scans your shared folders on demand or on a schedule. Infected files move to a quarantine, where you can restore or delete them, and you get an
+                  Scans your volumes on demand or on a schedule. Infected files move to a quarantine, where you can restore or delete them, and you get an
                   email. A scan uses about 1.5 GB of memory while it runs; nothing stays in memory afterwards.
                 </p>
                 {!d.ram_ok ? (
@@ -124,8 +124,8 @@ export default function AntivirusPage() {
           </div>
         </Card>
 
-        {d.installed && <ScanCard d={d} shares={shares.data} />}
-        {d.installed && <ScheduleCard d={d} shares={shares.data} />}
+        {d.installed && <ScanCard d={d} volumes={vols.data} />}
+        {d.installed && <ScheduleCard d={d} volumes={vols.data} />}
         {(d.installed || d.quarantine.length > 0) && <QuarantineCard items={d.quarantine} />}
       </div>
       <ConfirmDialog
@@ -142,8 +142,8 @@ export default function AntivirusPage() {
   );
 }
 
-/** Which shared folders: all of them (none chosen), or the ones ticked. */
-function SharePicker({ shares, value, onChange }: { shares: Share[]; value: string[]; onChange: (v: string[]) => void }) {
+/** Which volumes: all of them (none chosen), or the ones ticked. */
+function VolumePicker({ volumes, value, onChange }: { volumes: Volume[]; value: string[]; onChange: (v: string[]) => void }) {
   const all = value.length === 0;
   const chip = (on: boolean) =>
     cx(
@@ -153,9 +153,9 @@ function SharePicker({ shares, value, onChange }: { shares: Share[]; value: stri
   return (
     <div className="flex flex-wrap gap-1.5">
       <button type="button" className={chip(all)} onClick={() => onChange([])}>
-        All shared folders
+        All volumes
       </button>
-      {shares.map((s) => {
+      {volumes.map((s) => {
         const on = value.includes(s.name);
         return (
           <button key={s.name} type="button" className={chip(on)} onClick={() => onChange(on ? value.filter((x) => x !== s.name) : [...value, s.name])}>
@@ -167,9 +167,9 @@ function SharePicker({ shares, value, onChange }: { shares: Share[]; value: stri
   );
 }
 
-function ScanCard({ d, shares }: { d: AvInfo; shares: Share[] }) {
+function ScanCard({ d, volumes }: { d: AvInfo; volumes: Volume[] }) {
   const [sel, setSel] = useState<string[]>([]);
-  const scan = useAction(() => api.post<AvInfo>("/antivirus/scan", { shares: sel }), { invalidate: ["antivirus"] });
+  const scan = useAction(() => api.post<AvInfo>("/antivirus/scan", { volumes: sel }), { invalidate: ["antivirus"] });
   const stop = useAction(() => api.post("/antivirus/stop"), { invalidate: ["antivirus"] });
   const p = d.progress;
   const running = p.state === "running";
@@ -177,14 +177,14 @@ function ScanCard({ d, shares }: { d: AvInfo; shares: Share[] }) {
   const pctDone = p.total ? Math.min(100, ((p.done ?? 0) / p.total) * 100) : 0;
   return (
     <Card>
-      <CardHeader icon={<Play className="size-4.5" />} title="Scan Now" subtitle="Choose the shared folders to scan" />
+      <CardHeader icon={<Play className="size-4.5" />} title="Scan Now" subtitle="Choose the volumes to scan" />
       <div className="space-y-4 px-5 pb-5">
         {running ? (
           <div className="rounded-2xl bg-zinc-50 p-4 dark:bg-white/[0.03]">
             <div className="flex items-baseline justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-sm font-semibold">
-                  {p.phase === "counting" ? "Counting files…" : p.phase === "loading" ? "Loading the virus definitions…" : `Scanning ${p.shares?.join(", ")}`}
+                  {p.phase === "counting" ? "Counting files…" : p.phase === "loading" ? "Loading the virus definitions…" : `Scanning ${p.volumes?.join(", ")}`}
                 </div>
                 <div className="text-[13px] text-zinc-500">
                   {(p.done ?? 0).toLocaleString()} of {(p.total ?? 0).toLocaleString()} files
@@ -200,7 +200,7 @@ function ScanCard({ d, shares }: { d: AvInfo; shares: Share[] }) {
           </div>
         ) : (
           <>
-            <SharePicker shares={shares} value={sel} onChange={setSel} />
+            <VolumePicker volumes={volumes} value={sel} onChange={setSel} />
             <div className="flex flex-wrap items-center gap-3">
               <Button variant="primary" icon={<Play className="size-4" />} loading={scan.isPending} disabled={!d.definitions && !d.db_date} onClick={() => scan.mutate()}>
                 Scan now
@@ -217,7 +217,7 @@ function ScanCard({ d, shares }: { d: AvInfo; shares: Share[] }) {
                 {last.found ? `${last.found} infected file${last.found > 1 ? "s" : ""} moved to the quarantine` : last.error ? "The scan failed" : last.stopped ? "Scan stopped" : "No viruses found"}
               </div>
               <div className="break-words text-zinc-600 dark:text-zinc-400">
-                {last.error ?? `${last.files.toLocaleString()} files in ${last.shares.join(", ")} · ${dateTime(last.at)} · took ${last.duration < 60 ? "under a minute" : duration(last.duration)}`}
+                {last.error ?? `${last.files.toLocaleString()} files in ${last.volumes.join(", ")} · ${dateTime(last.at)} · took ${last.duration < 60 ? "under a minute" : duration(last.duration)}`}
               </div>
             </div>
           </div>
@@ -227,9 +227,9 @@ function ScanCard({ d, shares }: { d: AvInfo; shares: Share[] }) {
   );
 }
 
-function ScheduleCard({ d, shares }: { d: AvInfo; shares: Share[] }) {
+function ScheduleCard({ d, volumes }: { d: AvInfo; volumes: Volume[] }) {
   const [s, setS] = useState(d.settings);
-  useEffect(() => setS(d.settings), [d.settings.schedule, d.settings.time, d.settings.weekday, d.settings.shares.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => setS(d.settings), [d.settings.schedule, d.settings.time, d.settings.weekday, d.settings.volumes.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
   const save = useAction(() => api.put<AvInfo>("/antivirus/settings", s), { invalidate: ["antivirus"], success: "Schedule saved" });
   const timeOk = /^([01]\d|2[0-3]):[0-5]\d$/.test(s.time);
   const changed = JSON.stringify(s) !== JSON.stringify(d.settings);
@@ -269,7 +269,7 @@ function ScheduleCard({ d, shares }: { d: AvInfo; shares: Share[] }) {
               <Input value={s.time} onChange={(e) => setS({ ...s, time: e.target.value })} className="w-24" aria-label="Time" placeholder="02:30" />
               {!timeOk && <span className="text-xs text-rose-600">Use hh:mm, 24-hour</span>}
             </div>
-            <SharePicker shares={shares} value={s.shares} onChange={(v) => setS({ ...s, shares: v })} />
+            <VolumePicker volumes={volumes} value={s.volumes} onChange={(v) => setS({ ...s, volumes: v })} />
           </>
         )}
       </div>
@@ -284,7 +284,7 @@ function QuarantineCard({ items }: { items: QItem[] }) {
   const [restoreItem, setRestoreItem] = useState<QItem | null>(null);
   return (
     <Card>
-      <CardHeader icon={<ShieldAlert className="size-4.5" />} title="Quarantine" subtitle="Infected files, moved out of the shared folders" />
+      <CardHeader icon={<ShieldAlert className="size-4.5" />} title="Quarantine" subtitle="Infected files, moved out of reach" />
       {items.length === 0 ? (
         <Empty icon={<ShieldCheck className="size-6" />} title="Nothing in the quarantine" />
       ) : (
