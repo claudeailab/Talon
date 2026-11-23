@@ -1,3 +1,8 @@
+## 1.0.127
+- Updates is listed below Settings; the Talon card no longer shows a restart option
+- System updates: clear Security and Other headings, both always shown
+- Check now and other section actions are plain links, without a box appearing after a check
+
 ## 1.0.126
 - New Updates page: General (status and settings for Talon and the system), Talon and System tabs that check when opened
 - Notifications: Email, Notifications and Thresholds tabs; failed sign-in emails on by default

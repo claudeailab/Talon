@@ -65,7 +65,7 @@ function EmailTab() {
       <Section
         title="Email notifications"
         right={
-          <Button size="sm" variant="ghost" icon={<Send className="size-3.5" />} disabled={changed || !q.data.recipients.length} loading={test.isPending} onClick={() => test.mutate()}>
+          <Button size="sm" variant="link" icon={<Send className="size-3.5" />} disabled={changed || !q.data.recipients.length} loading={test.isPending} onClick={() => test.mutate()}>
             Send test
           </Button>
         }

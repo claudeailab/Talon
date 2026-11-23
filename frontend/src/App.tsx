@@ -90,9 +90,9 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
   {
     section: "System",
     items: [
-      { to: "/updates", label: "Updates", icon: Download, page: UpdatesPage },
       { to: "/activity", label: "Activity", icon: ActivityIcon, page: ActivityPage },
       { to: "/settings", label: "Settings", icon: SettingsIcon, page: SettingsPage },
+      { to: "/updates", label: "Updates", icon: Download, page: UpdatesPage },
       { to: "/services", label: "Services", icon: Server, page: ServicesPage },
       { to: "/antivirus", label: "Antivirus", icon: ShieldCheck, page: AntivirusPage },
       { to: "/scheduled", label: "Scheduled", icon: Clock, page: ScheduledPage },

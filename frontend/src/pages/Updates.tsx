@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, Download, ExternalLink, RefreshCw, RotateCcw } from "lucide-react";
+import { ChevronRight, Download, ExternalLink, Package, RefreshCw, RotateCcw, ShieldAlert } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, cx, date } from "../lib/format";
 import { useAction } from "../lib/hooks";
@@ -164,9 +164,6 @@ function TalonSettings({ t }: { t: UpdateInfo }) {
           ]}
         />
       </Row>
-      <Row inline label="Restart when needed" hint="An update only restarts Talon itself, for a few seconds; shared folders keep working">
-        <span className="text-[13px] text-zinc-400">Not needed</span>
-      </Row>
     </RowCard>
   );
 }
@@ -232,7 +229,7 @@ function SystemSettings({ o }: { o: OsInfo }) {
 /** Check now: the arrows spin while Talon checks. */
 function CheckNow({ busy, onClick }: { busy: boolean; onClick: () => void }) {
   return (
-    <Button size="sm" variant="ghost" disabled={busy} icon={<RefreshCw className={cx("size-3.5", busy && "animate-spin")} />} onClick={onClick}>
+    <Button size="sm" variant="link" disabled={busy} icon={<RefreshCw className={cx("size-3.5", busy && "animate-spin")} />} onClick={onClick}>
       {busy ? "Checking…" : "Check now"}
     </Button>
   );
@@ -373,7 +370,6 @@ function SystemTab() {
   const reboot = useAction(() => restartNas(), { onSuccess: () => setRestart(false) });
   const [confirm, setConfirm] = useState(false);
   const [restart, setRestart] = useState(false);
-  const [showOther, setShowOther] = useState(false);
   useOnOpen(() => check.mutate());
   if (!q.data) return <PageLoader />;
   const d = q.data;
@@ -460,21 +456,19 @@ function SystemTab() {
         <>
           {sec.length > 0 && (
             <>
-              <Section title={`Security · ${sec.length}`} />
+              <PkgHeader
+                icon={<ShieldAlert className="size-4" />}
+                tone="security"
+                title={`Security updates · ${sec.length}`}
+                text="Fix known security holes; install these soon"
+              />
               <PkgList pkgs={sec} />
             </>
           )}
           {other.length > 0 && (
             <>
-              <button
-                type="button"
-                onClick={() => setShowOther(!showOther)}
-                className="flex min-h-9 w-full items-center justify-between border-t border-zinc-100 bg-zinc-50/80 px-5 py-1.5 text-[11px] font-semibold tracking-wider text-zinc-400 uppercase hover:text-zinc-600 dark:border-white/5 dark:bg-white/[0.02] dark:text-zinc-500"
-              >
-                Other · {other.length}
-                <ChevronDown className={cx("size-4 transition", showOther && "rotate-180")} />
-              </button>
-              {showOther && <PkgList pkgs={other} />}
+              <PkgHeader icon={<Package className="size-4" />} tone="other" title={`Other updates · ${other.length}`} text="Bug fixes and improvements" />
+              <PkgList pkgs={other} />
             </>
           )}
         </>
@@ -498,6 +492,35 @@ function SystemTab() {
         message="Shared folders and this web interface are unavailable for a minute or two."
       />
     </RowCard>
+  );
+}
+
+/** The heading of a group of package updates: what kind they are and why it matters. */
+function PkgHeader({ icon, tone, title, text }: { icon: ReactNode; tone: "security" | "other"; title: string; text: string }) {
+  return (
+    <div
+      className={cx(
+        "flex items-center gap-3 border-t px-5 py-2.5",
+        tone === "security"
+          ? "border-rose-100 bg-rose-50/70 dark:border-rose-400/10 dark:bg-rose-500/10"
+          : "border-zinc-100 bg-zinc-50 dark:border-white/5 dark:bg-white/[0.03]",
+      )}
+    >
+      <span
+        className={cx(
+          "flex size-7 shrink-0 items-center justify-center rounded-lg",
+          tone === "security" ? "bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-300" : "bg-zinc-200/70 text-zinc-600 dark:bg-white/10 dark:text-zinc-300",
+        )}
+      >
+        {icon}
+      </span>
+      <span className="min-w-0">
+        <span className={cx("block text-[13.5px] font-semibold", tone === "security" ? "text-rose-700 dark:text-rose-300" : "text-zinc-800 dark:text-zinc-100")}>
+          {title}
+        </span>
+        <span className="block text-xs text-zinc-500 dark:text-zinc-400">{text}</span>
+      </span>
+    </div>
   );
 }
 

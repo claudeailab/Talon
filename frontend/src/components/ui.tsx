@@ -27,7 +27,7 @@ import {
 import { cx, dateFormat, dateToIso, isoToDate } from "../lib/format";
 
 /* ------------------------------------------------------------------ Button */
-type Variant = "primary" | "secondary" | "ghost" | "danger" | "soft";
+type Variant = "primary" | "secondary" | "ghost" | "danger" | "soft" | "link";
 const variants: Record<Variant, string> = {
   primary:
     "bg-brand-600 text-white shadow-sm shadow-brand-600/25 hover:bg-brand-500 active:bg-brand-700 disabled:bg-brand-600/50",
@@ -38,6 +38,8 @@ const variants: Record<Variant, string> = {
   danger:
     "bg-rose-600 text-white shadow-sm shadow-rose-600/25 hover:bg-rose-500 disabled:bg-rose-600/50",
   soft: "bg-brand-50 text-brand-700 hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-300 dark:hover:bg-brand-500/20",
+  // text only, no box: for actions in a section header
+  link: "px-1! text-brand-600 hover:text-brand-500 disabled:text-zinc-400 dark:text-brand-400 dark:hover:text-brand-300 dark:disabled:text-zinc-500",
 };
 
 export function Button({

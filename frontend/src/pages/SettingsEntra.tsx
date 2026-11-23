@@ -89,10 +89,10 @@ export default function EntraTab() {
         badge={q.data.configured ? <Badge tone="green" dot>Configured</Badge> : <Badge dot>Not configured</Badge>}
         right={
           <>
-            <Button size="sm" variant="ghost" icon={<BookOpen className="size-3.5" />} onClick={() => setGuide(true)}>
+            <Button size="sm" variant="link" icon={<BookOpen className="size-3.5" />} onClick={() => setGuide(true)}>
               Setup guide
             </Button>
-            <Button size="sm" variant="ghost" icon={<PlugZap className="size-3.5" />} loading={test.isPending} onClick={() => test.mutate()}>
+            <Button size="sm" variant="link" icon={<PlugZap className="size-3.5" />} loading={test.isPending} onClick={() => test.mutate()}>
               Test
             </Button>
           </>

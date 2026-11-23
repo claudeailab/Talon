@@ -902,7 +902,7 @@ export const GUIDE: Topic[] = [
         id: "system",
         title: "System",
         blocks: [
-          { p: "Opening the **System** tab checks for operating system updates straight away, with a progress bar. Security updates are listed first; **Other** shows the rest." },
+          { p: "Opening the **System** tab checks for operating system updates straight away, with a progress bar. **Security updates** fix known security holes and are listed first; **Other updates** are bug fixes and improvements." },
           { p: "**Install all** installs them with a progress bar. Shared folders keep working, and configuration files you changed are kept. When an update needs a restart, for example a new Linux kernel, **Restart to finish** appears here and in the bell." },
           { p: "Waiting security updates show in the bell, and you get an email about new ones unless they install automatically." },
         ],

@@ -42,7 +42,7 @@ export default function SmtpCard() {
         title="SMTP server"
         badge={d.configured ? <Badge tone="green" dot>Configured</Badge> : <Badge dot>Not configured</Badge>}
         right={
-          <Button size="sm" variant="ghost" icon={<PlugZap className="size-3.5" />} disabled={!f.host || !f.sender} loading={test.isPending} onClick={() => test.mutate()}>
+          <Button size="sm" variant="link" icon={<PlugZap className="size-3.5" />} disabled={!f.host || !f.sender} loading={test.isPending} onClick={() => test.mutate()}>
             Test
           </Button>
         }
