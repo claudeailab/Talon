@@ -280,7 +280,7 @@
   "id": "volumes",
   "title": "Volumes",
   "group": "Storage",
-  "summary": "Format a RAID array or a single disk so it can store files.",
+  "summary": "Format a RAID array or a single disk so it can store files; a RAID array can hold several volumes.",
   "page": {
    "to": "/volumes",
    "label": "Open Volumes"
@@ -293,9 +293,10 @@
      {
       "steps": [
        "On the [Volumes](/volumes) page, click **Create volume**.",
-       "Pick a RAID array or a single unused disk.",
+       "Pick a RAID array or a single unused disk. A RAID array shows how much of it is still free.",
        "Enter a **Volume name**, for example volume1. It is mounted at /srv/nas/<name>.",
        "Choose a **Filesystem**: **ext4** (recommended Linux default) or **XFS** (for very large files).",
+       "On a RAID array, choose the **Size** with the slider or in GB. **Use all** takes all the free space; anything left stays free for more volumes.",
        "Click **Create volume** (for a single disk: **Erase disk & create**)."
       ]
      },
@@ -305,6 +306,30 @@
      },
      {
       "warn": "A single disk is erased when a volume is created on it."
+     }
+    ]
+   },
+   {
+    "id": "several",
+    "title": "Several volumes on one RAID array",
+    "blocks": [
+     {
+      "p": "A RAID array can hold several volumes, each with its own size, for example one for photos and one for backups. Every volume on the array is protected by it in the same way. Talon uses LVM for this, the standard Linux tool. The RAID page lists each array's volumes and how much space is still free."
+     },
+     {
+      "list": [
+       "**⋯ → Change size** grows a volume into the free space while it stays in use.",
+       "An **ext4** volume can also shrink, to make room for another volume. It is unmounted for a moment, so its shared folders are briefly unavailable. It cannot shrink below what its files need.",
+       "An **XFS** volume can only grow.",
+       "Deleting a volume returns its space to the array.",
+       "When the RAID array is expanded with another disk, the new space becomes free for volumes."
+      ]
+     },
+     {
+      "tip": "To keep files apart, several shared folders on one volume are often simpler: they share the space instead of each having a fixed size."
+     },
+     {
+      "p": "Volumes created before Talon 1.0.135 take the whole array; they keep working as before, and **Expand filesystem** grows them after the array is expanded."
      }
     ]
    },
@@ -320,7 +345,8 @@
       "list": [
        "Each volume shows its used and free space and whether it survives disk failures.",
        "**⋯ → Browse files** opens the volume on the [Browser](/browser) page.",
-       "**Expand filesystem** appears after the RAID array under the volume has grown.",
+       "**Change size** grows or shrinks a volume that shares a RAID array (see above).",
+       "**Expand filesystem** appears on a volume that takes a whole RAID array after the array has grown.",
        "**Delete volume** erases everything on it."
       ]
      },

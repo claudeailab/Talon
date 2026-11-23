@@ -55,8 +55,12 @@ export interface RaidArray {
   name: string;
   level: string;
   created: number | null;
-  volume: string | null;
+  /** volumes on this array; several share it through LVM */
+  volumes: string[];
   size: number;
+  /** space for more volumes */
+  free: number;
+  lvm: boolean;
   members: Member[];
   sync: SyncInfo | null;
   raid_disks?: number;
@@ -85,10 +89,15 @@ export interface Volume {
   status: StorageStatus;
   status_detail: string;
   fault_tolerance: number;
+  /** on a RAID's LVM pool: its size can change between min_size and max_size */
+  resizable: boolean;
+  lv_size: number;
+  min_size: number;
+  max_size: number;
 }
 
 export interface VolumeSources {
-  arrays: { name: string; level: string; size: number; status: StorageStatus }[];
+  arrays: { name: string; level: string; size: number; free: number; volumes: string[]; status: StorageStatus }[];
   disks: { name: string; model: string; size: number; kind: string; status: string }[];
 }
 

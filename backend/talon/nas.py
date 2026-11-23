@@ -24,8 +24,9 @@ from .notify import Notifier
 from .scheduler import Scheduler
 from .state import State
 from .util import (DATE_FORMATS, TIME_FORMATS, NFS_CLIENT_RE, RESERVED_SHARES, SHARE_NAME_RE, USER_NAME_RE,
-                   VOLUME_NAME_RE, UserError, require, unique, write_atomic)
+                   VOLUME_NAME_RE, UserError, human_bytes, require, unique, write_atomic)
 
+MIN_VOLUME = 2**30                     # smallest volume on a RAID array: 1 GB
 SYSTEM_MOUNTS = {"/", "/boot", "/boot/efi", "/boot/firmware", "/usr", "/var", "/home",
                  "[SWAP]", "/var/log", "/tmp", "/opt", "/srv"}
 SMB_PROTOCOLS = ["SMB2_02", "SMB2_10", "SMB3_00", "SMB3_11"]
@@ -259,7 +260,10 @@ class Nas:
         known = self.state.get("arrays")
         md_by_dev = {a["dev"]: a for a in self.p.md_arrays()}
         uuid_to_array = {r["md_uuid"]: n for n, r in known.items()}
-        array_to_vol = {v["array"]: v["name"] for v in vols.values() if v.get("array")}
+        array_to_vol: Dict[str, str] = {}
+        for v in sorted(vols.values(), key=lambda x: x["name"]):
+            if v.get("array"):
+                array_to_vol[v["array"]] = ", ".join(filter(None, [array_to_vol.get(v["array"]), v["name"]]))
         mp_to_vol = {v["mountpoint"]: v["name"] for v in vols.values()}
         out = []
         for d in self.p.scan_disks():
@@ -401,9 +405,8 @@ class Nas:
         out = []
         for r in sorted(known.values(), key=lambda x: x["name"]):
             item = {"name": r["name"], "level": r["level"], "created": r.get("created"),
-                    "volume": next((v["name"] for v in vols.values()
-                                    if v.get("array") == r["name"]), None),
-                    "size": 0, "members": [], "sync": None,
+                    "volumes": sorted(v["name"] for v in vols.values() if v.get("array") == r["name"]),
+                    "size": 0, "free": 0, "lvm": False, "members": [], "sync": None,
                     "status": "healthy", "status_detail": ""}
             a = self._live(r, live)
             if not a:
@@ -411,6 +414,10 @@ class Nas:
             else:
                 item["dev"] = a["dev"]
                 item["size"] = a["size"]
+                # several volumes share an array through LVM; a volume made before that fills it
+                pool = self.p.lvm_info(a["dev"])
+                item["lvm"] = bool(pool)
+                item["free"] = pool["free"] if pool else (0 if item["volumes"] else a["size"])
                 item["raid_disks"] = a["raid_disks"]
                 item["degraded"] = a["degraded"]
                 item["sync"] = {k: a[k] for k in ("sync_action", "sync_progress", "sync_speed_kbs")}
@@ -583,9 +590,14 @@ class Nas:
             if mode == "grow":
                 go(n + 2)
                 self.p.md_grow(a["dev"], a["raid_disks"] + 1, log)
-                log("RESULT The expansion runs in the background. When it finishes, use Expand filesystem on "
-                    "the volume to make the new space available." if level != "raid1" else
-                    "RESULT Disk added as an additional mirror.")
+                if level == "raid1":
+                    log("RESULT Disk added as an additional mirror.")
+                elif self.p.lvm_info(a["dev"]):
+                    log("RESULT The expansion runs in the background. When it finishes, the new space is free "
+                        "for volumes: grow one with Change size, or create another.")
+                else:
+                    log("RESULT The expansion runs in the background. When it finishes, use Expand filesystem on "
+                        "the volume to make the new space available.")
             go(len(labels))
             self.p.save_mdadm_conf(log)
 
@@ -642,14 +654,21 @@ class Nas:
                 "fault_tolerance": arr["fault_tolerance"] if arr else 0,
                 "shares": sorted(n for n, s in shares.items() if s["volume"] == v["name"]),
                 "can_expand_fs": False, "status": "healthy", "status_detail": "",
+                "resizable": bool(v.get("lv")), "lv_size": 0, "min_size": 0, "max_size": 0,
             }
+            if v.get("lv") and arr:
+                lv_size = self.p.block_size(v["lv"])
+                item["lv_size"] = lv_size
+                item["max_size"] = lv_size + (arr.get("free") or 0)
+                # ext4 can shrink to what its files need (plus room); XFS cannot shrink
+                item["min_size"] = lv_size if v["fs"] == "xfs" else min(lv_size, max(MIN_VOLUME, int(item["used"] * 1.1)))
             if v.get("array"):
                 if not arr:
                     item["status"], item["status_detail"] = "missing", f"RAID {v['array']} not found"
                 else:
                     item["status"], item["status_detail"] = arr["status"], arr["status_detail"]
                     sync = arr["sync"] or {}
-                    if info and info.get("mounted") and sync.get("sync_action") != "reshape" \
+                    if info and info.get("mounted") and not v.get("lv") and sync.get("sync_action") != "reshape" \
                             and arr["size"] > (v.get("fs_dev_size") or arr["size"]):
                         item["can_expand_fs"] = True
             else:
@@ -669,11 +688,11 @@ class Nas:
         return out
 
     def volume_sources(self) -> dict:
-        """RAID arrays without a volume, and unused disks, a volume can be created on."""
+        """RAID arrays with free space, and unused disks, a volume can be created on."""
         return {
-            "arrays": [{k: a[k] for k in ("name", "level", "size", "status")}
+            "arrays": [{k: a[k] for k in ("name", "level", "size", "free", "volumes", "status")}
                        for a in self.raid_arrays()
-                       if not a["volume"] and a["status"] not in ("missing", "failed")],
+                       if a["free"] >= MIN_VOLUME and a["status"] not in ("missing", "failed")],
             "disks": [{k: d[k] for k in ("name", "model", "size", "kind", "status")}
                       for d in self.disks() if d["selectable"]],
         }
@@ -685,7 +704,7 @@ class Nas:
         return v
 
     def create_volume(self, name: str, fs: str, array: Optional[str], disk: Optional[str],
-                      user: str):
+                      user: str, size: Optional[int] = None):
         require(VOLUME_NAME_RE, name, "volume name (lowercase letters, digits, - and _)")
         if name in self.state.get("volumes"):
             raise UserError(f"A volume named {name} already exists")
@@ -696,11 +715,20 @@ class Nas:
         if array:
             src = next((a for a in self.volume_sources()["arrays"] if a["name"] == array), None)
             if not src:
-                raise UserError(f"RAID {array} is not available for a new volume")
-            size = src["size"]
+                raise UserError(f"RAID {array} has no free space for a new volume")
+            if size is not None:
+                size = int(size)
+                if size < MIN_VOLUME:
+                    raise UserError("A volume needs at least 1 GB")
+                if size > src["free"]:
+                    raise UserError(f"Only {human_bytes(src['free'])} is free on RAID {array}")
+                if src["free"] - size < MIN_VOLUME:
+                    size = None                        # a sliver left over: use all the free space
+            want = size or src["free"]
         else:
-            size = self._check_disks([disk])[disk]["size"]
-        if fs == "xfs" and size < 320 * 10**6:
+            size = None
+            want = self._check_disks([disk])[disk]["size"]
+        if fs == "xfs" and want < 320 * 10**6:
             raise UserError("XFS needs a volume of at least 300 MB; use ext4")
         mountpoint = os.path.join(self.cfg.mount_root, name)
         if os.path.ismount(mountpoint):
@@ -709,16 +737,20 @@ class Nas:
         def work(log):
             record = {"name": name, "fs": fs, "mountpoint": mountpoint, "created": time.time(),
                       "uuid": None, "array": array}
-            go = steps(log, ([] if array else [f"Preparing disk {disk}"]) + [
+            go = steps(log, ([f"Making room for the volume on RAID {array}"] if array else [f"Preparing disk {disk}"]) + [
                 f"Creating the {fs} filesystem", f"Mounting it at {mountpoint}"])
             if array:
                 _, a = self._array(array)
-                dev = a["dev"]
+                go(1)
+                if not self.p.lvm_info(a["dev"]):
+                    self.p.lvm_setup(a["dev"], f"talon-{array}", log)
+                dev = self.p.lvm_create(self.p.lvm_info(a["dev"])["vg"], name, size, a["dev"], log)
+                record["lv"] = dev
             else:
                 go(1)
                 self.p.wipe_disk(disk, log)
                 dev = self.p.make_partition(disk, False, log)
-            first = 1 if array else 2
+            first = 2
             go(first)
             record["uuid"] = self.p.mkfs(dev, fs, name, log)
             record["fs_dev_size"] = self.p.block_size(dev)
@@ -741,7 +773,10 @@ class Nas:
             info = self.p.fs_info(v.get("uuid")) if v.get("uuid") else None
             self.p.unmount_remove(v.get("uuid"), v["mountpoint"], log)
             go(2)
-            if v.get("array"):
+            if v.get("lv"):
+                _, a = self._array(v["array"])
+                self.p.lvm_remove(v["lv"], a["dev"], log)
+            elif v.get("array"):
                 r = self.state.get("arrays").get(v["array"])
                 a = self._live(r, self.p.md_arrays()) if r else None
                 if a:
@@ -754,6 +789,38 @@ class Nas:
             self.state.update(lambda d: d["volumes"].pop(name, None))
 
         return self.jobs.submit(f"Delete volume {name}", user, work)
+
+    def resize_volume(self, name: str, size, user: str):
+        """Change the size of a volume on a RAID's LVM pool: grow it online, or shrink an
+        ext4 volume (unmounted for a moment)."""
+        v = self._vol(name)
+        if not v.get("lv"):
+            raise UserError("Only volumes that share a RAID array can change size")
+        vol = next(x for x in self.volumes() if x["name"] == name)
+        try:
+            size = int(size)
+        except (TypeError, ValueError):
+            raise UserError("Enter the new size") from None
+        if size > vol["max_size"]:
+            raise UserError(f"At most {human_bytes(vol['max_size'])}: that is all the free space on RAID {v['array']}")
+        if size < vol["min_size"]:
+            raise UserError("XFS volumes can only grow" if v["fs"] == "xfs" else
+                            f"At least {human_bytes(vol['min_size'])}: the files on it need the room")
+        grow = size > vol["lv_size"]
+        _, a = self._array(v["array"])
+
+        def work(log):
+            go = steps(log, ["Growing the volume and its filesystem"] if grow else [
+                "Unmounting the volume", "Shrinking the filesystem and the volume", "Mounting it again"])
+            go(1)
+            if not grow:
+                go(2)
+            self.p.lvm_resize(v["lv"], size, v["fs"], v["mountpoint"], a["dev"], log)
+            if not grow:
+                go(3)
+            log(f"RESULT {name} is now {human_bytes(size)}.")
+
+        return self.jobs.submit(f"{'Grow' if grow else 'Shrink'} volume {name} to {human_bytes(size)}", user, work)
 
     def expand_fs(self, name: str, user: str):
         v = self._vol(name)

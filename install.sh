@@ -120,7 +120,7 @@ step "Checking system packages"
 export DEBIAN_FRONTEND=noninteractive
 : >"$LOG"
 PKGS=(python3 python3-venv ca-certificates curl openssl tar iproute2 udev util-linux
-      mdadm parted smartmontools e2fsprogs xfsprogs acl rsync
+      mdadm lvm2 parted smartmontools e2fsprogs xfsprogs acl rsync
       samba samba-common-bin nfs-kernel-server avahi-daemon)
 is_installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "install ok installed"; }
 # Only install what is missing: never upgrade (and thereby restart) Samba/NFS

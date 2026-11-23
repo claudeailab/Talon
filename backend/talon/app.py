@@ -70,6 +70,7 @@ class VolumeIn(BaseModel):
     fs: str = "ext4"
     array: Optional[str] = None
     disk: Optional[str] = None
+    size: Optional[int] = None          # bytes, on a RAID array; empty: all the free space
 
 
 class OptionsIn(BaseModel):
@@ -127,6 +128,7 @@ ACTIONS = {
     "POST /api/volumes": ("storage", "Created a volume"),
     "DELETE /api/volumes/{name}": ("storage", "Deleted volume {name}"),
     "POST /api/volumes/{name}/expand": ("storage", "Expanded volume {name}"),
+    "POST /api/volumes/{name}/resize": ("storage", "Changed the size of volume {name}"),
     "POST /api/shares": ("sharing", "Created a shared folder"),
     "PUT /api/shares/{name}": ("sharing", "Updated shared folder {name}"),
     "DELETE /api/shares/{name}": ("sharing", "Deleted shared folder {name}"),
@@ -545,11 +547,15 @@ def create_app(cfg, platform) -> FastAPI:
 
     @app.post("/api/volumes")
     def volume_create(body: VolumeIn, user: str = Depends(current_user)):
-        return nas.create_volume(body.name, body.fs, body.array, body.disk, user).to_dict()
+        return nas.create_volume(body.name, body.fs, body.array, body.disk, user, body.size).to_dict()
 
     @app.delete("/api/volumes/{name}")
     def volume_delete(name: str, user: str = Depends(current_user)):
         return nas.delete_volume(name, user).to_dict()
+
+    @app.post("/api/volumes/{name}/resize")
+    def volume_resize(name: str, body: dict = Body(...), user: str = Depends(current_user)):
+        return nas.resize_volume(name, body.get("size"), user).to_dict()
 
     @app.post("/api/volumes/{name}/expand")
     def volume_expand(name: str, user: str = Depends(current_user)):

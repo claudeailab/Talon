@@ -60,6 +60,7 @@ class DemoPlatform:
         self.disks["sdj"]["parts"] = [{"name": "sdj1", "size": 2 * TB, "fstype": "ext4", "label": "Backup",
                                        "mounts": []}]
         self.arrays: Dict[str, dict] = {}
+        self.vgs: Dict[str, dict] = {}       # md -> {"vg": name, "lvs": {lv: size}}
         self.fs: Dict[str, dict] = {}
         self.users: Dict[str, dict] = {
             "admin": {"uid": 1000, "full_name": "Administrator", "password": DEMO_PASSWORD,
@@ -82,9 +83,11 @@ class DemoPlatform:
         self.arrays[md["dev"]]["sync_start"] = 0          # already in sync
         for m in self.arrays[md["dev"]]["members"]:
             m["state"] = "active"
-        u = self.mkfs(md["dev"], "ext4", "tank", log)
+        self.lvm_setup(md["dev"], "talon-tank", log)
+        lv = self.lvm_create("talon-tank", "tank", int(self._array_size(self.arrays[md["dev"]]) * 0.7), md["dev"], log)
+        u = self.mkfs(lv, "ext4", "tank", log)
         self.mount_persist(u, "ext4", "/srv/nas/tank", log)
-        self.fs[u]["used"] = int(3.1 * TB)
+        self.fs[u]["used"] = int(2.0 * TB)
         # disks from another NAS: an old RAID 1 that is assembled but not Talon's
         old = [self.make_partition(d, True, log) for d in ("sdh", "sdi")]
         md_old = self.md_create("oldnas", "raid1", old, [], log)
@@ -95,7 +98,7 @@ class DemoPlatform:
         self.fs[u2]["used"] = int(2.4 * TB)
         self._seed_volumes = {
             "tank": {"name": "tank", "level": "raid5", "fs": "ext4", "mountpoint": "/srv/nas/tank",
-                     "created": time.time() - 86400 * 120, "uuid": u, "md_uuid": md["uuid"]},
+                     "created": time.time() - 86400 * 120, "uuid": u, "md_uuid": md["uuid"], "lv": lv},
             "backup": {"name": "backup", "level": "single", "fs": "xfs",
                        "mountpoint": "/srv/nas/backup", "created": time.time() - 86400 * 30,
                        "uuid": u2, "md_uuid": None},
@@ -340,6 +343,9 @@ class DemoPlatform:
         log("$ mdadm --detail --scan > /etc/mdadm/mdadm.conf")
 
     def block_size(self, dev: str) -> int:
+        if "/" in dev:
+            vg, lv = dev.split("/")
+            return next((g["lvs"].get(lv, 0) for g in self.vgs.values() if g["vg"] == vg), 0)
         if dev in self.arrays:
             return self._array_size(self.arrays[dev])
         return self._part_size(dev)
@@ -348,7 +354,7 @@ class DemoPlatform:
     def mkfs(self, dev, fs, label, log) -> str:
         with self.lock:
             log(f"$ mkfs.{fs} -L {label} /dev/{dev}")
-            size = self._array_size(self.arrays[dev]) if dev in self.arrays else self._part_size(dev)
+            size = self.block_size(dev)
             u = _uuid()
             self.fs[u] = {"dev": dev, "fs": fs, "size": int(size * 0.98), "used": 0,
                           "mountpoint": None}
@@ -385,8 +391,53 @@ class DemoPlatform:
         with self.lock:
             for f in self.fs.values():
                 if f["dev"] == dev:
-                    f["size"] = int(self._array_size(self.arrays[dev]) * 0.98)
+                    f["size"] = int(self.block_size(dev) * 0.98)
             log(f"$ resize2fs /dev/{dev}" if fs == "ext4" else f"$ xfs_growfs {mountpoint}")
+
+    # ----------------------------------------------------------- LVM
+    def lvm_info(self, md) -> Optional[dict]:
+        g = self.vgs.get(md)
+        if not g:
+            return None
+        size = int(self._array_size(self.arrays[md])) if md in self.arrays else 0
+        return {"vg": g["vg"], "size": size, "free": max(0, size - sum(g["lvs"].values()))}
+
+    def lvm_setup(self, md, vg, log) -> None:
+        log(f"$ pvcreate /dev/{md}")
+        log(f"$ vgcreate {vg} /dev/{md}")
+        self.vgs[md] = {"vg": vg, "lvs": {}}
+
+    def lvm_create(self, vg, lv, size, md, log) -> str:
+        info = self.lvm_info(md)
+        size = info["free"] if size is None else min(int(size), info["free"])
+        log(f"$ lvcreate -n {lv} -L {size}b {vg}")
+        self.vgs[md]["lvs"][lv] = size
+        time.sleep(0.4 * self.pause)
+        return f"{vg}/{lv}"
+
+    def lvm_resize(self, lv, size, fs, mountpoint, md, log) -> None:
+        vg, name = lv.split("/")
+        cur = self.vgs[md]["lvs"][name]
+        if size < cur and fs != "ext4":
+            raise UserError("XFS volumes can only grow")
+        log(f"$ {'lvextend' if size > cur else 'lvreduce'} -L {int(size)}b /dev/{lv}")
+        self.vgs[md]["lvs"][name] = int(size)
+        time.sleep(0.6 * self.pause)
+        with self.lock:
+            for f in self.fs.values():
+                if f["dev"] == lv:
+                    f["size"] = int(size * 0.98)
+
+    def lvm_remove(self, lv, md, log) -> None:
+        vg, name = lv.split("/")
+        log(f"$ lvremove /dev/{lv}")
+        self.vgs[md]["lvs"].pop(name, None)
+        with self.lock:
+            for u in [u for u, f in self.fs.items() if f["dev"] == lv]:
+                self.fs.pop(u)
+        if not self.vgs[md]["lvs"]:
+            log(f"$ vgremove {vg}")
+            self.vgs.pop(md)
 
     # ----------------------------------------------------------- shares
     def prepare_share_dir(self, path, group, log) -> None:

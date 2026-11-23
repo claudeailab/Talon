@@ -125,8 +125,8 @@ function RaidCard({ a, disks, onJob }: { a: RaidArray; disks: Disk[]; onJob: (id
               Stop data scrub
             </MenuItem>
           )}
-          <MenuItem icon={<Trash2 />} danger disabled={!!a.volume} onClick={() => setConfirmDelete(true)}>
-            {a.volume ? "Delete RAID (delete its volume first)" : "Delete RAID"}
+          <MenuItem icon={<Trash2 />} danger disabled={a.volumes.length > 0} onClick={() => setConfirmDelete(true)}>
+            {a.volumes.length ? `Delete RAID (delete its volume${a.volumes.length > 1 ? "s" : ""} first)` : "Delete RAID"}
           </MenuItem>
         </Menu>
       </div>
@@ -152,17 +152,31 @@ function RaidCard({ a, disks, onJob }: { a: RaidArray; disks: Disk[]; onJob: (id
         <div className="mb-2.5 text-xs font-semibold tracking-wide text-zinc-500 uppercase">Member disks</div>
         <MemberList members={a.members} onRemove={a.members.length > 1 ? setRemove : undefined} />
         <div className="mt-3 text-xs text-zinc-500">
-          {a.volume ? (
+          {a.volumes.length ? (
             <>
-              Volume:{" "}
-              <Link to="/volumes" className="font-medium text-brand-600 hover:underline dark:text-brand-400">
-                {a.volume}
-              </Link>
+              {a.volumes.length > 1 ? "Volumes: " : "Volume: "}
+              {a.volumes.map((v, i) => (
+                <span key={v}>
+                  {i > 0 && ", "}
+                  <Link to="/volumes" className="font-medium text-brand-600 hover:underline dark:text-brand-400">
+                    {v}
+                  </Link>
+                </span>
+              ))}
+              {a.free >= 2 ** 30 && (
+                <>
+                  {" · "}
+                  {bytes(a.free)} free for more volumes.{" "}
+                  <Link to="/volumes?create=1" className="font-medium text-brand-600 hover:underline dark:text-brand-400">
+                    Create a volume
+                  </Link>
+                </>
+              )}
             </>
           ) : (
             <>
               No volume yet.{" "}
-              <Link to="/volumes" className="font-medium text-brand-600 hover:underline dark:text-brand-400">
+              <Link to="/volumes?create=1" className="font-medium text-brand-600 hover:underline dark:text-brand-400">
                 Create a volume on this RAID
               </Link>
             </>

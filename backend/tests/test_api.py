@@ -26,7 +26,7 @@ def test_disk_status(client):
 
 def test_existing_raid_volume_is_migrated(client):
     arrays = {a["name"]: a for a in client.get("/api/raid").json()}
-    assert arrays["tank"]["level"] == "raid5" and arrays["tank"]["volume"] == "tank"
+    assert arrays["tank"]["level"] == "raid5" and arrays["tank"]["volumes"] == ["tank"]
     vols = {v["name"]: v for v in client.get("/api/volumes").json()}
     assert vols["tank"]["array"] == "tank" and vols["tank"]["level"] == "raid5"
     assert vols["backup"]["array"] is None and vols["backup"]["disk"] == "sde"
@@ -43,14 +43,13 @@ def test_raid_then_volume_lifecycle(client):
     assert r.status_code == 200, r.text
     assert wait_job(client, r.json())["status"] == "success"
     arrays = {a["name"]: a for a in client.get("/api/raid").json()}
-    assert arrays["fast"]["volume"] is None and len(arrays["fast"]["members"]) == 2
+    assert arrays["fast"]["volumes"] == [] and len(arrays["fast"]["members"]) == 2
     # in-use disks cannot be reused
     assert client.post("/api/raid", json={"name": "x", "level": "raid1",
                                           "disks": ["sdd", "sdg"]}).status_code == 400
     # the new array is offered as a volume source
     src = client.get("/api/volumes/sources").json()
     assert "fast" in {a["name"] for a in src["arrays"]}
-    assert "tank" not in {a["name"] for a in src["arrays"]}   # already has a volume
     r = client.post("/api/volumes", json={"name": "fastvol", "fs": "xfs", "array": "fast"})
     assert r.status_code == 200, r.text
     assert wait_job(client, r.json())["status"] == "success"
@@ -95,7 +94,7 @@ def test_invalid_raid_and_volume_requests(client):
     for body in [
         {"name": "v", "fs": "btrfs", "disk": "sdd"},
         {"name": "v", "fs": "ext4"},
-        {"name": "v", "fs": "ext4", "array": "tank"},
+        {"name": "v", "fs": "ext4", "array": "nope"},
         {"name": "v", "fs": "ext4", "disk": "nvme0n1"},
         {"name": "tank", "fs": "ext4", "disk": "sdd"},
     ]:
@@ -387,3 +386,39 @@ def test_jobs_report_their_steps(client):
     steps = [l for l in j["log"] if l.startswith("STEPS ")]
     assert len(steps) == 1 and json.loads(steps[0][6:])[0] == "Stopping anything that uses the disk"
     assert [l for l in j["log"] if l.startswith("STEP ")][-1].startswith("STEP 3")
+
+
+def test_several_volumes_on_one_raid(client):
+    """Volumes on a RAID array share it through LVM, each with its own size."""
+    GB = 2**30
+    tank = next(a for a in client.get("/api/raid").json() if a["name"] == "tank")
+    assert tank["lvm"] and 0 < tank["free"] < tank["size"]                     # the demo's tank uses 70%
+    src = {a["name"]: a for a in client.get("/api/volumes/sources").json()["arrays"]}
+    assert src["tank"]["free"] == tank["free"] and src["tank"]["volumes"] == ["tank"]
+    assert client.post("/api/volumes", json={"name": "big", "array": "tank", "size": tank["free"] + GB}).status_code == 400
+    assert client.post("/api/volumes", json={"name": "tiny", "array": "tank", "size": GB // 2}).status_code == 400
+    r = client.post("/api/volumes", json={"name": "photos", "fs": "ext4", "array": "tank", "size": 200 * GB})
+    assert r.status_code == 200, r.text
+    assert wait_job(client, r.json())["status"] == "success"
+    vols = {v["name"]: v for v in client.get("/api/volumes").json()}
+    assert vols["photos"]["array"] == "tank" and vols["photos"]["mounted"] and vols["photos"]["resizable"]
+    assert vols["photos"]["lv_size"] == 200 * GB
+    tank2 = next(a for a in client.get("/api/raid").json() if a["name"] == "tank")
+    assert tank2["volumes"] == ["photos", "tank"] and tank2["free"] == tank["free"] - 200 * GB
+    # grow, then shrink (ext4); not beyond the free space, not below what the files need
+    assert client.post("/api/volumes/photos/resize", json={"size": vols["photos"]["max_size"] + GB}).status_code == 400
+    j = wait_job(client, client.post("/api/volumes/photos/resize", json={"size": 300 * GB}).json())
+    assert j["status"] == "success" and any(l.startswith("RESULT ") for l in j["log"])
+    assert next(v for v in client.get("/api/volumes").json() if v["name"] == "photos")["lv_size"] == 300 * GB
+    assert wait_job(client, client.post("/api/volumes/photos/resize", json={"size": 100 * GB}).json())["status"] == "success"
+    tank_vol = vols["tank"]
+    assert client.post("/api/volumes/tank/resize", json={"size": tank_vol["min_size"] - GB}).status_code == 400
+    # the rest of the free space, then delete: the space returns to the pool
+    r = client.post("/api/volumes", json={"name": "rest", "fs": "xfs", "array": "tank"})
+    assert wait_job(client, r.json())["status"] == "success"
+    assert next(a for a in client.get("/api/raid").json() if a["name"] == "tank")["free"] == 0
+    rest = next(v for v in client.get("/api/volumes").json() if v["name"] == "rest")
+    assert rest["min_size"] == rest["lv_size"]                                     # XFS cannot shrink
+    for n in ("rest", "photos"):
+        assert wait_job(client, client.delete(f"/api/volumes/{n}").json())["status"] == "success"
+    assert next(a for a in client.get("/api/raid").json() if a["name"] == "tank")["free"] == tank["free"]

@@ -502,7 +502,72 @@ class RealPlatform:
             run(["xfs_growfs", mountpoint], log=log, timeout=7200)
 
     def block_size(self, dev: str) -> int:
+        if "/" in dev:                     # a logical volume: <vg>/<lv>
+            cp = run(["blockdev", "--getsize64", _dev(dev)], check=False, timeout=15)
+            return int(cp.stdout.strip() or 0) if cp.returncode == 0 else 0
         return int(read_file(f"/sys/class/block/{dev}/size", "0").strip() or 0) * 512
+
+    # ------------------------------------------------------------ LVM: several volumes on one RAID
+    def lvm_info(self, md: str) -> Optional[dict]:
+        """The LVM pool on a RAID array: its volume group, size and free space (bytes).
+        Space the array gained (it was expanded) and LVM does not use yet counts as free."""
+        if not shutil.which("pvs"):
+            return None
+        cp = run(["pvs", "--noheadings", "--units", "b", "--nosuffix", "--separator", ";",
+                  "-o", "vg_name,pv_size,vg_free", _dev(md)], check=False, timeout=15)
+        if cp.returncode != 0 or not cp.stdout.strip():
+            return None
+        vg, pv_size, free = (x.strip() for x in cp.stdout.strip().split(";")[:3])
+        if not vg:
+            return None
+        grown = max(0, self.block_size(md) - int(pv_size) - 4 * 2**20)   # minus LVM's metadata
+        return {"vg": vg, "size": int(pv_size) + grown, "free": int(free) + grown}
+
+    def lvm_setup(self, md: str, vg: str, log: Logger) -> None:
+        if not shutil.which("pvcreate"):
+            raise UserError("LVM is not installed: update Talon, or run: apt-get install lvm2")
+        run(["pvcreate", "-ff", "-y", _dev(md)], log=log)
+        run(["vgcreate", vg, _dev(md)], log=log)
+
+    def lvm_create(self, vg: str, lv: str, size: Optional[int], md: str, log: Logger) -> str:
+        """A logical volume of `size` bytes (None: all the free space); returns <vg>/<lv>."""
+        run(["pvresize", _dev(md)], check=False, log=log)
+        size_arg = ["-l", "100%FREE"] if size is None else ["-L", f"{int(size)}b"]
+        run(["lvcreate", "-y", "-W", "y", "-n", lv, *size_arg, vg], log=log)
+        self._settle(log)
+        return f"{vg}/{lv}"
+
+    def lvm_resize(self, lv: str, size: int, fs: str, mountpoint: str, md: str, log: Logger) -> None:
+        """Grow (online) or shrink (ext4 only, briefly unmounted) a volume and its filesystem."""
+        path = _dev(lv)
+        current = self.block_size(lv)
+        if abs(size - current) < 8 * 2**20:        # less than two LVM extents: nothing to do
+            return
+        if size > current:
+            run(["pvresize", _dev(md)], check=False, log=log)
+            run(["lvextend", "-L", f"{int(size)}b", path], log=log)
+            self.fs_grow(lv, fs, mountpoint, log)
+            return
+        if fs != "ext4":
+            raise UserError("XFS volumes can only grow")
+        run(["umount", mountpoint], log=log)
+        try:
+            run(["e2fsck", "-f", "-y", path], log=log, timeout=7200)
+            run(["resize2fs", path, f"{int(size) // 1024}K"], log=log, timeout=7200)
+            run(["lvreduce", "-f", "-L", f"{int(size)}b", path], log=log)
+            run(["resize2fs", path], log=log, timeout=7200)        # fill the exact LV size
+        finally:
+            run(["mount", mountpoint], log=log)
+
+    def lvm_remove(self, lv: str, md: str, log: Logger) -> None:
+        """Remove a volume; the last one also removes the pool, leaving the RAID array empty."""
+        vg = lv.split("/")[0]
+        run(["lvremove", "-y", _dev(lv)], log=log)
+        cp = run(["vgs", "--noheadings", "-o", "lv_count", vg], check=False, log=log)
+        if cp.returncode == 0 and cp.stdout.strip() == "0":
+            run(["vgremove", "-y", vg], log=log)
+            run(["pvremove", "-y", _dev(md)], check=False, log=log)
+            run(["wipefs", "-a", _dev(md)], check=False, log=log)
 
     # ------------------------------------------------------------ shares
     def prepare_share_dir(self, path: str, group: str, log: Logger) -> None:
