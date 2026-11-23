@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import {
   Activity as ActivityIcon,
   Bell,
@@ -175,30 +175,82 @@ function Shell({ me }: { me: Me }) {
   // the phone menu closes when a page opens, also a tab of the same page (?tab=…)
   const search = useSearch();
   useEffect(() => setMobileNav(false), [path, search]);
-  // phones: swipe right to open the menu, swipe left to close it
+  // phones: the menu follows the finger (swipe right to open, left to close) and glides into place
+  const drawer = useRef<HTMLElement>(null);
+  const shade = useRef<HTMLDivElement>(null);
+  const openRef = useRef(false);
+  const place = (open: boolean, animate = true) => {
+    const a = drawer.current;
+    const d = shade.current;
+    if (!a || !d) return;
+    const ease = "280ms cubic-bezier(0.32, 0.72, 0, 1)";
+    a.style.transition = animate ? `transform ${ease}, visibility 0s linear ${open ? "0s" : "280ms"}` : "none";
+    d.style.transition = animate ? `opacity ${ease}` : "none";
+    a.style.transform = open ? "translateX(0)" : "translateX(-100%)";
+    a.style.visibility = open ? "visible" : "hidden";
+    d.style.opacity = open ? "1" : "0";
+  };
+  useEffect(() => {
+    openRef.current = mobileNav;
+    place(mobileNav);
+  }, [mobileNav]);
   useEffect(() => {
     let start: { x: number; y: number; t: number } | null = null;
+    let dragging = false;
+    let shown = 0; // how far the menu is out, in px
+    const width = () => drawer.current?.offsetWidth || 288;
     const down = (e: TouchEvent) => {
       const t = e.touches[0];
       const el = e.target as HTMLElement | null;
-      // not while sliding a control, selecting text in a field, or scrolling something sideways
+      // not while sliding a control, typing, in a window, or scrolling something sideways
       const busy = el?.closest("input, textarea, select, [role=dialog], [data-noswipe]") || sideways(el);
       start = e.touches.length === 1 && !busy && window.innerWidth < 1024 ? { x: t.clientX, y: t.clientY, t: Date.now() } : null;
+      dragging = false;
+    };
+    const move = (e: TouchEvent) => {
+      if (!start) return;
+      const t = e.touches[0];
+      const dx = t.clientX - start.x;
+      const dy = t.clientY - start.y;
+      if (!dragging) {
+        if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return;
+        // a vertical move is page scrolling; only the right direction drags the menu
+        if (Math.abs(dy) > Math.abs(dx) || (openRef.current ? dx > 0 : dx < 0)) {
+          start = null;
+          return;
+        }
+        dragging = true;
+        place(openRef.current, false);
+        if (drawer.current) drawer.current.style.visibility = "visible";
+      }
+      e.preventDefault(); // no page scrolling while the menu moves
+      const w = width();
+      shown = Math.max(0, Math.min(w, (openRef.current ? w : 0) + dx));
+      if (drawer.current) drawer.current.style.transform = `translateX(${shown - w}px)`;
+      if (shade.current) shade.current.style.opacity = String(shown / w);
     };
     const up = (e: TouchEvent) => {
-      if (!start) return;
-      const t = e.changedTouches[0];
-      const dx = t.clientX - start.x;
-      const dy = Math.abs(t.clientY - start.y);
-      const quick = Date.now() - start.t < 700;
-      if (quick && Math.abs(dx) > 70 && dy < Math.abs(dx) / 2) setMobileNav(dx > 0);
+      if (!start || !dragging) {
+        start = null;
+        return;
+      }
+      const dx = e.changedTouches[0].clientX - start.x;
+      const speed = dx / Math.max(1, Date.now() - start.t); // px per ms; a quick flick decides by itself
+      const open = Math.abs(speed) > 0.5 ? speed > 0 : shown > width() / 2;
       start = null;
+      dragging = false;
+      place(open);
+      setMobileNav(open);
     };
     document.addEventListener("touchstart", down, { passive: true });
+    document.addEventListener("touchmove", move, { passive: false });
     document.addEventListener("touchend", up, { passive: true });
+    document.addEventListener("touchcancel", up, { passive: true });
     return () => {
       document.removeEventListener("touchstart", down);
+      document.removeEventListener("touchmove", move);
       document.removeEventListener("touchend", up);
+      document.removeEventListener("touchcancel", up);
     };
   }, []);
   useEffect(() => {
@@ -375,12 +427,17 @@ function Shell({ me }: { me: Me }) {
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 border-r border-zinc-200/70 bg-zinc-100/60 backdrop-blur lg:block dark:border-white/5 dark:bg-zinc-900/40">
         {sidebar}
       </aside>
-      {mobileNav && (
-        <div className="fixed inset-0 z-40 lg:hidden">
-          <div className="absolute inset-0 animate-in bg-black/40" onClick={() => setMobileNav(false)} />
-          <aside className="absolute inset-y-0 left-0 w-72 animate-slide bg-zinc-50 shadow-xl dark:bg-zinc-900">{sidebar}</aside>
-        </div>
-      )}
+      {/* always there on phones, moved in and out (see place()), so it can follow the finger */}
+      <div className={cx("fixed inset-0 z-40 lg:hidden", !mobileNav && "pointer-events-none")}>
+        <div ref={shade} className="absolute inset-0 bg-black/40 opacity-0" onClick={() => setMobileNav(false)} />
+        <aside
+          ref={drawer}
+          className="invisible absolute inset-y-0 left-0 w-72 bg-zinc-50 shadow-xl will-change-transform dark:bg-zinc-900"
+          style={{ transform: "translateX(-100%)" }}
+        >
+          {sidebar}
+        </aside>
+      </div>
       <div className="lg:pl-64">
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-zinc-200/70 bg-zinc-50/80 px-4 backdrop-blur-xl sm:px-6 lg:hidden dark:border-white/5 dark:bg-zinc-950/70">
           <IconButton label="Open menu" onClick={() => setMobileNav(true)}>

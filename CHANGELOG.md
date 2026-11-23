@@ -1,3 +1,6 @@
+## 1.0.142
+- Phones: the menu follows your finger while you swipe and glides open or closed
+
 ## 1.0.141
 - Phones: swipe right to open the menu, left to close it; it closes when you open a page, also the one already open
 
