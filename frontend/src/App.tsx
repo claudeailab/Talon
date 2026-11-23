@@ -206,6 +206,9 @@ function Shell({ me }: { me: Me }) {
       const busy = el?.closest("input, textarea, select, [role=dialog], [data-noswipe]") || sideways(el);
       start = e.touches.length === 1 && !busy && window.innerWidth < 1024 ? { x: t.clientX, y: t.clientY, t: Date.now() } : null;
       dragging = false;
+      // a swipe from the very edge is also the browser's "back" gesture: it would open the previous
+      // page, which closes the menu again. Keep it for the menu (taps on buttons and links still work).
+      if (start && t.clientX < 24 && !el?.closest("a, button, [role=button]")) e.preventDefault();
     };
     const move = (e: TouchEvent) => {
       if (!start) return;
@@ -234,6 +237,13 @@ function Shell({ me }: { me: Me }) {
         start = null;
         return;
       }
+      if (e.type === "touchcancel") {
+        // the browser or the phone took the gesture over: back to how the menu was
+        start = null;
+        dragging = false;
+        place(openRef.current);
+        return;
+      }
       const dx = e.changedTouches[0].clientX - start.x;
       const speed = dx / Math.max(1, Date.now() - start.t); // px per ms; a quick flick decides by itself
       const open = Math.abs(speed) > 0.5 ? speed > 0 : shown > width() / 2;
@@ -242,7 +252,7 @@ function Shell({ me }: { me: Me }) {
       place(open);
       setMobileNav(open);
     };
-    document.addEventListener("touchstart", down, { passive: true });
+    document.addEventListener("touchstart", down, { passive: false });
     document.addEventListener("touchmove", move, { passive: false });
     document.addEventListener("touchend", up, { passive: true });
     document.addEventListener("touchcancel", up, { passive: true });

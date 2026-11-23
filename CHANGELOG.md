@@ -1,3 +1,6 @@
+## 1.0.143
+- Phones: a swipe from the screen edge no longer triggers the browser's back gesture, which closed the menu again
+
 ## 1.0.142
 - Phones: the menu follows your finger while you swipe and glides open or closed
 
