@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { BellRing, Mail, Send, Thermometer } from "lucide-react";
+import { Send, Thermometer } from "lucide-react";
 import { api } from "../lib/api";
 import { cx, sameSet, sameValue } from "../lib/format";
 import { useAction } from "../lib/hooks";
-import { navigate } from "../lib/router";
+import SmtpCard from "./NotificationsSmtp";
+import { Row, RowCard, SaveBar, Section } from "../components/rows";
 import type { NotificationSettings } from "../lib/types";
-import { Badge, Button, Card, CardHeader, Empty, Field, Input, PageHeader, PageLoader, Switch, Tabs } from "../components/ui";
+import { Badge, Button, Card, CardHeader, Input, PageHeader, PageLoader, Switch, Tabs } from "../components/ui";
 
 type TabId = "email" | "thresholds";
 
@@ -57,61 +58,44 @@ function EmailTab() {
   const test = useAction(() => api.post("/notifications/test"), { success: "Test notification sent" });
   if (!q.data) return <PageLoader />;
 
-  if (!q.data.smtp)
-    return (
-      <>
-        <Card>
-          <Empty
-            icon={<Mail className="size-6" />}
-            title="Set up SMTP first"
-            text="The NAS needs an SMTP server to send email."
-            action={
-              <Button variant="primary" onClick={() => navigate("/settings?tab=smtp")}>
-                Configure SMTP
-              </Button>
-            }
-          />
-        </Card>
-      </>
-    );
+  if (!q.data.smtp) return <SmtpCard />;
 
   const changed = !sameSet(list, q.data.recipients) || !sameValue(events, q.data.events);
   return (
-    <>
-      <Card>
-        <CardHeader
-          icon={<BellRing className="size-4.5" />}
-          title="Email Notifications"
-          subtitle="Each alert is sent once, and again if it comes back"
-          actions={
-            <div className="flex gap-2">
-              <Button icon={<Send className="size-4" />} disabled={changed || !q.data.recipients.length} loading={test.isPending} onClick={() => test.mutate()}>
-                Send test
-              </Button>
-              <Button variant="primary" disabled={!changed} loading={save.isPending} onClick={() => save.mutate()}>
-                Save
-              </Button>
-            </div>
+    <div className="space-y-5">
+      <SmtpCard />
+      <RowCard>
+        <Section
+          title="Email notifications"
+          right={
+            <Button size="sm" variant="ghost" icon={<Send className="size-3.5" />} disabled={changed || !q.data.recipients.length} loading={test.isPending} onClick={() => test.mutate()}>
+              Send test
+            </Button>
           }
         />
-        <div className="space-y-5 px-5 pb-5">
-          <Field label="Send to" hint="Separate several addresses with commas">
-            <Input value={recipients} onChange={(e) => setRecipients(e.target.value)} placeholder="you@example.com" />
-          </Field>
-          <div>
-            <div className="mb-1.5 text-[13px] font-medium">Send an email when</div>
-            <div className="grid gap-2 md:grid-cols-2">
-              {Object.entries(q.data.labels).map(([id, label]) => (
-                <div key={id} className="flex min-h-11 items-center py-2 justify-between gap-4 rounded-xl bg-zinc-50 px-3.5 dark:bg-white/[0.03]">
-                  <span className="truncate text-[13px] font-medium">{label}</span>
-                  <Switch checked={!!events[id]} onChange={(v) => setEvents({ ...events, [id]: v })} label={label} />
-                </div>
-              ))}
+        <Row label="Send to" hint="Separate several addresses with commas; each alert is sent once, and again if it comes back">
+          <Input value={recipients} onChange={(e) => setRecipients(e.target.value)} placeholder="you@example.com" className="w-full sm:w-72" aria-label="Send to" />
+        </Row>
+        <Section title="Send an email when" />
+        <div className="grid md:grid-cols-2">
+          {Object.entries(q.data.labels).map(([id, label]) => (
+            <div key={id} className="flex min-h-11 items-center justify-between gap-4 border-t border-zinc-100 px-5 py-2 first:border-t-0 md:[&:nth-child(2)]:border-t-0 dark:border-white/5">
+              <span className="min-w-0 text-[13.5px] font-medium break-words">{label}</span>
+              <Switch checked={!!events[id]} onChange={(v) => setEvents({ ...events, [id]: v })} label={label} />
             </div>
-          </div>
+          ))}
         </div>
-      </Card>
-    </>
+        <SaveBar
+          show={changed}
+          onDiscard={() => {
+            setRecipients(q.data!.recipients.join(", "));
+            setEvents(q.data!.events);
+          }}
+          loading={save.isPending}
+          onSave={() => save.mutate()}
+        />
+      </RowCard>
+    </div>
   );
 }
 

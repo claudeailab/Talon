@@ -1076,18 +1076,18 @@ class Nas:
                         "title": "EntraID client secret " + (
                             "has expired" if exp["days"] < 0 else f"expires in {exp['days']} days"
                             if exp["days"] != 1 else "expires tomorrow"),
-                        "detail": "Create a new secret in Entra and save it here",
+                        "detail": "Create a new secret in Entra and save it in Settings › EntraID",
                         "link": "/settings?tab=entra", "action": "Open"})
         os_up = self.osupdate.info()
         if os_up["progress"].get("state") != "running":
             if os_up["security"]:
                 out.append({"level": "warning",
                             "title": f"{os_up['security']} security update{'s' if os_up['security'] > 1 else ''} for the operating system",
-                            "detail": "", "link": "/settings?tab=update&os=1", "action": "Install"})
+                            "detail": "", "link": "/settings?tab=update", "action": "Install"})
             if os_up["restart_needed"]:
                 out.append({"level": "warning", "title": "Restart to finish the updates",
                             "detail": "Some updates are only used after a restart",
-                            "link": "/settings?tab=update&os=1", "action": "Open"})
+                            "link": "/settings?tab=update", "action": "Open"})
         return self._stamp(out)
 
     def _stamp(self, alerts: List[dict]) -> List[dict]:

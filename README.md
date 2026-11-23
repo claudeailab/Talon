@@ -70,7 +70,7 @@ https://<nas-ip>/
 - **Usage history:** a year of CPU, memory, network, disk and storage graphs
 - **Updates:** Talon and the operating system, optionally automatic
 - **Antivirus:** ClamAV scans of volumes with quarantine
-- **Networking:** DHCP or static IP, HTTPS on or off
+- **Network:** DHCP or static IP, HTTPS on or off
 - **Scheduled:** scripts on a schedule, with live output and progress
 - **SD cards:** fewer writes to an SD or USB flash system disk
 - **Notifications:** email alerts with adjustable thresholds

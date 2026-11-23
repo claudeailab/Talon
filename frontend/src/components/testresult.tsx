@@ -12,7 +12,7 @@ export function TestResult({ checks }: { checks: Check[] }) {
           <li key={c.name} className="flex items-center gap-2 text-[13px]">
             {c.ok ? <CheckCircle2 className="size-4 shrink-0 text-emerald-500" /> : <XCircle className="size-4 shrink-0 text-rose-500" />}
             <span className="shrink-0 font-medium">{c.name}</span>
-            <span className="truncate text-zinc-500" title={c.detail}>
+            <span className="min-w-0 break-words text-zinc-500">
               {c.detail}
             </span>
           </li>

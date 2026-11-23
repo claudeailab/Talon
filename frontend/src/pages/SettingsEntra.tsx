@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
-import { BookOpen, Copy, KeyRound, PlugZap } from "lucide-react";
+import { BookOpen, Copy, PlugZap } from "lucide-react";
 import { api } from "../lib/api";
 import { dateFormat, dateToIso, isoToDate } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { EntraCheck, EntraConfig } from "../lib/types";
 import { TestResult } from "../components/testresult";
-import { Badge, Button, Card, CardHeader, DateInput, Field, Input, Modal, PageLoader, Select, useToast } from "../components/ui";
+import { Badge, Button, DateInput, Input, Modal, PageLoader, Select, useToast } from "../components/ui";
+import { Row, RowCard, SaveBar, Section } from "../components/rows";
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -64,81 +65,89 @@ export default function EntraTab() {
   const recipients = remindTo.split(/[\s,;]+/).filter(Boolean);
   const expiresBad = expires.trim() !== "" && !expiresIso;
   const changed =
-    tenant !== q.data.tenant ||
+    tenant !== (GUID.test(q.data.tenant) ? q.data.tenant : "") ||
     clientId.trim() !== q.data.client_id ||
     secret !== "" ||
     (expiresIso ?? expires) !== q.data.secret_expires ||
     remindDays !== q.data.remind_days ||
     recipients.join(",") !== q.data.remind_to.join(",");
 
+  const W = "w-full font-mono text-[13px] sm:w-80";
+  const discard = () => {
+    setTenantId(GUID.test(q.data!.tenant) ? q.data!.tenant : "");
+    setClientId(q.data!.client_id);
+    setSecret("");
+    setExpires(isoToDate(q.data!.secret_expires));
+    setRemindDays(q.data!.remind_days);
+    setRemindTo(q.data!.remind_to.join(", "));
+  };
+
   return (
-    <div className="space-y-5">
-    <Card>
-      <CardHeader
-        icon={<KeyRound className="size-4.5" />}
-        title={
-          <span className="flex items-center gap-2">
-            EntraID App {q.data.configured ? <Badge tone="green" dot>Configured</Badge> : <Badge dot>Not configured</Badge>}
-          </span>
-        }
-        subtitle="Microsoft sign-in used by OneDrive"
-        actions={
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="ghost" icon={<BookOpen className="size-4" />} onClick={() => setGuide(true)}>
+    <RowCard>
+      <Section
+        title="App registration"
+        badge={q.data.configured ? <Badge tone="green" dot>Configured</Badge> : <Badge dot>Not configured</Badge>}
+        right={
+          <>
+            <Button size="sm" variant="ghost" icon={<BookOpen className="size-3.5" />} onClick={() => setGuide(true)}>
               Setup guide
             </Button>
-            <Button icon={<PlugZap className="size-4" />} loading={test.isPending} onClick={() => test.mutate()}>
+            <Button size="sm" variant="ghost" icon={<PlugZap className="size-3.5" />} loading={test.isPending} onClick={() => test.mutate()}>
               Test
             </Button>
-            <Button variant="primary" disabled={!changed || expiresBad || !tenant} loading={save.isPending} onClick={() => save.mutate()}>
-              Save
-            </Button>
-          </div>
+          </>
         }
       />
-      <div className="grid gap-x-8 gap-y-4 px-5 pb-5 md:grid-cols-2 [&>*]:min-w-0">
-        <Field label="Application (client) ID">
-          <Input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" className="font-mono text-[13px]" />
-        </Field>
-        <Field label="Directory (tenant) ID">
-          <Input value={tenantId} onChange={(e) => setTenantId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" className="font-mono text-[13px]" />
-        </Field>
-        <Field label="Client secret value" hint={q.data.secret_set ? "Saved. Leave empty to keep it." : "Not saved yet"}>
-          <Input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder={q.data.secret_set ? "••••••••••••" : ""} autoComplete="new-password" />
-        </Field>
-        <Field label="Redirect URI">
-          <CopyField value={redirectUri()} />
-        </Field>
-      </div>
-      <div className="border-t border-zinc-100 px-5 pt-4 pb-5 dark:border-white/5">
-        <div className="mb-3 flex items-center gap-2 text-sm font-semibold">
-          Client secret expiry <ExpiryBadge expiry={q.data.expiry} />
-        </div>
-        <div className="grid gap-x-8 gap-y-4 md:grid-cols-3 [&>*]:min-w-0">
-          <Field label="Secret expires on" error={expiresBad ? `Enter the date as ${dateFormat()}` : null}>
-            <DateInput value={expires} onChange={setExpires} />
-          </Field>
-          <Field label="Send a reminder">
-            <Select value={remindDays} onChange={(e) => setRemindDays(Number(e.target.value))}>
-              {[7, 14, 30, 60, 90].map((d) => (
-                <option key={d} value={d}>
-                  {d} days before
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field
-            label="Send the reminder to"
-            hint={smtp.data && !smtp.data.configured ? <span className="text-amber-600 dark:text-amber-400">Set up SMTP first</span> : undefined}
-          >
-            <Input value={remindTo} onChange={(e) => setRemindTo(e.target.value)} placeholder="it@example.com, me@example.com" />
-          </Field>
-        </div>
-      </div>
+      <Row label="Application (client) ID">
+        <Input value={clientId} onChange={(e) => setClientId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" className={W} aria-label="Application (client) ID" />
+      </Row>
+      <Row label="Directory (tenant) ID">
+        <Input value={tenantId} onChange={(e) => setTenantId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" className={W} aria-label="Directory (tenant) ID" />
+      </Row>
+      <Row label="Redirect URI" hint={<span className="font-mono break-all">{redirectUri()}</span>}>
+        <CopyButton value={redirectUri()} />
+      </Row>
+      <Section
+        title="Client secret"
+        badge={<ExpiryBadge expiry={q.data.expiry} />}
+      />
+      <Row label="Value" hint={q.data.secret_set ? "Saved. Leave empty to keep it." : "Not saved yet"}>
+        <Input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} placeholder={q.data.secret_set ? "••••••••••••" : ""} autoComplete="new-password" className={W} aria-label="Client secret value" />
+      </Row>
+      <Row label="Expires on" hint={expiresBad ? <span className="text-rose-600 dark:text-rose-400">Enter the date as {dateFormat()}</span> : "Shown in Entra next to the secret"}>
+        <DateInput value={expires} onChange={setExpires} className="w-full sm:w-44" />
+      </Row>
+      <Row
+        label="Reminder"
+        hint={smtp.data && !smtp.data.configured ? <span className="text-amber-600 dark:text-amber-400">Set up SMTP first, under Notifications</span> : "An email before the secret expires"}
+      >
+        <Select value={remindDays} onChange={(e) => setRemindDays(Number(e.target.value))} className="w-full sm:w-44" aria-label="Send a reminder">
+          {[7, 14, 30, 60, 90].map((d) => (
+            <option key={d} value={d}>
+              {d} days before
+            </option>
+          ))}
+        </Select>
+        <Input value={remindTo} onChange={(e) => setRemindTo(e.target.value)} placeholder="it@example.com" className="w-full sm:w-56" aria-label="Send the reminder to" />
+      </Row>
       {checks && <TestResult checks={checks} />}
+      <SaveBar show={changed} onDiscard={discard} disabled={expiresBad || !tenant} loading={save.isPending} onSave={() => save.mutate()} />
       {guide && <SetupGuide onClose={() => setGuide(false)} />}
-    </Card>
-    </div>
+    </RowCard>
+  );
+}
+
+/** A small Copy button for a value shown next to it. */
+function CopyButton({ value }: { value: string }) {
+  const toast = useToast();
+  return (
+    <Button
+      size="sm"
+      icon={<Copy className="size-3.5" />}
+      onClick={() => navigator.clipboard?.writeText(value).then(() => toast("success", "Copied"), () => toast("error", "Copy failed"))}
+    >
+      Copy
+    </Button>
   );
 }
 
@@ -231,7 +240,7 @@ export function SetupGuide({ onClose }: { onClose: () => void }) {
             Copy the secret <B>Value</B> (not the Secret ID) into Talon. It is shown once.
           </p>
           <p>
-            In Talon, enter its <B>Expires</B> date under <B>Secret expires on</B>.
+            In Talon, enter its <B>Expires</B> date under <B>Expires on</B>.
           </p>
         </Step>
         <Step n={6} title="Save and test in Talon">

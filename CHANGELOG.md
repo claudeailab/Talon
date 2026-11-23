@@ -1,3 +1,8 @@
+## 1.0.125
+- Settings: tidier tabs with one card of rows each, and a Save bar that only appears after a change
+- SMTP moved to Notifications → Email; About removed (version under Update, hardware on the Dashboard)
+- Update shows Talon and the operating system on one page
+
 ## 1.0.124
 - Issues are shown once, in the bell; the status badge and the yellow cards on the Dashboard are gone
 - Each issue shows since when it exists and a button that takes you to the fix

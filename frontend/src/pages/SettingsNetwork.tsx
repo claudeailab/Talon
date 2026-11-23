@@ -1,11 +1,12 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ExternalLink, Lock, Network } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Settings } from "../lib/types";
-import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, Field, Input, Modal, PageLoader, Segmented, Select, ToggleRow, useToast } from "../components/ui";
+import { Badge, Button, Callout, Card, ConfirmDialog, Input, Modal, PageLoader, Segmented, Select, Switch, useToast } from "../components/ui";
+import { Row, RowBlock, RowCard, SaveBar, Section } from "../components/rows";
 
 interface Iface {
   name: string;
@@ -112,81 +113,75 @@ export default function NetworkTab() {
   const locked = !iface.manager || !!q.data.pending;
   const sameAddress = f.mode === "static" && f.address.trim() === iface.address;
 
+  const field = (k: "address" | "subnet" | "gateway" | "dns1" | "dns2", placeholder: string) => (
+    <div className="w-full sm:w-56">
+      <Input value={f[k]} onChange={(e) => set(k, e.target.value)} placeholder={placeholder} inputMode="decimal" className="tabular" aria-label={k} />
+      {errors[k] && <div className="mt-1 text-xs text-rose-600 dark:text-rose-400">{errors[k]}</div>}
+    </div>
+  );
+  const ip = (v: string | null) => <span className={cx("tabular font-mono text-[13px]", !v && "text-zinc-400")}>{v || "—"}</span>;
+
   return (
-    <>
-      <Card>
-        <CardHeader
-          icon={<Network className="size-4.5" />}
-          title={
-            <span className="flex items-center gap-2">
-              Network {iface.mode === "static" ? <Badge tone="violet" dot>Static IP</Badge> : <Badge tone="blue" dot>DHCP</Badge>}
-            </span>
-          }
-          subtitle={`${iface.name} · ${iface.mac}${iface.manager ? ` · managed by ${MANAGER[iface.manager]}` : ""}`}
-          actions={
-            <Button variant="primary" disabled={!changed || !valid || locked} onClick={() => setConfirm(true)}>
-              Save
-            </Button>
-          }
+    <RowCard>
+      <Section
+        title={
+          <>
+            <span className="normal-case">{iface.name}</span> · <span className="normal-case">{iface.mac}</span>
+            {iface.manager && <> · <span className="normal-case">{MANAGER[iface.manager]}</span></>}
+          </>
+        }
+      />
+      {iface.unsupported && (
+        <RowBlock>
+          <Callout tone="warning">{iface.unsupported}.</Callout>
+        </RowBlock>
+      )}
+      {q.data.interfaces.length > 1 && (
+        <Row label="Interface">
+          <Select value={iface.name} onChange={(e) => setName(e.target.value)} className="w-full sm:w-56" aria-label="Interface">
+            {q.data.interfaces.map((i) => (
+              <option key={i.name} value={i.name}>
+                {i.name}
+                {i.address ? ` · ${i.address}` : ""}
+              </option>
+            ))}
+          </Select>
+        </Row>
+      )}
+      <Row label="IP address" hint={f.mode === "dhcp" ? "Given by your router" : "Fixed, set here"}>
+        <Segmented
+          value={f.mode}
+          onChange={(v) => set("mode", v)}
+          options={[
+            { value: "dhcp", label: "Automatic" },
+            { value: "static", label: "Static" },
+          ]}
         />
-        <div className="space-y-5 px-5 pb-5">
-          {iface.unsupported && <Callout tone="warning">{iface.unsupported}.</Callout>}
-          <div className="flex flex-wrap items-end gap-x-8 gap-y-4">
-            {q.data.interfaces.length > 1 && (
-              <Field label="Interface">
-                <Select value={iface.name} onChange={(e) => setName(e.target.value)} className="w-56">
-                  {q.data.interfaces.map((i) => (
-                    <option key={i.name} value={i.name}>
-                      {i.name}
-                      {i.address ? ` · ${i.address}` : ""}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-            )}
-            <div>
-              <div className="mb-1.5 text-[13px] font-medium text-zinc-700 dark:text-zinc-300">IP address</div>
-              <Segmented
-                value={f.mode}
-                onChange={(v) => set("mode", v)}
-                options={[
-                  { value: "dhcp", label: "Automatic (DHCP)" },
-                  { value: "static", label: "Static IP" },
-                ]}
-              />
-            </div>
-          </div>
-
-          {f.mode === "dhcp" ? (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <Value label="IP address" value={iface.address} />
-              <Value label="Subnet mask" value={iface.subnet} />
-              <Value label="Gateway" value={iface.gateway} />
-              <Value label="DNS servers" value={iface.dns.join(", ")} />
-            </div>
-          ) : (
-            <div className="grid gap-x-6 gap-y-4 md:grid-cols-3 [&>*]:min-w-0">
-              <Field label="IP address" error={errors.address}>
-                <Input value={f.address} onChange={(e) => set("address", e.target.value)} placeholder="192.168.1.60" inputMode="decimal" className="tabular" />
-              </Field>
-              <Field label="Subnet mask" error={errors.subnet}>
-                <Input value={f.subnet} onChange={(e) => set("subnet", e.target.value)} placeholder="255.255.255.0" inputMode="decimal" className="tabular" />
-              </Field>
-              <Field label="Gateway" hint="Usually your router" error={errors.gateway}>
-                <Input value={f.gateway} onChange={(e) => set("gateway", e.target.value)} placeholder="192.168.1.1" inputMode="decimal" className="tabular" />
-              </Field>
-              <Field label="DNS server" error={errors.dns1}>
-                <Input value={f.dns1} onChange={(e) => set("dns1", e.target.value)} placeholder="192.168.1.1" inputMode="decimal" className="tabular" />
-              </Field>
-              <Field label="Second DNS server" hint="Optional" error={errors.dns2}>
-                <Input value={f.dns2} onChange={(e) => set("dns2", e.target.value)} placeholder="1.1.1.1" inputMode="decimal" className="tabular" />
-              </Field>
-            </div>
-          )}
-
-        </div>
-      </Card>
-
+      </Row>
+      {f.mode === "dhcp" ? (
+        <>
+          <Row label="Address">
+            {ip(iface.address)}
+            <span className="text-zinc-400">/</span>
+            {ip(iface.subnet)}
+          </Row>
+          <Row label="Gateway · DNS">
+            {ip(iface.gateway)}
+            <span className="text-zinc-400">·</span>
+            {ip(iface.dns.join(", "))}
+          </Row>
+        </>
+      ) : (
+        <>
+          <Row label="Address">{field("address", "192.168.1.60")}</Row>
+          <Row label="Subnet mask">{field("subnet", "255.255.255.0")}</Row>
+          <Row label="Gateway" hint="Usually your router">{field("gateway", "192.168.1.1")}</Row>
+          <Row label="DNS server">{field("dns1", "192.168.1.1")}</Row>
+          <Row label="Second DNS server" hint="Optional">{field("dns2", "1.1.1.1")}</Row>
+        </>
+      )}
+      <SaveBar show={changed} onDiscard={() => setF(start)} disabled={!valid || locked} onSave={() => setConfirm(true)} />
+      <WebRows />
       <ConfirmDialog
         open={confirm}
         onClose={() => setConfirm(false)}
@@ -213,8 +208,7 @@ export default function NetworkTab() {
         }
       />
       {moving && <Moving target={moving} onDone={() => setMoving(null)} />}
-      <WebCard />
-    </>
+    </RowCard>
   );
 }
 
@@ -222,7 +216,7 @@ export default function NetworkTab() {
 
 type Web = { https: boolean; port: number; https_port: number; serving_https: boolean };
 
-function WebCard() {
+function WebRows() {
   const q = useQuery({ queryKey: ["web"], queryFn: () => api.get<Web>("/settings/web") });
   const [ask, setAsk] = useState<boolean | null>(null);
   const [restarting, setRestarting] = useState<string | null>(null);
@@ -242,24 +236,19 @@ function WebCard() {
   if (!q.data) return null;
   const on = q.data.https;
   return (
-    <Card className="mt-5">
-      <CardHeader
-        icon={<Lock className="size-4.5" />}
-        title={
-          <span className="flex items-center gap-2">
-            Web Interface {on ? <Badge tone="green" dot>HTTPS</Badge> : <Badge tone="amber" dot>HTTP</Badge>}
+    <>
+      <Section title="Web interface" />
+      <Row
+        inline
+        label={
+          <span className="flex flex-wrap items-center gap-2">
+            HTTPS {on ? <Badge tone="green">port {q.data.port}</Badge> : <Badge tone="amber">off · http:// on port {q.data.port}</Badge>}
           </span>
         }
-        subtitle={on ? `https:// on port ${q.data.port}, with Talon's own certificate` : `Plain http:// on port ${q.data.port}`}
-      />
-      <div className="px-5 pb-3">
-        <ToggleRow
-          title="HTTPS"
-          description="Turn off when Cloudflare or another proxy provides HTTPS"
-          checked={on}
-          onChange={(v) => setAsk(v)}
-        />
-      </div>
+        hint="Turn off when Cloudflare or another proxy provides HTTPS"
+      >
+        <Switch checked={on} onChange={(v) => setAsk(v)} label="HTTPS" />
+      </Row>
       <ConfirmDialog
         open={ask !== null}
         onClose={() => setAsk(null)}
@@ -280,16 +269,7 @@ function WebCard() {
           </p>
         </Modal>
       )}
-    </Card>
-  );
-}
-
-function Value({ label, value }: { label: string; value: string | null }) {
-  return (
-    <div className="rounded-xl bg-zinc-50 px-3.5 py-2.5 dark:bg-white/[0.03]">
-      <div className="text-xs text-zinc-500">{label}</div>
-      <div className={cx("tabular truncate text-sm font-medium", !value && "text-zinc-400")}>{value || "—"}</div>
-    </div>
+    </>
   );
 }
 

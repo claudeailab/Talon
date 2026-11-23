@@ -84,7 +84,7 @@ def validate(data: dict) -> dict:
 def netplan_yaml(key: str, cfg: dict) -> str:
     """A netplan file for one ethernet interface (it overrides the same key in
     the other files, which netplan reads in alphabetical order)."""
-    lines = ["# Written by Talon (Settings > Networking).", "network:", "  version: 2",
+    lines = ["# Written by Talon (Settings > Network).", "network:", "  version: 2",
              "  ethernets:", f"    {key}:"]
     if cfg["mode"] == "dhcp":
         lines.append("      dhcp4: true")
