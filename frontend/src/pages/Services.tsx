@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { Apple, Cloud, Copy, FolderSync, ShieldCheck, Globe, Monitor, Network, RotateCw, Server, Settings2, Terminal } from "lucide-react";
+import { Apple, Cloud, Copy, FolderSync, MemoryStick, ShieldCheck, Globe, Monitor, Network, RotateCw, Server, Settings2, Terminal } from "lucide-react";
 import { api } from "../lib/api";
 import { useAction } from "../lib/hooks";
 import { navigate } from "../lib/router";
@@ -16,6 +16,7 @@ const ICONS: Record<string, React.ReactNode> = {
   onedrive: <Cloud className="size-5" />,
   webdav: <FolderSync className="size-5" />,
   antivirus: <ShieldCheck className="size-5" />,
+  sdcard: <MemoryStick className="size-5" />,
 };
 
 export default function ServicesPage() {
@@ -49,13 +50,14 @@ export default function ServicesPage() {
                 </div>
               </div>
               <Switch
-                checked={s.enabled && s.active}
+                checked={s.app ? s.enabled : s.enabled && s.active}
                 disabled={!s.installed || act.isPending}
                 label={`Enable ${s.label}`}
                 onChange={(v) => act.mutate({ id: s.id, action: v ? "enable" : "disable" })}
               />
             </div>
             <p className="mt-3 text-[13px] text-zinc-500 dark:text-zinc-400">{s.description}</p>
+            {s.detail && <p className="mt-1 text-[12.5px] font-medium text-zinc-700 dark:text-zinc-300">{s.detail}</p>}
             {s.id === "webdav" && s.enabled && (
               <p className="mt-1 font-mono text-[12.5px] break-all text-zinc-700 dark:text-zinc-300">{davUrl}</p>
             )}
@@ -77,7 +79,7 @@ export default function ServicesPage() {
                 >
                   Copy address
                 </Button>
-              ) : s.app ? (
+              ) : s.id === "sdcard" ? null : s.app ? (
                 <Button size="sm" variant="ghost" icon={<Settings2 className="size-3.5" />} disabled={!s.enabled} onClick={() => navigate(`/${s.id}`)}>
                   Configure
                 </Button>

@@ -8,7 +8,8 @@ restarts, the same idea as log2ram. Talon writes its own files less often too.
 At boot a small systemd service (talon-ramlog) bind-mounts the real /var/log to
 /var/hdd.log, mounts a tmpfs on /var/log and copies the logs into it. It never
 stops the NAS from starting: if anything fails, the logs simply stay on the disk.
-Turning it on or off takes effect after the next restart."""
+Turning it on or off (Services → SD-card protection, off by default) takes effect
+after the next restart."""
 from __future__ import annotations
 
 import os
@@ -176,6 +177,19 @@ class RamLog:
         except (OSError, ValueError, AttributeError):
             return None
 
+    def service_info(self) -> dict:
+        """The Services page: off by default, recommended when the system disk is flash."""
+        st = self.status()
+        what = {"sd": "an SD card", "usb": "a USB flash drive"}.get(st["flash"])
+        detail = ("Applies after the next restart" if st["restart_needed"]
+                  else f"Logs in memory: {st['used_mb']} of {st['size_mb']} MB" if st["active"]
+                  else f"Recommended: the system runs from {what}" if what else None)
+        return {"id": "sdcard", "unit": None, "installed": True, "active": st["active"], "enabled": st["enabled"],
+                "label": "SD-card protection",
+                "description": "Keeps the system logs in memory and writes them to the disk once a day, "
+                               "so an SD card or USB flash drive lasts longer",
+                "detail": detail, "app": True}
+
     # ------------------------------------------------------------ on / off
     def set_enabled(self, enabled: bool, actor: str) -> dict:
         if not self.demo:
@@ -215,13 +229,3 @@ class RamLog:
     def write_now(self) -> None:
         if not self.demo and self.active():
             run(["systemctl", "reload", "talon-ramlog.service"], check=False)
-
-    def auto_enable(self) -> None:
-        """First start on an SD card or USB flash drive: turn it on by default."""
-        if self.state.get("ramlog") is not None:
-            return
-        st = self.status()
-        if st["recommended"]:
-            self.set_enabled(True, "talon")
-        else:
-            self.state.update(lambda d: d.__setitem__("ramlog", {"enabled": False, "changed": time.time()}))

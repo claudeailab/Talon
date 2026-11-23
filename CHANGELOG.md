@@ -1,3 +1,6 @@
+## 1.0.120
+- SD-card protection is now a service on the Services page, off by default
+
 ## 1.0.119
 - Website publishing retries when GitHub is slow to list the upload
 

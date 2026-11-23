@@ -101,10 +101,6 @@ class Nas:
 
     # ---------------------------------------------------------------- lifecycle
     def start(self) -> None:
-        try:
-            self.ramlog.auto_enable()
-        except Exception:   # noqa: BLE001 - only a convenience
-            pass
         if getattr(self.p, "demo", False):
             try:
                 self.usage.seed_demo({v["name"]: float(v["used"]) for v in self.volumes() if v.get("size")},

@@ -282,14 +282,14 @@ def test_alert_thresholds(client):
         assert client.put("/api/thresholds", json={**info["values"], **bad}).status_code == 400
 
 
-def test_fewer_writes_to_the_system_disk(client):
-    st = client.get("/api/settings/sdcard").json()
-    # the demo system disk is an SD card: turned on by default, active after a restart
-    assert st["recommended"] and st["flash"] == "sd" and st["enabled"]
-    st = client.put("/api/settings/sdcard", json={"enabled": False}).json()
-    assert not st["enabled"]
+def test_sd_card_protection_is_a_service(client):
+    svc = next(s for s in client.get("/api/services").json() if s["id"] == "sdcard")
+    assert not svc["enabled"] and "SD card" in svc["detail"]                 # off by default, recommended
+    assert client.post("/api/services/sdcard/enable").status_code == 200
+    svc = next(s for s in client.get("/api/services").json() if s["id"] == "sdcard")
+    assert svc["enabled"]
     acts = client.get("/api/activity", params={"q": "system disk"}).json()["items"]
-    assert acts and "Turned off" in acts[0]["message"]
+    assert acts and "Turned on" in acts[0]["message"]
 
 
 def test_ramlog_script_never_blocks_the_boot():

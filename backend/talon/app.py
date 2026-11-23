@@ -628,10 +628,16 @@ def create_app(cfg, platform) -> FastAPI:
     # ------------------------------------------------------------ services & system
     @app.get("/api/services")
     def services(_u: str = Depends(current_user)):
-        return platform.services() + [nas.cloud.service_info(), webdav.service_info(), nas.antivirus.service_info()]
+        return platform.services() + [nas.cloud.service_info(), webdav.service_info(), nas.antivirus.service_info(),
+                                      nas.ramlog.service_info()]
 
     @app.post("/api/services/{sid}/{action}")
     def service_action(sid: str, action: str, user: str = Depends(current_user)):
+        if sid == "sdcard":
+            if action not in ("enable", "disable"):
+                raise HTTPException(400, "SD-card protection can only be enabled or disabled")
+            nas.ramlog.set_enabled(action == "enable", user)
+            return {"ok": True}
         if sid == "antivirus":
             if action not in ("enable", "disable"):
                 raise HTTPException(400, "The antivirus can only be enabled or disabled")
@@ -991,14 +997,6 @@ def create_app(cfg, platform) -> FastAPI:
     def settings_update(body: dict = Body(...), user: str = Depends(current_user)):
         nas.update_settings(body, user)
         return nas.settings()
-
-    @app.get("/api/settings/sdcard")
-    def sdcard(_u: str = Depends(current_user)):
-        return nas.ramlog.status()
-
-    @app.put("/api/settings/sdcard")
-    def sdcard_update(body: dict = Body(...), user: str = Depends(current_user)):
-        return nas.ramlog.set_enabled(bool(body.get("enabled")), user)
 
     @app.get("/api/settings/timezones")
     def timezones(_u: str = Depends(current_user)):

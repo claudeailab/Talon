@@ -161,6 +161,7 @@ export interface Service {
   label: string;
   description: string;
   app?: boolean;
+  detail?: string | null;   // a status line under the description
 }
 
 export interface SysInfo {
