@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import os
 import time
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 
 from .util import read_file, run, write_atomic
 
@@ -128,21 +128,124 @@ def flash_kind(root_disk: str, tran: str = "", rotational: bool = False) -> str:
     return ""
 
 
+LOGGERS = ("systemd-journal", "rsyslogd")          # what the logging programs are called in /proc/<pid>/comm
+SAMPLE_SECONDS = 300
+KEEP_HOURS = 7 * 24
+MIN_HOURS = 3                                     # before that, the page says it is still measuring
+
+
+def read_diskstats(disk: str, text: Optional[str] = None) -> Optional[Tuple[int, int]]:
+    """(bytes written, write operations) of a whole disk since boot, from /proc/diskstats."""
+    for line in (text if text is not None else read_file("/proc/diskstats") or "").splitlines():
+        f = line.split()
+        if len(f) >= 10 and f[2] == disk:
+            return int(f[9]) * 512, int(f[7])
+    return None
+
+
+def logger_bytes(proc: str = "/proc") -> Dict[int, int]:
+    """{pid: bytes it caused to be written to storage} for the logging programs (/proc/<pid>/io)."""
+    out = {}
+    try:
+        pids = [p for p in os.listdir(proc) if p.isdigit()]
+    except OSError:
+        return out
+    for pid in pids:
+        try:
+            with open(f"{proc}/{pid}/comm") as f:
+                if f.read().strip() not in LOGGERS:
+                    continue
+            with open(f"{proc}/{pid}/io") as f:
+                for line in f:
+                    if line.startswith("write_bytes:"):
+                        out[int(pid)] = int(line.split()[1])
+        except (OSError, ValueError):
+            continue
+    return out
+
+
 class RamLog:
     def __init__(self, state, demo: bool = False):
         self.state = state
         self.demo = demo
+        self._root: Optional[dict] = None
+        self._prev: Optional[dict] = None         # the counters at the last sample
+        # hourly totals: {hour start: [disk bytes, disk writes, log bytes]}
+        self._hours: Dict[int, List[int]] = {int(k): v for k, v in ((self.state.get("ramlog_stats") or {}).items())}
+
+    # ------------------------------------------------------------ measuring
+    def sample(self) -> None:
+        """Every 5 minutes: what was written to the system disk, and by the logging programs."""
+        if self.demo:
+            return
+        disk = read_diskstats(self._root_disk()["name"])
+        if not disk:
+            return
+        logs = logger_bytes()
+        now = time.time()
+        prev, self._prev = self._prev, {"disk": disk, "logs": logs}
+        if not prev:
+            return
+        d_bytes = max(0, disk[0] - prev["disk"][0])
+        d_ops = max(0, disk[1] - prev["disk"][1])
+        # a logging program that restarted starts counting from 0 again
+        l_bytes = sum(v - prev["logs"].get(pid, 0) if v >= prev["logs"].get(pid, 0) else v for pid, v in logs.items())
+        hour = int(now // 3600 * 3600)
+        h = self._hours.setdefault(hour, [0, 0, 0])
+        h[0] += d_bytes
+        h[1] += d_ops
+        h[2] += min(l_bytes, d_bytes)
+        cut = hour - KEEP_HOURS * 3600
+        for k in [k for k in self._hours if k < cut]:
+            del self._hours[k]
+        if len(self._hours) and (not hasattr(self, "_saved_hour") or self._saved_hour != hour):
+            self._saved_hour = hour                # kept once an hour, so a restart does not lose a week
+            snapshot = {str(k): v for k, v in self._hours.items()}
+            self.state.update(lambda d: d.__setitem__("ramlog_stats", snapshot))
+
+    def measured(self) -> Optional[dict]:
+        """Daily averages over the hours measured (up to 7 days)."""
+        if self.demo:
+            if (self.state.get("ramlog") or {}).get("enabled"):
+                return None
+            return {"hours": 168, "disk_bytes": int(2.4 * 1024 ** 3), "disk_ops": 41200,
+                    "log_bytes": int(1.4 * 1024 ** 3), "log_ops": 29000}
+        hours = len(self._hours)
+        if hours < MIN_HOURS:
+            return {"hours": hours}
+        tot = [sum(h[i] for h in self._hours.values()) for i in range(3)]
+        per_day = 24 / hours
+        share = tot[2] / tot[0] if tot[0] else 0
+        return {"hours": hours, "disk_bytes": int(tot[0] * per_day), "disk_ops": int(tot[1] * per_day),
+                "log_bytes": int(tot[2] * per_day), "log_ops": int(tot[1] * share * per_day)}
+
+    def saved(self) -> Optional[dict]:
+        """While it is on: the writes it avoided since it was turned on (at most 7 days),
+        from what the logs wrote per day before."""
+        r = self.state.get("ramlog") or {}
+        base = r.get("baseline")
+        since = r.get("active_since")
+        if self.demo and r.get("enabled"):
+            base, since = {"log_bytes": int(1.4 * 1024 ** 3), "log_ops": 29000}, time.time() - 7 * 86400
+        if not base or not since:
+            return None
+        days = min(7.0, max(0.0, (time.time() - since) / 86400))
+        return {"days": round(days, 1), "bytes": int(base["log_bytes"] * days), "ops": int(base["log_ops"] * days),
+                "per_day_bytes": base["log_bytes"]}
 
     # ------------------------------------------------------------ status
     def _root_disk(self) -> dict:
         if self.demo:
             return {"name": "mmcblk0", "tran": "", "rotational": False}
+        if self._root:
+            return self._root
         src = run(["findmnt", "-n", "-o", "SOURCE", "/"], check=False).stdout.strip()
         disk = run(["lsblk", "-ndo", "PKNAME", src], check=False).stdout.strip() if src.startswith("/dev/") else ""
         disk = disk or os.path.basename(src)
         info = run(["lsblk", "-ndo", "TRAN,ROTA", f"/dev/{disk}"], check=False).stdout.split()
-        return {"name": disk, "tran": info[0] if info and info[0] not in ("0", "1") else "",
-                "rotational": bool(info) and info[-1] == "1"}
+        self._root = {"name": disk, "tran": info[0] if info and info[0] not in ("0", "1") else "",
+                      "rotational": bool(info) and info[-1] == "1"}
+        return self._root
 
     def active(self) -> bool:
         if self.demo:
@@ -182,9 +285,16 @@ class RamLog:
         st = self.status()
         what = {"sd": "an SD card", "usb": "a USB flash drive"}.get(st["flash"])
         detail = ("Applies after the next restart" if st["restart_needed"]
-                  else f"Logs in memory: {st['used_mb']} of {st['size_mb']} MB" if st["active"]
+                  else None if st["active"]
                   else f"Recommended: the system runs from {what}" if what else None)
+        if st["active"] and not (self.state.get("ramlog") or {}).get("active_since"):
+            # the first look after the restart that turned it on: from now on it saves
+            self.state.update(lambda d: d.setdefault("ramlog", {}).__setitem__("active_since", time.time()))
+        disk_label = {"sd": "SD card", "usb": "USB flash drive"}.get(st["flash"], "system disk")
         return {"id": "sdcard", "unit": None, "installed": True, "active": st["active"], "enabled": st["enabled"],
+                "writes": {"disk": disk_label, "measured": None if st["active"] else self.measured(),
+                           "saved": self.saved() if st["active"] else None,
+                           "used_mb": st["used_mb"], "size_mb": st["size_mb"], "synced_at": st["synced_at"]},
                 "label": "SD-card protection",
                 "description": "Keeps the system logs in memory and writes them to the disk once a day, "
                                "so an SD card or USB flash drive lasts longer",
@@ -194,7 +304,11 @@ class RamLog:
     def set_enabled(self, enabled: bool, actor: str) -> dict:
         if not self.demo:
             (self._install if enabled else self._uninstall)()
-        self.state.update(lambda d: d.__setitem__("ramlog", {"enabled": bool(enabled), "changed": time.time()}))
+        m = self.measured() if enabled else None
+        # what the logs wrote per day so far: the base for "saved" once it runs
+        baseline = {"log_bytes": m["log_bytes"], "log_ops": m["log_ops"]} if m and "log_bytes" in m else None
+        self.state.update(lambda d: d.__setitem__("ramlog", {"enabled": bool(enabled), "changed": time.time(),
+                                                             "baseline": baseline}))
         self.state.log_activity(actor, ("Turned on" if enabled else "Turned off") +
                                 " fewer writes to the system disk (applies after a restart)", "info", "settings")
         return self.status()

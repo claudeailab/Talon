@@ -1,3 +1,7 @@
+## 1.0.121
+- SD-card protection shows what is written to the system disk and what it would save, or saved
+- Services are listed as Enabled and Disabled
+
 ## 1.0.120
 - SD-card protection is now a service on the Services page, off by default
 

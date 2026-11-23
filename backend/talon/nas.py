@@ -112,6 +112,7 @@ class Nas:
         threading.Thread(target=self._watcher, daemon=True, name="notify").start()
         self.cloud.start()
         self.scheduler.start()
+        threading.Thread(target=self._ramlog_sampler, daemon=True, name="disk-writes").start()
         threading.Thread(target=self.backup.background_loop, args=(self._stop,), daemon=True, name="backup").start()
         threading.Thread(target=self.antivirus.background_loop, args=(self._stop,), daemon=True, name="antivirus").start()
         threading.Thread(target=self.osupdate.background_loop, args=(self._stop,), daemon=True, name="os-update-check").start()
@@ -186,6 +187,16 @@ class Nas:
         out["volumes"] = {name: {"size": size, "forecast": self.usage.forecast("vol:" + name, size)} for name, size in vols.items()}
         out["disks"] = sorted({k[5:] for p in out["points"] for k in p if k.startswith("disk:") and not k.endswith("^")})
         return out
+
+    def _ramlog_sampler(self) -> None:
+        """What is written to the system disk (Services → SD-card protection)."""
+        from .ramlog import SAMPLE_SECONDS
+        while not self._stop.is_set():
+            try:
+                self.ramlog.sample()
+            except Exception:   # noqa: BLE001
+                pass
+            self._stop.wait(SAMPLE_SECONDS)
 
     def _smart_refresher(self) -> None:
         while not self._stop.is_set():

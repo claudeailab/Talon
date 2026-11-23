@@ -345,3 +345,25 @@ def test_date_and_time_format(client):
     assert client.put("/api/settings", json={"date_format": "yyyy/dd/mm"}).status_code == 400
     from talon.util import date_pattern
     assert date_pattern(s, True) == "%m/%d/%Y %I:%M %p" and date_pattern({}) == "%d-%m-%Y"
+
+
+def test_disk_write_measuring(tmp_path):
+    import types
+    from talon.ramlog import RamLog, logger_bytes
+    proc = tmp_path / "proc"
+    for pid, comm, wb in ((10, "systemd-journal", 4096), (11, "rsyslogd", 1024), (12, "bash", 999999)):
+        (proc / str(pid)).mkdir(parents=True)
+        (proc / str(pid) / "comm").write_text(comm + "\n")
+        (proc / str(pid) / "io").write_text(f"rchar: 1\nwrite_bytes: {wb}\n")
+    assert logger_bytes(str(proc)) == {10: 4096, 11: 1024}
+
+    class St:
+        d = {}
+        def get(self, k): return self.d.get(k)
+        def update(self, f): f(self.d)
+    r = RamLog(St())
+    import time
+    hour = int(time.time() // 3600 * 3600)
+    r._hours = {hour - i * 3600: [100 * 2 ** 20, 1000, 40 * 2 ** 20] for i in range(24)}
+    m = r.measured()
+    assert m["disk_bytes"] == 2400 * 2 ** 20 and m["log_bytes"] == 960 * 2 ** 20 and m["log_ops"] == 9600

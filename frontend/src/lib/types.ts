@@ -162,6 +162,15 @@ export interface Service {
   description: string;
   app?: boolean;
   detail?: string | null;   // a status line under the description
+  // SD-card protection: what is written to the system disk now, or what it saved
+  writes?: {
+    disk: string;
+    measured: { hours: number; disk_bytes?: number; disk_ops?: number; log_bytes?: number; log_ops?: number } | null;
+    saved: { days: number; bytes: number; ops: number; per_day_bytes: number } | null;
+    used_mb: number | null;
+    size_mb: number;
+    synced_at: number | null;
+  };
 }
 
 export interface SysInfo {
