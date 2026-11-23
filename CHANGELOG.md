@@ -1,3 +1,6 @@
+## 1.0.141
+- Phones: swipe right to open the menu, left to close it; it closes when you open a page, also the one already open
+
 ## 1.0.140
 - Checkboxes have Talon's own look in light and dark mode, instead of a black square in some browsers
 

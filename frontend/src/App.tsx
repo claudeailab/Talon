@@ -34,7 +34,7 @@ import { api, setUnauthorizedHandler } from "./lib/api";
 import type { Settings } from "./lib/types";
 import { cx, date, setFormats } from "./lib/format";
 import { useTheme } from "./lib/hooks";
-import { Link, navigate, usePath } from "./lib/router";
+import { Link, navigate, usePath, useSearch } from "./lib/router";
 import type { Alert, Job, OneDriveStatus, UpdateInfo } from "./lib/types";
 import { ConfirmDialog, IconButton, Menu, MenuItem, PageLoader } from "./components/ui";
 import { useAction } from "./lib/hooks";
@@ -102,6 +102,15 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
   },
 ];
 
+/** Inside something that scrolls sideways (a wide table): a horizontal swipe scrolls it instead. */
+function sideways(el: HTMLElement | null): boolean {
+  for (let n = el; n && n !== document.body; n = n.parentElement) {
+    const ox = getComputedStyle(n).overflowX;
+    if ((ox === "auto" || ox === "scroll") && n.scrollWidth > n.clientWidth) return true;
+  }
+  return false;
+}
+
 export default function App() {
   const qc = useQueryClient();
   const me = useQuery({ queryKey: ["me"], queryFn: () => api.get<Me>("/auth/me"), retry: false, staleTime: Infinity });
@@ -163,7 +172,35 @@ function Shell({ me }: { me: Me }) {
     setPrevRunning(running.length);
   }, [running.length]); // eslint-disable-line
 
-  useEffect(() => setMobileNav(false), [path]);
+  // the phone menu closes when a page opens, also a tab of the same page (?tab=…)
+  const search = useSearch();
+  useEffect(() => setMobileNav(false), [path, search]);
+  // phones: swipe right to open the menu, swipe left to close it
+  useEffect(() => {
+    let start: { x: number; y: number; t: number } | null = null;
+    const down = (e: TouchEvent) => {
+      const t = e.touches[0];
+      const el = e.target as HTMLElement | null;
+      // not while sliding a control, selecting text in a field, or scrolling something sideways
+      const busy = el?.closest("input, textarea, select, [role=dialog], [data-noswipe]") || sideways(el);
+      start = e.touches.length === 1 && !busy && window.innerWidth < 1024 ? { x: t.clientX, y: t.clientY, t: Date.now() } : null;
+    };
+    const up = (e: TouchEvent) => {
+      if (!start) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - start.x;
+      const dy = Math.abs(t.clientY - start.y);
+      const quick = Date.now() - start.t < 700;
+      if (quick && Math.abs(dx) > 70 && dy < Math.abs(dx) / 2) setMobileNav(dx > 0);
+      start = null;
+    };
+    document.addEventListener("touchstart", down, { passive: true });
+    document.addEventListener("touchend", up, { passive: true });
+    return () => {
+      document.removeEventListener("touchstart", down);
+      document.removeEventListener("touchend", up);
+    };
+  }, []);
   useEffect(() => {
     if (path === "/storage") navigate("/volumes"); // old address
     if (path === "/support") navigate("/documentation" + location.search); // old address
@@ -249,6 +286,7 @@ function Shell({ me }: { me: Me }) {
                   <Link
                     key={i.to}
                     to={i.to}
+                    onClick={() => setMobileNav(false)}
                     className={cx(
                       "group flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-medium transition",
                       active

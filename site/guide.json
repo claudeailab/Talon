@@ -69,6 +69,9 @@
     "blocks": [
      {
       "p": "Click your name at the bottom of the menu to **Log out**, **Restart** or **Shut down** the NAS. The moon and sun button switches between dark and light mode."
+     },
+     {
+      "p": "On a phone, open the menu with the button at the top left or by swiping right, and close it by swiping left. It closes by itself when you open a page."
      }
     ]
    }
