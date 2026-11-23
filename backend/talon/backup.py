@@ -68,7 +68,8 @@ class Backup:
         if self.demo:
             return f"demo-{dev}"
         key = f"{dev}:{fstype}"
-        if key not in self._uuid_cache:
+        if not self._uuid_cache.get(key):
+            # not cached when empty: a disk that was just plugged in may not have it yet
             self._uuid_cache[key] = run(["lsblk", "-ndo", "UUID", f"/dev/{dev}"], check=False).stdout.strip()
         return self._uuid_cache[key]
 

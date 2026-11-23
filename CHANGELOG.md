@@ -1,5 +1,10 @@
+## 1.0.137
+- Backup: a USB disk that was read before it was fully detected no longer stays hidden until Talon restarts
+
 ## 1.0.136
-- Releases 1.0.135: several volumes on one RAID array (its build check had failed)
+- A RAID array can hold several volumes, each with its own size (LVM)
+- Change size: grow a volume while in use, or shrink an ext4 volume to free space
+- The RAID page shows each array's volumes and its free space
 
 ## 1.0.135
 - A RAID array can hold several volumes, each with its own size (LVM)
