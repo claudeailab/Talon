@@ -1,3 +1,7 @@
+## 1.0.139
+- Backup: choose whole volumes or folders on them, with their sizes, instead of shared folders
+- Existing backups keep copying the same folders
+
 ## 1.0.138
 - New backup also offers empty disks: Talon erases and prepares the chosen one (ext4) before the first backup
 - Shorter texts in the New backup steps

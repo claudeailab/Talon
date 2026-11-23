@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { DatabaseBackup, HardDrive, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Square, Trash2, Usb } from "lucide-react";
+import { Check, ChevronDown, DatabaseBackup, HardDrive, Minus, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Square, Trash2, Usb } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, bytes, cx, dateTime, rate } from "../lib/format";
 import { useAction } from "../lib/hooks";
@@ -15,7 +15,7 @@ type Task = {
   disk_name: string;
   disk_size: number;
   versions: boolean;
-  shares: string[];
+  sources: Source[];
   when: "plug" | "daily" | "both";
   time: string;
   eject: boolean;
@@ -27,7 +27,11 @@ type Task = {
   progress: { state: "idle" | "running" | "success" | "error" | "stopped"; share?: string; index?: number; total?: number; percent?: number; speed?: number | null };
 };
 type Blank = { disk: string; name: string; media: string; size: number; kind: string; state: "Empty" | "Has data" | "Old RAID" };
-type Info = { tasks: Task[]; disks: Disk[]; prepare: Blank[]; shares: string[]; backup_dir: string };
+/** a whole volume (no folders) or folders on it */
+type Source = { volume: string; folders: string[] };
+type VolumeSrc = { volume: string; used: number; folders: { name: string; size: number | null }[] };
+type Info = { tasks: Task[]; disks: Disk[]; prepare: Blank[]; sources: VolumeSrc[]; backup_dir: string };
+const describe = (src: Source[]) => src.map((x) => (x.folders.length ? `${x.volume}: ${x.folders.join(", ")}` : x.volume)).join(" · ");
 const KEEP = [7, 14, 30, 90, 365];
 const whenText = (t: Pick<Task, "when" | "time">) =>
   t.when === "plug" ? "Runs when the disk is plugged in" : t.when === "daily" ? `Runs every day at ${t.time}` : `Runs when plugged in and every day at ${t.time}`;
@@ -47,7 +51,7 @@ export default function BackupPage() {
     <>
       <PageHeader
         title="Backup"
-        description="Copy shared folders to another disk"
+        description="Copy volumes and folders to another disk"
         actions={
           d.tasks.length > 0 && (
             <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setWizard("new")}>
@@ -61,7 +65,7 @@ export default function BackupPage() {
           <Empty
             icon={<DatabaseBackup className="size-6" />}
             title="No backups yet"
-            text="Keep a copy of your shared folders on a USB or internal disk. RAID is not a backup."
+            text="Keep a copy on a USB or internal disk. RAID is not a backup."
             action={
               <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setWizard("new")}>
                 New backup
@@ -103,7 +107,7 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
           <p className="text-[13px] break-words text-zinc-500">
             {t.disk ? `${t.disk.media}: ` : ""}
             {t.disk_name}
-            {t.disk_size ? ` · ${bytes(t.disk_size)}` : ""} · {t.shares.length ? t.shares.join(", ") : "All shared folders"}
+            {t.disk_size ? ` · ${bytes(t.disk_size)}` : ""} · {describe(t.sources)}
           </p>
         </div>
         <Menu
@@ -209,7 +213,13 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
     setPrep(dev);
     setErase(false);
   };
-  const [shares, setShares] = useState<string[]>(task?.shares ?? []);
+  // volume -> "all", or the chosen folders on it
+  const [sel, setSel] = useState<Record<string, "all" | string[]>>(() =>
+    Object.fromEntries(task ? task.sources.map((x) => [x.volume, x.folders.length ? x.folders : "all"]) : info.sources.map((v) => [v.volume, "all"])),
+  );
+  const sources: Source[] = Object.entries(sel)
+    .filter(([, v]) => v === "all" || v.length > 0)
+    .map(([volume, v]) => ({ volume, folders: v === "all" ? [] : v }));
   const [when, setWhen] = useState<Task["when"]>(task?.when ?? "plug");
   const [time, setTime] = useState(task?.time ?? "02:00");
   const [eject, setEject] = useState(task?.eject ?? true);
@@ -220,7 +230,7 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
   const timeOk = /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
   const target = blank?.name ?? d?.name;
   const fallback = !target ? "Backup" : /backup/i.test(target) ? target : `Backup to ${target}`;
-  const body = { name: name.trim() || (task?.name ?? fallback), disk_uuid: disk, shares, when, time, eject, keep_days: keep };
+  const body = { name: name.trim() || (task?.name ?? fallback), disk_uuid: disk, sources, when, time, eject, keep_days: keep };
   const save = useAction(
     () => (editing ? api.put(`/backup/${task!.id}`, body) : api.post("/backup", { ...body, ...(blank ? { prepare_disk: blank.disk } : {}), run_now: true })),
     {
@@ -229,13 +239,8 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
       onSuccess: onClose,
     },
   );
-  const steps = ["Disk", "Folders", "When", "Name"];
-  const canNext = step === 0 ? !!d || (!!blank && erase) : step === 2 ? timeOk || when === "plug" : true;
-  const chip = (on: boolean) =>
-    cx(
-      "rounded-full px-3 py-1 text-[12.5px] font-semibold ring-1 ring-inset transition",
-      on ? "bg-brand-50 text-brand-700 ring-brand-300 dark:bg-brand-500/15 dark:text-brand-300 dark:ring-brand-400/30" : "text-zinc-600 ring-zinc-200 hover:bg-zinc-50 dark:text-zinc-300 dark:ring-white/10 dark:hover:bg-white/5",
-    );
+  const steps = ["Disk", "What to back up", "When", "Name"];
+  const canNext = step === 0 ? !!d || (!!blank && erase) : step === 1 ? sources.length > 0 : step === 2 ? timeOk || when === "plug" : true;
   return (
     <Modal
       open
@@ -305,23 +310,7 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
           )}
         </div>
       )}
-      {step === 1 && (
-        <div className="space-y-3">
-          <div className="flex flex-wrap gap-1.5">
-            <button type="button" className={chip(shares.length === 0)} onClick={() => setShares([])}>
-              All shared folders
-            </button>
-            {info.shares.map((s) => {
-              const on = shares.includes(s);
-              return (
-                <button key={s} type="button" className={chip(on)} onClick={() => setShares(on ? shares.filter((x) => x !== s) : [...shares, s])}>
-                  {s}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      {step === 1 && <SourcePicker volumes={info.sources} sel={sel} onChange={setSel} />}
       {step === 2 && (
         <div className="space-y-3">
           {(
@@ -382,7 +371,7 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
           </Field>
           <dl className="space-y-1.5 rounded-xl bg-zinc-50 p-3.5 text-[13px] dark:bg-white/[0.03]">
             <Row k="Disk" v={task ? task.disk_name : blank ? `${blank.name} (erased and prepared)` : d ? `${d.name} (${d.fs_label})` : "—"} />
-            <Row k="Folders" v={shares.length ? shares.join(", ") : "All shared folders"} />
+            <Row k="What" v={describe(sources)} />
             <Row k="When" v={whenText({ when, time })} />
             <Row k="Versions" v={versions ? `Kept for ${keep === 365 ? "1 year" : `${keep} days`}` : "One copy, kept up to date"} />
             <Row k="Afterwards" v={eject ? "Eject the disk" : "Leave it connected"} />
@@ -390,6 +379,77 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
         </div>
       )}
     </Modal>
+  );
+}
+
+/** Whole volumes, or folders on them, with their sizes and the total. */
+function SourcePicker({ volumes, sel, onChange }: { volumes: VolumeSrc[]; sel: Record<string, "all" | string[]>; onChange: (s: Record<string, "all" | string[]>) => void }) {
+  const [closed, setClosed] = useState<Record<string, boolean>>({});
+  if (!volumes.length) return <Callout tone="info">Create a volume first.</Callout>;
+  const size = (v: VolumeSrc, f: string) => v.folders.find((x) => x.name === f)?.size ?? 0;
+  const total = volumes.reduce((sum, v) => {
+    const s = sel[v.volume];
+    return sum + (s === "all" ? v.used : (s ?? []).reduce((a, f) => a + size(v, f), 0));
+  }, 0);
+  const box = (state: "on" | "part" | "off") => (
+    <span
+      className={cx(
+        "flex size-4.5 shrink-0 items-center justify-center rounded-[5px] text-white",
+        state === "off" ? "ring-1 ring-zinc-300 ring-inset dark:ring-white/20" : "bg-brand-600",
+      )}
+    >
+      {state === "on" ? <Check className="size-3" strokeWidth={3} /> : state === "part" ? <Minus className="size-3" strokeWidth={3} /> : null}
+    </span>
+  );
+  return (
+    <div>
+      <div className="max-h-[22rem] space-y-2 overflow-y-auto">
+        {volumes.map((v) => {
+          const s = sel[v.volume];
+          const all = s === "all";
+          const chosen = all ? v.folders.map((f) => f.name) : (s ?? []);
+          const state = all ? "on" : chosen.length ? "part" : "off";
+          const open = !closed[v.volume] && v.folders.length > 0;
+          const toggleFolder = (f: string) => {
+            const next = chosen.includes(f) ? chosen.filter((x) => x !== f) : [...chosen, f];
+            // every folder ticked is the whole volume (folders added later included)
+            onChange({ ...sel, [v.volume]: next.length === v.folders.length ? "all" : next });
+          };
+          return (
+            <div key={v.volume} className="overflow-hidden rounded-xl ring-1 ring-zinc-200 ring-inset dark:ring-white/10">
+              <div className="flex items-center gap-3 bg-zinc-50 px-3 py-2.5 dark:bg-white/[0.03]">
+                <button type="button" className="flex min-w-0 flex-1 items-center gap-3 text-left" onClick={() => onChange({ ...sel, [v.volume]: all ? [] : "all" })}>
+                  {box(state)}
+                  <span className="text-[13.5px] font-semibold break-words">{v.volume}</span>
+                  <span className="ml-auto text-xs text-zinc-500">
+                    {all ? `Whole volume · ${bytes(v.used)}` : chosen.length ? `${chosen.length} of ${v.folders.length} folders` : "Not included"}
+                  </span>
+                </button>
+                {v.folders.length > 0 && (
+                  <button type="button" aria-label={open ? "Hide folders" : "Show folders"} onClick={() => setClosed({ ...closed, [v.volume]: open })} className="text-zinc-400 hover:text-zinc-600">
+                    <ChevronDown className={cx("size-4 transition", open && "rotate-180")} />
+                  </button>
+                )}
+              </div>
+              {open &&
+                v.folders.map((f) => (
+                  <button
+                    key={f.name}
+                    type="button"
+                    onClick={() => toggleFolder(f.name)}
+                    className="flex w-full items-center gap-3 border-t border-zinc-100 py-2 pr-10 pl-10 text-left text-[13.5px] hover:bg-zinc-50 dark:border-white/5 dark:hover:bg-white/[0.03]"
+                  >
+                    {box(chosen.includes(f.name) ? "on" : "off")}
+                    <span className="min-w-0 break-words">{f.name}</span>
+                    <span className="ml-auto text-xs text-zinc-500">{f.size == null ? "…" : bytes(f.size)}</span>
+                  </button>
+                ))}
+            </div>
+          );
+        })}
+      </div>
+      <div className="mt-2 text-xs text-zinc-500">{bytes(total)} selected</div>
+    </div>
   );
 }
 

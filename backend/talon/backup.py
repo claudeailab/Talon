@@ -1,8 +1,9 @@
-"""Backup: copy shared folders to a USB or internal (SATA, NVMe) disk, when it is plugged in or every day.
+"""Backup: copy volumes, or folders on them, to a USB or internal (SATA, NVMe) disk, when it is
+plugged in or every day.
 
 Each backup task belongs to one disk (recognised by its filesystem UUID, so it does
-not matter which port it is in) and copies the chosen shared folders into
-"Talon Backup/<NAS name>/" on it with rsync.
+not matter which port it is in) and copies the chosen volumes and folders into
+"Talon Backup/<NAS name>/<version>/<volume>/" on it with rsync.
 
 On disks that support hard links (ext4, XFS, Btrfs, NTFS) every run is a dated
 version: files that did not change are hard links to the previous version, so a
@@ -51,6 +52,11 @@ def to_prune(names: List[str], keep_days: int, now: float) -> List[str]:
     return old
 
 
+# never copied: recycle bins and previous versions (anywhere), Talon's own folders and lost+found
+EXCLUDES = ["--exclude=.recycle/", "--exclude=.versions/", "--exclude=/.talon-*", "--exclude=/lost+found"]
+SIZES_TTL = 600
+
+
 class Backup:
     def __init__(self, nas, demo: bool = False):
         self.nas = nas
@@ -62,6 +68,8 @@ class Backup:
         self._uuid_cache: Dict[str, str] = {}
         self._seen: Optional[set] = None          # disks connected at the last look
         self._lock = threading.Lock()
+        self._sizes: Dict[str, dict] = {}            # volume -> {"at": time, "folders": {name: bytes}}
+        self._sizing: set = set()
 
     # ------------------------------------------------------------ disks
     def _uuid(self, dev: str, fstype: str) -> str:
@@ -98,6 +106,74 @@ class Backup:
                         "state": {"available": "Empty", "raid_member": "Old RAID"}.get(d["status"], "Has data")})
         return out
 
+    # ------------------------------------------------------------ what can be backed up
+    def sources(self) -> List[dict]:
+        """Mounted volumes and the folders at their top, with sizes (worked out in the background)."""
+        out = []
+        for v in self.nas.volumes():
+            if not (v["mounted"] or self.demo):
+                continue
+            try:
+                items = self.nas.files.list(v["name"], "")["items"]
+            except UserError:
+                continue
+            folders = sorted((i["name"] for i in items if i["folder"] and i["name"] != "lost+found"), key=str.lower)
+            sizes = self._folder_sizes(v["name"])
+            out.append({"volume": v["name"], "used": v["used"],
+                        "folders": [{"name": f, "size": sizes.get(f)} for f in folders]})
+        return out
+
+    def _folder_sizes(self, volume: str) -> Dict[str, int]:
+        c = self._sizes.get(volume)
+        if (not c or time.time() - c["at"] > SIZES_TTL) and volume not in self._sizing:
+            self._sizing.add(volume)
+            threading.Thread(target=self._measure, args=(volume,), daemon=True, name=f"backup-sizes-{volume}").start()
+        return (c or {}).get("folders", {})
+
+    def _measure(self, volume: str) -> None:
+        try:
+            root = self.nas.files._root(volume)
+            cp = run(["nice", "-n", "15", "du", "-b", "--max-depth=1", root], check=False, timeout=3600)
+            folders = {}
+            for line in cp.stdout.splitlines():
+                size, _, path = line.partition("\t")
+                name = os.path.relpath(path, root)
+                if name != "." and "/" not in name and size.isdigit():
+                    folders[name] = int(size)
+            if self.demo and folders:           # the demo's files are tiny: share out the volume's used space
+                used = next((v["used"] for v in self.nas.volumes() if v["name"] == volume), 0)
+                total = sum(folders.values()) or 1
+                folders = {k: int(used * n / total) for k, n in folders.items()}
+            self._sizes[volume] = {"at": time.time(), "folders": folders}
+        finally:
+            self._sizing.discard(volume)
+
+    def _sources(self, task: dict) -> List[dict]:
+        """What a task copies: [{"volume", "folders"}] (no folders: the whole volume). Tasks made
+        before volumes could be chosen copied shared folders: those become their folders."""
+        if "sources" in task:
+            return task["sources"]
+        out: Dict[str, List[str]] = {}
+        for sh in self.nas.shares():
+            if sh.get("path") and (not task.get("shares") or sh["name"] in task["shares"]):
+                out.setdefault(sh["volume"], []).append(sh["folder"])
+        return [{"volume": v, "folders": sorted(set(f))} for v, f in sorted(out.items())]
+
+    def _items(self, task: dict) -> List[dict]:
+        """The copies a run makes: a source folder and where it goes in the version."""
+        out = []
+        for src in self._sources(task):
+            try:
+                root = self.nas.files._root(src["volume"])
+            except UserError:
+                raise UserError(f"Volume {src['volume']} is not available") from None
+            for f in (src["folders"] or [""]):
+                path = os.path.join(root, f) if f else root
+                if os.path.isdir(path) or self.demo:
+                    out.append({"label": f"{src['volume']}/{f}" if f else src["volume"], "path": path,
+                                "dest": os.path.join(src["volume"], f) if f else src["volume"], "whole": not f})
+        return out
+
     # ------------------------------------------------------------ tasks
     def _tasks(self) -> Dict[str, dict]:
         return self.state.get("usb_backup") or {}
@@ -107,10 +183,11 @@ class Backup:
         tasks = []
         for t in sorted(self._tasks().values(), key=lambda t: t["name"].lower()):
             d = disks.get(t["disk_uuid"])
-            tasks.append({**t, "connected": bool(d), "disk": d, "progress": self.progress.get(t["id"], {"state": "idle"}),
+            tasks.append({**t, "sources": self._sources(t), "connected": bool(d), "disk": d,
+                          "progress": self.progress.get(t["id"], {"state": "idle"}),
                           "snapshots": self._snapshots(t, d) if d else t.get("snapshots_seen", [])})
         return {"tasks": tasks, "disks": list(disks.values()), "prepare": self.blank_disks(),
-                "shares": [s["name"] for s in self.nas.shares() if s.get("path")],
+                "sources": self.sources(),
                 "backup_dir": os.path.relpath(self._base("/"), "/")}
 
     def _clean(self, data: dict, old: Optional[dict], preparing: bool = False) -> dict:
@@ -121,8 +198,10 @@ class Backup:
         disks = {d["uuid"]: d for d in self.disks()}
         if not old and not preparing and disk_uuid not in disks:
             raise UserError("Plug in the disk and choose it")
-        known = {s["name"] for s in self.nas.shares()}
-        shares = [s for s in data.get("shares", (old or {}).get("shares", [])) if s in known]
+        sources = self._clean_sources(data["sources"]) if "sources" in data else (
+            self._sources(old) if old else None)
+        if not sources:
+            raise UserError("Choose what to back up")
         when = data.get("when", (old or {}).get("when", "plug"))
         if when not in WHEN:
             raise UserError("Invalid schedule")
@@ -137,7 +216,7 @@ class Backup:
                 "disk_name": d["name"] if d else (old or {}).get("disk_name", ""),
                 "disk_size": d["size"] if d else (old or {}).get("disk_size", 0),
                 "versions": d["versions"] if d else (old or {}).get("versions", False),
-                "shares": shares, "when": when, "time": t, "eject": bool(data.get("eject", (old or {}).get("eject", True))),
+                "sources": sources, "when": when, "time": t, "eject": bool(data.get("eject", (old or {}).get("eject", True))),
                 "keep_days": keep}
 
     def create(self, data: dict, actor: str) -> dict:
@@ -178,9 +257,24 @@ class Backup:
             self.progress[tid] = {"state": "error", "error": f"Could not prepare disk {disk}: {e}", "finished": time.time()}
             self.state.log_activity(actor, f"Could not prepare disk {disk} for backup {task['name']}: {e}", "error", "backup")
 
+    def _clean_sources(self, raw) -> List[dict]:
+        vols = {v["volume"]: {f["name"] for f in v["folders"]} for v in self.sources()}
+        out = []
+        for src in raw or []:
+            v = str((src or {}).get("volume", ""))
+            if v not in vols:
+                raise UserError(f"Volume {v} is not available")
+            folders = sorted({str(f) for f in (src.get("folders") or [])})
+            bad = [f for f in folders if f not in vols[v]]
+            if bad:
+                raise UserError(f"Folder {bad[0]} is not on volume {v}")
+            out.append({"volume": v, "folders": folders})
+        return out
+
     def update(self, tid: str, data: dict, actor: str) -> dict:
         old = self._get(tid)
         new = {**old, **self._clean(data, old)}
+        new.pop("shares", None)
         self.state.update(lambda d: d["usb_backup"].__setitem__(tid, new))
         self.state.log_activity(actor, f"Updated backup {new['name']}", "info", "backup")
         return new
@@ -253,14 +347,14 @@ class Backup:
         err = None
         stamp = snapshot_name(time.time())
         try:
-            shares = [s for s in self.nas.shares() if s.get("path") and (not task["shares"] or s["name"] in task["shares"])]
-            if not shares:
-                raise UserError("There are no shared folders to back up")
-            p["total"] = len(shares)
+            items = self._items(task)
+            if not items:
+                raise UserError("Nothing to back up: the chosen folders no longer exist")
+            p["total"] = len(items)
             if self.demo:
-                self._demo_run(task, shares, stamp)
+                self._demo_run(task, items, stamp)
             else:
-                self._real_run(task, disk, shares, stamp)
+                self._real_run(task, disk, items, stamp)
             stopped = tid in self._stop
             p.update(state="stopped" if stopped else "success", percent=100, finished=time.time())
         except Exception as e:   # noqa: BLE001 - reported in the page, the log and by email
@@ -302,7 +396,7 @@ class Backup:
             pass
         return ""
 
-    def _real_run(self, task: dict, disk: dict, shares: List[dict], stamp: str) -> None:
+    def _real_run(self, task: dict, disk: dict, items: List[dict], stamp: str) -> None:
         tid = task["id"]
         p = self.progress[tid]
         if not shutil.which("rsync"):
@@ -323,18 +417,18 @@ class Backup:
         else:
             prev, dest = None, os.path.join(base, CURRENT)
         os.makedirs(dest, exist_ok=True)
-        for i, s in enumerate(shares):
+        n = len(items)
+        for i, it in enumerate(items):
             if tid in self._stop:
                 return
-            p.update(share=s["name"], index=i, percent=round(i / len(shares) * 100, 1))
-            target = os.path.join(dest, s["name"])
+            p.update(share=it["label"], index=i, percent=round(i / n * 100, 1))
+            target = os.path.join(dest, it["dest"])
             os.makedirs(target, exist_ok=True)
-            cmd = ["nice", "-n", "10", "rsync", "--info=progress2", "--no-inc-recursive", "--delete",
-                   "--exclude=/.recycle", "--exclude=/.versions", "--exclude=/.talon-*"]
+            cmd = ["nice", "-n", "10", "rsync", "--info=progress2", "--no-inc-recursive", "--delete", *EXCLUDES]
             cmd += ["-aH"] if versions else ["-rt", "--modify-window=2"]
-            if prev and os.path.isdir(os.path.join(prev, s["name"])):
-                cmd.append(f"--link-dest={os.path.join(prev, s['name'])}")
-            cmd += [s["path"].rstrip("/") + "/", target + "/"]
+            if prev and os.path.isdir(os.path.join(prev, it["dest"])):
+                cmd.append(f"--link-dest={os.path.join(prev, it['dest'])}")
+            cmd += [it["path"].rstrip("/") + "/", target + "/"]
             proc = self._procs[tid] = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
             assert proc.stdout is not None
             buf = ""
@@ -345,7 +439,7 @@ class Backup:
                 if ch in "\r\n":
                     pr = parse_progress(buf)
                     if pr and pr.get("source") == "rsync":
-                        p.update(percent=round((i + pr["percent"] / 100) / len(shares) * 100, 1), speed=pr.get("speed"))
+                        p.update(percent=round((i + pr["percent"] / 100) / n * 100, 1), speed=pr.get("speed"))
                     buf = ""
                 else:
                     buf += ch
@@ -366,15 +460,15 @@ class Backup:
         snaps = sorted((n for n in os.listdir(base) if STAMP_RE.match(n) or n == CURRENT), reverse=True)
         self.state.update(lambda d: d["usb_backup"][tid].__setitem__("snapshots_seen", snaps))
 
-    def _demo_run(self, task: dict, shares: List[dict], stamp: str) -> None:
+    def _demo_run(self, task: dict, items: List[dict], stamp: str) -> None:
         tid = task["id"]
         p = self.progress[tid]
         disk = next((d for d in self.disks() if d["uuid"] == task["disk_uuid"]), None)
-        for i, s in enumerate(shares):
+        for i, it in enumerate(items):
             for step in range(10):
                 if tid in self._stop:
                     return
-                p.update(share=s["name"], index=i, percent=round((i + step / 10) / len(shares) * 100, 1), speed=48 * 1024 ** 2)
+                p.update(share=it["label"], index=i, percent=round((i + step / 10) / len(items) * 100, 1), speed=48 * 1024 ** 2)
                 time.sleep(0.12)
 
         snaps = sorted(set(task.get("demo_snapshots") or [snapshot_name(time.time() - k * 86400) for k in range(1, 6)]) | {stamp},
@@ -382,11 +476,11 @@ class Backup:
         if disk:                                   # folders in the Files sandbox, so Restore opens something
             base = self._base(self.nas.files._root(disk["id"]))
             for snap in snaps:
-                for s in shares:
-                    folder = os.path.join(base, snap, s["name"])
+                for it in items:
+                    folder = os.path.join(base, snap, it["dest"])
                     os.makedirs(folder, exist_ok=True)
                     with open(os.path.join(folder, "Example.txt"), "w") as f:
-                        f.write(f"A file from {s['name']}, backed up {snap}\n")
+                        f.write(f"A file from {it['label']}, backed up {snap}\n")
         self.state.update(lambda d: d["usb_backup"][tid].__setitem__("demo_snapshots", snaps))
 
     # ------------------------------------------------------------ plug and schedule

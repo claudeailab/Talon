@@ -598,7 +598,7 @@ export const GUIDE: Topic[] = [
     id: "backup",
     title: "Backup",
     group: "Cloud and alerts",
-    summary: "Copy shared folders to a USB or internal disk when you plug it in or every day, with earlier versions.",
+    summary: "Copy volumes, or folders on them, to a USB or internal disk when you plug it in or every day, with earlier versions.",
     page: { to: "/backup", label: "Open Backup" },
     sections: [
       {
@@ -611,12 +611,12 @@ export const GUIDE: Topic[] = [
             steps: [
               "Plug in a USB disk, or use an internal disk (SATA, eSATA or NVMe) that is not in a RAID array or used by a volume. On the [Backup](/backup) page, click **New backup**.",
               "**Disk**: choose the disk. **Ready** disks already have a filesystem and are used as they are. **Prepared when chosen** are empty disks and disks Talon cannot write to: tick **Erase … and prepare it for backups**, and Talon formats the disk (ext4, label Talon Backup) before the first backup.",
-              "**Folders**: keep **All shared folders** or choose some.",
+              "**What to back up**: tick a whole volume, or open it and tick folders on it. A whole volume also includes folders added to it later. The sizes and the total selected are shown.",
               "**When**: **Whenever I plug in the disk**, **Every day** at a time you choose, or both. Turn on **Eject the disk when done** to unplug it safely afterwards, and choose how long to **Keep earlier versions**.",
               "**Name**: check the summary and click **Create and back up now**.",
             ],
           },
-          { p: "The disk is recognised wherever you connect it. Backups are in the folder **Talon Backup** on the disk, as normal files. A prepared disk uses ext4: Linux opens it directly, Windows and macOS need an extra tool; restoring through Talon always works. You get an email when a backup completes or fails." },
+          { p: "The disk is recognised wherever you connect it. Backups are in the folder **Talon Backup** on the disk, one folder per volume, as normal files. Recycle bins and earlier versions of files are not copied. A prepared disk uses ext4: Linux opens it directly, Windows and macOS need an extra tool; restoring through Talon always works. You get an email when a backup completes or fails." },
         ],
       },
       {
