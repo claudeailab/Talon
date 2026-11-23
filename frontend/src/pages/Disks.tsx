@@ -1,13 +1,12 @@
-import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { Activity, Eraser, HardDrive, MoreHorizontal, Thermometer } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { Activity, Check, CheckCircle2, Eraser, HardDrive, Loader2, MoreHorizontal, Thermometer } from "lucide-react";
 import { api } from "../lib/api";
-import { bytes } from "../lib/format";
+import { bytes, cx } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Disk, Job } from "../lib/types";
 import { DiskIcon, DiskStatusBadge, HealthBadge, kindLabel } from "../components/disk";
-import { JobDialog } from "../components/jobs";
-import { Badge, Button, Card, ConfirmDialog, Empty, IconButton, Menu, MenuItem, Modal, PageHeader, PageLoader, Spinner } from "../components/ui";
+import { Badge, Button, Callout, Card, Empty, IconButton, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Spinner } from "../components/ui";
 
 interface Smart {
   available: boolean;
@@ -42,13 +41,6 @@ export default function DisksPage() {
   const { data } = useQuery({ queryKey: ["disks"], queryFn: () => api.get<Disk[]>("/disks"), refetchInterval: 15000 });
   const [smart, setSmart] = useState<Disk | null>(null);
   const [wipe, setWipe] = useState<Disk | null>(null);
-  const [job, setJob] = useState<string | null>(null);
-  const doWipe = useAction((n: string) => api.post<Job>(`/disks/${n}/wipe`), {
-    onSuccess: (j) => {
-      setWipe(null);
-      setJob(j.id);
-    },
-  });
   if (!data) return <PageLoader />;
 
   return (
@@ -84,7 +76,7 @@ export default function DisksPage() {
                             {d.name}
                             <span className="ml-1.5 font-sans font-medium text-zinc-500 sm:hidden">{bytes(d.size)}</span>
                           </div>
-                          <div className="truncate text-xs text-zinc-500 sm:max-w-[16rem]">{d.model}</div>
+                          <div className="text-xs break-words text-zinc-500 sm:max-w-[16rem]">{d.model}</div>
                           {d.serial && <div className="hidden font-mono text-[11px] text-zinc-400 sm:block">{d.serial}</div>}
                           {/* phones: health and usage under the name, so the model has the full width */}
                           <div className="mt-1 flex flex-wrap gap-1.5 sm:hidden">
@@ -112,7 +104,7 @@ export default function DisksPage() {
                     <td className="hidden px-3 py-3.5 sm:table-cell">
                       <div className="flex flex-col items-start gap-0.5">
                         <DiskStatusBadge d={d} />
-                        <span className="hidden max-w-[14rem] truncate text-xs text-zinc-500 sm:block">{d.status_detail}</span>
+                        <span className="hidden max-w-[16rem] text-xs break-words text-zinc-500 sm:block">{d.status_detail}</span>
                       </div>
                     </td>
                     <td className="px-3 py-3.5">
@@ -139,23 +131,7 @@ export default function DisksPage() {
         )}
       </Card>
       {smart && <SmartDialog disk={smart} onClose={() => setSmart(null)} />}
-      <ConfirmDialog
-        open={!!wipe}
-        onClose={() => setWipe(null)}
-        onConfirm={() => wipe && doWipe.mutate(wipe.name)}
-        loading={doWipe.isPending}
-        danger
-        title={`Wipe ${wipe?.name}?`}
-        confirmText="Wipe disk"
-        typeToConfirm={wipe?.name}
-        message={
-          <>
-            All partitions and data on <b>{wipe?.model}</b> ({bytes(wipe?.size)}) will be permanently erased.
-            {wipe?.status === "raid_member" && <OldRaidNote disk={wipe} disks={data ?? []} />}
-          </>
-        }
-      />
-      <JobDialog jobId={job} onClose={() => setJob(null)} />
+      {wipe && <WipeDialog disk={wipe} disks={data} onClose={() => setWipe(null)} />}
     </>
   );
 }
@@ -267,6 +243,138 @@ function SmartDialog({ disk, onClose }: { disk: Disk; onClose: () => void }) {
 }
 
 /** Wiping one disk of an old RAID stops that whole array first. */
+const WIPE_STEPS = ["Stopping anything that uses the disk", "Removing RAID and filesystem signatures", "Reading the empty disk again"];
+
+/** Wipe a disk in one window: confirm, the steps as they run, then done (no terminal). */
+function WipeDialog({ disk, disks, onClose }: { disk: Disk; disks: Disk[]; onClose: () => void }) {
+  const qc = useQueryClient();
+  const [sure, setSure] = useState(false);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [details, setDetails] = useState(false);
+  const start = useAction(() => api.post<Job>(`/disks/${disk.name}/wipe`), { onSuccess: (j) => setJobId(j.id) });
+  const job = useQuery({
+    queryKey: ["job", jobId],
+    queryFn: () => api.get<Job>(`/jobs/${jobId}`),
+    enabled: !!jobId,
+    refetchInterval: (q) => (q.state.data && ["success", "error"].includes(q.state.data.status) ? false : 500),
+  });
+  const j = job.data;
+  const finished = j && (j.status === "success" || j.status === "error");
+  useEffect(() => {
+    if (finished) qc.invalidateQueries({ queryKey: ["disks"] });
+  }, [finished, qc]);
+  const lines = j?.log ?? [];
+  const step = Math.max(0, ...lines.map((l) => Number(/^STEP (\d)$/.exec(l)?.[1] ?? 0)));
+  const what = `${disk.model} · ${bytes(disk.size)} · ${kindLabel[disk.kind] ?? disk.kind}`;
+
+  if (j?.status === "success")
+    return (
+      <Modal open onClose={onClose} title="" footer={<Button variant="primary" onClick={onClose}>Done</Button>}>
+        <div className="flex flex-col items-center py-2 text-center">
+          <div className="mb-3 flex size-14 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15">
+            <CheckCircle2 className="size-7" />
+          </div>
+          <div className="text-lg font-semibold">{disk.name} is empty</div>
+          <p className="mt-1 text-[13px] text-zinc-500">It can now be used for a volume, a RAID array or backups.</p>
+        </div>
+      </Modal>
+    );
+  if (jobId)
+    return (
+      <Modal
+        open
+        onClose={finished ? onClose : () => {}}
+        title={j?.status === "error" ? `Could not wipe ${disk.name}` : `Wiping ${disk.name}`}
+        description={what}
+        footer={
+          <Button disabled={!finished} onClick={onClose}>
+            Close
+          </Button>
+        }
+      >
+        {j?.status === "error" && <Callout tone="danger">{j.error}</Callout>}
+        <ol className="mt-1 space-y-2.5">
+          {WIPE_STEPS.map((label, i) => {
+            const n = i + 1;
+            const failed = j?.status === "error" && n === Math.max(1, step);
+            const done = !failed && n < step;
+            const active = !failed && n === Math.max(1, step) && j?.status !== "error";
+            return (
+              <li key={label} className="flex items-center gap-3 text-[13.5px]">
+                <span
+                  className={cx(
+                    "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+                    done && "bg-emerald-500 text-white",
+                    active && "bg-brand-600 text-white",
+                    failed && "bg-rose-500 text-white",
+                    !done && !active && !failed && "bg-zinc-100 text-zinc-400 dark:bg-white/5",
+                  )}
+                >
+                  {done ? <Check className="size-3.5" strokeWidth={3} /> : active ? <Loader2 className="size-3.5 animate-spin" /> : failed ? "!" : n}
+                </span>
+                <span className={cx(active ? "font-semibold" : done ? "text-zinc-700 dark:text-zinc-300" : "text-zinc-400")}>{label}</span>
+              </li>
+            );
+          })}
+        </ol>
+        {j?.status !== "error" && <Progress value={(Math.max(0, step - 1) / WIPE_STEPS.length) * 100 + 100 / WIPE_STEPS.length / 2} className="mt-4 h-2" />}
+        <div className="mt-3 text-xs text-zinc-500">
+          {j?.status !== "error" && "Takes a few seconds. "}
+          <button type="button" className="underline" onClick={() => setDetails(!details)}>
+            Details
+          </button>
+        </div>
+        {details && (
+          <pre className="mt-2 max-h-48 overflow-auto rounded-xl bg-zinc-100 p-3 font-mono text-[11px] whitespace-pre-wrap text-zinc-600 dark:bg-white/5 dark:text-zinc-300">
+            {lines.filter((l) => !/^STEP \d$/.test(l)).join("\n")}
+          </pre>
+        )}
+      </Modal>
+    );
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Wipe ${disk.name}?`}
+      description="Everything on the disk is erased"
+      footer={
+        <>
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="danger" disabled={!sure} loading={start.isPending} onClick={() => start.mutate()}>
+            Wipe disk
+          </Button>
+        </>
+      }
+    >
+      <div className="flex items-center gap-3 rounded-2xl bg-zinc-50 p-3 dark:bg-white/[0.03]">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white ring-1 ring-zinc-200 dark:bg-white/5 dark:ring-white/10">
+          <DiskIcon kind={disk.kind} />
+        </div>
+        <div className="min-w-0">
+          <div className="text-[13.5px] font-semibold break-words">{disk.model}</div>
+          <div className="text-xs text-zinc-500">
+            {disk.name} · {bytes(disk.size)} · {kindLabel[disk.kind] ?? disk.kind}
+          </div>
+        </div>
+      </div>
+      {disk.status !== "available" && (
+        <div className="mt-3 rounded-xl bg-rose-50 px-3 py-2.5 text-[13px] text-rose-800 dark:bg-rose-500/10 dark:text-rose-300">
+          <b>On it now:</b> {disk.status_detail.replace(/; erased when you use the disk$/, "")}. It cannot be recovered after wiping.
+          {disk.status === "raid_member" && <OldRaidNote disk={disk} disks={disks} />}
+        </div>
+      )}
+      <label className="mt-3 flex cursor-pointer items-start gap-2 text-[13px]">
+        <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-rose-600" checked={sure} onChange={(e) => setSure(e.target.checked)} />
+        <span>
+          I understand that everything on <b>{disk.name}</b> is erased
+        </span>
+      </label>
+    </Modal>
+  );
+}
+
 function OldRaidNote({ disk, disks }: { disk: Disk; disks: Disk[] }) {
   const md = disk.md ?? [];
   const others = disks.filter((d) => d.name !== disk.name && d.md?.some((m) => md.includes(m))).map((d) => d.name);

@@ -194,14 +194,19 @@ class DemoPlatform:
         if kind not in ("short", "long"):
             raise UserError("Test type must be short or long")
 
-    def wipe_disk(self, disk: str, log) -> None:
+    def wipe_disk(self, disk: str, log, step=lambda n: None) -> None:
         with self.lock:
             d = self.disks[disk]
             names = {p["name"] for p in d["parts"]}
+            step(1)
             for dev in [k for k, a in self.arrays.items() if {m["part"] for m in a["members"]} & names]:
                 log(f"$ mdadm --stop /dev/{dev}")
                 self.arrays.pop(dev)
+            time.sleep(0.8 * self.pause)
+            step(2)
             log(f"$ wipefs -a /dev/{disk}")
+            time.sleep(0.8 * self.pause)
+            step(3)
             for u in [u for u, f in self.fs.items() if f["dev"] in names]:
                 self.fs.pop(u)
             d["parts"], d["signature"] = [], None

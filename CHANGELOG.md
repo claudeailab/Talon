@@ -1,3 +1,7 @@
+## 1.0.123
+- Wiping a disk: one window with a confirmation, the steps as they run and a clear result; no terminal
+- Disks: what a disk holds is in plain words and no longer cut off
+
 ## 1.0.122
 - SD-card protection uses the same card as the other services; Statistics opens its numbers in a window
 

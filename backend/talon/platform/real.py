@@ -231,15 +231,18 @@ class RealPlatform:
                 log(f"-- stopping old RAID {md}")
                 run(["mdadm", "--stop", _dev(md)], log=log)
 
-    def wipe_disk(self, disk: str, log: Logger) -> None:
+    def wipe_disk(self, disk: str, log: Logger, step=lambda n: None) -> None:
         dev = _dev(disk)
+        step(1)
         self._stop_holders(disk, log)
+        step(2)
         for p in glob.glob(f"/sys/class/block/{disk}/{disk}*"):
             pn = os.path.basename(p)
             run(["mdadm", "--zero-superblock", _dev(pn)], check=False, log=log)
             run(["wipefs", "-a", _dev(pn)], check=False, log=log)
         run(["mdadm", "--zero-superblock", dev], check=False, log=log)
         run(["wipefs", "-a", dev], log=log)
+        step(3)
         run(["partprobe", dev], check=False, log=log)
         self._settle(log)
 

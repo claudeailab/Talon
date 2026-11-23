@@ -205,7 +205,7 @@ def test_disks_from_another_raid_can_be_reused(client):
     disks = {d["name"]: d for d in client.get("/api/disks").json()}
     old = disks["sdh"]
     assert old["status"] == "raid_member" and old["selectable"]
-    assert "will be erased" in old["status_detail"]
+    assert "erased when you use the disk" in old["status_detail"]
     assert disks["sdi"]["md"] == old["md"]
     # wiping one disk stops the old array; its other disk then just has data
     j = wait_job(client, client.post("/api/disks/sdh/wipe").json())

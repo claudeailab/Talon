@@ -32,6 +32,12 @@ SMB_PROTOCOLS = ["SMB2_02", "SMB2_10", "SMB3_00", "SMB3_11"]
 HOSTNAME_RE = re.compile(r"^(?!-)[A-Za-z0-9-]{1,63}(?<!-)$")
 WORKGROUP_RE = re.compile(r"^[A-Za-z0-9_-]{1,15}$")
 GROWABLE = {"raid1", "raid5", "raid6"}
+# what a disk holds, in words (blkid filesystem types)
+FS_WORDS = {"linux_raid_member": "part of a RAID array from another system", "ext4": "an ext4 filesystem",
+            "ext3": "an ext3 filesystem", "ext2": "an ext2 filesystem", "xfs": "an XFS filesystem",
+            "btrfs": "a Btrfs filesystem", "vfat": "a FAT32 filesystem", "exfat": "an exFAT filesystem",
+            "ntfs": "an NTFS filesystem", "swap": "swap space", "LVM2_member": "LVM volumes",
+            "zfs_member": "a ZFS pool", "crypto_LUKS": "an encrypted (LUKS) disk"}
 
 
 class Nas:
@@ -268,7 +274,8 @@ class Nas:
                 # a RAID array from another system: it can be erased unless it is in use
                 in_use = bool(d["mounts"]) or d.get("busy", False)
                 status = "raid_member"
-                detail = f"Old RAID {', '.join(d['md'])} - " + ("in use" if in_use else "will be erased")
+                detail = f"Part of an old RAID array ({', '.join(d['md'])}); " + (
+                    "in use" if in_use else "erased when you use the disk")
             elif any(m in SYSTEM_MOUNTS for m in d["mounts"]):
                 status, detail = "system", "Operating system disk"
             elif any(m in mp_to_vol for m in d["mounts"]):
@@ -277,8 +284,8 @@ class Nas:
             elif d["mounts"]:
                 status, detail = "mounted", "Mounted at " + ", ".join(d["mounts"])
             elif d["has_signature"]:
-                fs = ", ".join(d["fstypes"]) or "partitions"
-                status, detail = "has_data", f"Existing data ({fs}) - will be erased"
+                kinds = [FS_WORDS.get(f, f) for f in d["fstypes"]] or ["partitions"]
+                status, detail = "has_data", f"Holds {' and '.join(dict.fromkeys(kinds))}; erased when you use the disk"
             smart = self.p.smart_cached(d["name"])
             out.append({**d, "status": status, "status_detail": detail, "volume": volume,
                         "array": array,
@@ -369,7 +376,8 @@ class Nas:
         if not d["selectable"]:
             raise UserError(f"Disk {name} is in use ({d['status_detail']})")
         def work(log):
-            self.p.wipe_disk(name, log)       # stops an old RAID array on it first
+            # "STEP n" lines tell the web interface which step is running
+            self.p.wipe_disk(name, log, step=lambda n: log(f"STEP {n}"))       # stops an old RAID array on it first
             if d["status"] == "raid_member":
                 self.p.save_mdadm_conf(log)
 
