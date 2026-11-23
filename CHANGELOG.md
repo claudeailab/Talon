@@ -1,3 +1,6 @@
+## 1.0.130
+- System updates: the confirmation says when Samba or NFS restarts and shared folders are briefly unavailable
+
 ## 1.0.129
 - System updates: the Security and Other lists start closed; click a heading to open it
 

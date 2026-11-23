@@ -380,6 +380,11 @@ function SystemTab() {
   const sec = d.packages.filter((p) => p.security);
   const other = d.packages.filter((p) => !p.security);
   const needsRestart = d.packages.some((p) => p.restart);
+  // these packages restart their own service when they are updated: connected computers drop for a few seconds
+  const sharing = [...new Set(d.packages.flatMap((p) => SHARING.filter(([re]) => re.test(p.name)).map(([, label]) => label)))];
+  const sharingNote = sharing.length
+    ? `${sharing.join(" and ")} restart${sharing.length === 1 ? "s" : ""} during the update: shared folders are unavailable for a few seconds, and files open on other computers may need to be reopened.`
+    : "Shared folders keep working: Samba and NFS are not among these updates.";
   const n = d.packages.length;
   const status = running ? (
     <Badge tone="blue" dot>Installing</Badge>
@@ -430,7 +435,7 @@ function SystemTab() {
             <span className="tabular font-semibold text-zinc-500">{Math.round((running ? d.progress.percent : d.checking.percent) ?? 0)}%</span>
           </div>
           <Progress value={(running ? d.progress.percent : d.checking.percent) ?? 0} className="mt-2 h-2" />
-          {running && <p className="mt-2 text-xs text-zinc-500">Shared folders keep working. You can leave this page; the installation continues.</p>}
+          {running && <p className="mt-2 text-xs text-zinc-500">{sharingNote} You can leave this page; the installation continues.</p>}
         </RowBlock>
       )}
       {d.error && !checking && (
@@ -491,7 +496,7 @@ function SystemTab() {
         loading={install.isPending}
         title={`Install ${n} update${n === 1 ? "" : "s"}?`}
         confirmText="Install"
-        message={`Shared folders keep working while they install. Changed configuration files are kept.${needsRestart ? " A restart is needed afterwards." : ""}`}
+        message={`${sharingNote} Configuration files you changed are kept.${needsRestart ? " The NAS needs a restart afterwards." : ""}`}
       />
       <ConfirmDialog
         open={restart}
@@ -554,6 +559,12 @@ function PkgHeader({
     </button>
   );
 }
+
+/** Packages whose update restarts a file-sharing service (their install scripts restart it). */
+const SHARING: [RegExp, string][] = [
+  [/^samba$/, "Samba (SMB)"],
+  [/^nfs-kernel-server$/, "NFS"],
+];
 
 function PkgList({ pkgs }: { pkgs: Pkg[] }) {
   return (

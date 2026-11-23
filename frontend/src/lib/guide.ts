@@ -903,7 +903,7 @@ export const GUIDE: Topic[] = [
         title: "System",
         blocks: [
           { p: "Opening the **System** tab checks for operating system updates straight away, with a progress bar. **Security updates** (red) fix known security holes and are listed first; **Other updates** (yellow) are bug fixes and improvements. Both lists start closed; click a heading to see its updates." },
-          { p: "**Install all** installs them with a progress bar. Shared folders keep working, and configuration files you changed are kept. When an update needs a restart, for example a new Linux kernel, **Restart to finish** appears here and in the bell." },
+          { p: "**Install all** installs them with a progress bar. Configuration files you changed are kept. When Samba or NFS itself is updated, it restarts: shared folders are unavailable for a few seconds. Talon says so before you install. When an update needs a restart, for example a new Linux kernel, **Restart to finish** appears here and in the bell." },
           { p: "Waiting security updates show in the bell, and you get an email about new ones unless they install automatically." },
         ],
       },
