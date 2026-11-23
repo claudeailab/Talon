@@ -107,12 +107,12 @@ export default function ScheduledPage() {
                 {tasks.map((t) => (
                   <tr key={t.id}>
                     <td className="max-w-0 px-5 py-3.5 sm:max-w-none">
-                      <div className="truncate font-medium">{t.name}</div>
-                      <div className="max-w-md truncate font-mono text-xs text-zinc-500">{firstLine(t.script)}</div>
+                      <div className="[overflow-wrap:anywhere] font-medium">{t.name}</div>
+                      <div className="max-w-md [overflow-wrap:anywhere] font-mono text-xs text-zinc-500">{firstLine(t.script)}</div>
                       {/* phones: status, schedule and last run under the name */}
                       <div className="mt-1.5 flex min-w-0 items-center gap-2 sm:hidden">
                         <TaskStatus t={t} />
-                        <span className="truncate text-xs text-zinc-500">{t.schedule_label}</span>
+                        <span className="[overflow-wrap:anywhere] text-xs text-zinc-500">{t.schedule_label}</span>
                       </div>
                     </td>
                     <td className="hidden px-3 md:table-cell">
@@ -497,7 +497,7 @@ function RunProgress({ run }: { run: TaskRun }) {
     <div className="mb-2">
       <div className="flex items-center justify-between gap-3 text-sm">
         <span className="shrink-0 font-medium">{p ? `Running ${Math.floor(p.percent)}%` : "Running"}</span>
-        <span className="truncate text-zinc-500">{detail}</span>
+        <span className="[overflow-wrap:anywhere] text-zinc-500">{detail}</span>
       </div>
       <Progress value={p ? p.percent : null} tone="blue" className="mt-1.5 h-1.5" />
     </div>

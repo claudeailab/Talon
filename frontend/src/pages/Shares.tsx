@@ -113,7 +113,7 @@ function CopyLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center gap-2 text-xs">
       <span className="w-12 shrink-0 text-zinc-500">{label}</span>
-      <code className="min-w-0 flex-1 truncate rounded-md bg-zinc-100 px-2 py-1 font-mono text-[11.5px] dark:bg-white/5">{value}</code>
+      <code className="min-w-0 flex-1 [overflow-wrap:anywhere] rounded-md bg-zinc-100 px-2 py-1 font-mono text-[11.5px] dark:bg-white/5">{value}</code>
       <button
         title="Copy"
         className="text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200"
@@ -143,8 +143,8 @@ function ShareCard({ s, ip, mac, onEdit, onDelete }: { s: Share; ip: string; mac
             <FolderOpen className="size-5" />
           </div>
           <div className="min-w-0">
-            <h3 className="truncate font-semibold">{s.name}</h3>
-            <p className="truncate text-[13px] text-zinc-500">{s.description || `on ${s.volume}`}</p>
+            <h3 className="[overflow-wrap:anywhere] font-semibold">{s.name}</h3>
+            <p className="[overflow-wrap:anywhere] text-[13px] text-zinc-500">{s.description || `on ${s.volume}`}</p>
           </div>
         </div>
         <div className="flex">

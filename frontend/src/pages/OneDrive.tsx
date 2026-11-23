@@ -278,7 +278,7 @@ export default function OneDrivePage() {
                 <Badge dot>Not connected</Badge>
               )}
             </div>
-            <div className="truncate text-[13px] text-zinc-500">
+            <div className="[overflow-wrap:anywhere] text-[13px] text-zinc-500">
               {d.connected && d.account ? (
                 <>
                   {/* phones: the email on its own line, the details below */}
@@ -349,8 +349,8 @@ export default function OneDrivePage() {
                   {d.tasks.map((t) => (
                     <tr key={t.id}>
                       <td className="max-w-0 px-5 py-3.5 sm:max-w-none">
-                        <div className="truncate font-medium">{t.name}</div>
-                        <div className="truncate text-xs text-zinc-500">
+                        <div className="[overflow-wrap:anywhere] font-medium">{t.name}</div>
+                        <div className="[overflow-wrap:anywhere] text-xs text-zinc-500">
                           {t.direction === "push"
                             ? `${nasPath(t)} → ${odPath(t.remote)}`
                             : t.direction === "pull"
@@ -360,7 +360,7 @@ export default function OneDrivePage() {
                         {/* phones: status and schedule under the name */}
                         <div className="mt-1.5 flex min-w-0 items-center gap-2 sm:hidden">
                           <TaskStatus t={t} />
-                          <span className="truncate text-xs text-zinc-500">{scheduleLabel(t.schedule)}</span>
+                          <span className="[overflow-wrap:anywhere] text-xs text-zinc-500">{scheduleLabel(t.schedule)}</span>
                         </div>
                       </td>
                       <td className="hidden px-3 xl:table-cell">
@@ -526,11 +526,11 @@ function RunActivity({ r }: { r: Run }) {
       : ["green", (r.phase === "verifying" && r.read_speed ? `Working · disks reading ${bytes(r.read_speed)}/s · ` : "Working · ") +
           (r.idle <= 3 ? "updated just now" : `updated ${r.idle} s ago`)];
   return (
-    <div className={cx("mt-1.5 flex items-center gap-1.5 truncate text-xs",
+    <div className={cx("mt-1.5 flex items-center gap-1.5 [overflow-wrap:anywhere] text-xs",
       tone === "amber" ? "text-amber-600 dark:text-amber-400" : "text-zinc-500")}>
       <span className={cx("size-1.5 shrink-0 rounded-full",
         tone === "amber" ? "bg-amber-500" : "animate-pulse bg-emerald-500")} />
-      <span className="truncate">{text}</span>
+      <span className="[overflow-wrap:anywhere]">{text}</span>
     </div>
   );
 }
@@ -1095,7 +1095,7 @@ function PathButton({
       className="flex h-10 w-full min-w-0 items-center gap-2 rounded-xl bg-white px-3.5 text-left text-sm ring-1 ring-zinc-200 transition hover:ring-zinc-300 dark:bg-zinc-900 dark:ring-white/10"
     >
       {icon}
-      <span className="truncate">{text}</span>
+      <span className="[overflow-wrap:anywhere]">{text}</span>
       <span className="ml-auto shrink-0 text-[13px] font-medium text-brand-600 dark:text-brand-400">
         Change
       </span>
@@ -1117,8 +1117,8 @@ export function ToggleBox({
   return (
     <div className="flex min-h-14 items-center py-2 justify-between gap-4 rounded-xl bg-zinc-50 px-3.5 dark:bg-white/[0.03]">
       <div className="min-w-0">
-        <div className="truncate text-[13px] font-medium">{title}</div>
-        <div className="truncate text-xs text-zinc-500">{text}</div>
+        <div className="[overflow-wrap:anywhere] text-[13px] font-medium">{title}</div>
+        <div className="[overflow-wrap:anywhere] text-xs text-zinc-500">{text}</div>
       </div>
       {onChange && (
         <Switch checked={!!checked} onChange={onChange} label={title} />
@@ -1259,7 +1259,7 @@ function FolderPicker({
                 )}
               >
                 {it.folder ? <FolderOpen className="size-4 shrink-0 text-amber-500" /> : <FileText className="size-4 shrink-0 text-zinc-400" />}
-                <span className={cx("truncate", on && "font-medium")}>{it.name}</span>
+                <span className={cx("[overflow-wrap:anywhere]", on && "font-medium")}>{it.name}</span>
                 {it.folder ? (
                   <IconButton
                     label={`Open ${it.name}`}
@@ -1343,7 +1343,7 @@ function LogDialog({
           <Steps r={task.running} verify={task.verify ?? "off"} />
           <div className="flex items-center justify-between gap-3 text-sm">
             <span className="shrink-0 font-medium">{runLabel(task.running)}</span>
-            <span className="truncate text-zinc-500">{runDetail(task.running)}</span>
+            <span className="[overflow-wrap:anywhere] text-zinc-500">{runDetail(task.running)}</span>
           </div>
           <Progress value={task.running.percent} tone="blue" className="mt-1.5 h-1.5" />
           <RunActivity r={task.running} />
@@ -1374,7 +1374,7 @@ function Steps({ r, verify }: { r: Run; verify: "off" | "quick" | "full" }) {
   if (r.mode !== "run" || verify === "off") return null;      // a check on its own has one step
   const at = r.phase === "comparing" ? 0 : r.phase === "copying" ? 1 : 2;
   return (
-    <div className="mb-2 flex items-center gap-1.5 truncate text-xs">
+    <div className="mb-2 flex items-center gap-1.5 [overflow-wrap:anywhere] text-xs">
       {["Compare", "Copy", "Verify"].map((name, i) => (
         <span key={name} className="flex items-center gap-1.5">
           {i > 0 && <ChevronRight className="size-3 text-zinc-400" />}

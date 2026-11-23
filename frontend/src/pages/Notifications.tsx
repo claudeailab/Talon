@@ -160,12 +160,12 @@ function ThresholdsCard() {
               <div className="grid grid-cols-[minmax(0,1fr)_7.5rem] items-center gap-4 border-t border-zinc-100 py-3 sm:grid-cols-[minmax(0,1fr)_9rem] sm:gap-8 dark:border-white/5">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{r.title}</div>
-                    <div className="truncate text-[13px] text-zinc-500 dark:text-zinc-400">{r.text}</div>
+                    <div className="[overflow-wrap:anywhere] text-sm font-medium">{r.title}</div>
+                    <div className="[overflow-wrap:anywhere] text-[13px] text-zinc-500 dark:text-zinc-400">{r.text}</div>
                   </div>
                   {now.length > 0 && (
                     <span className="hidden min-w-0 lg:block">
-                      <Badge className="max-w-full truncate">
+                      <Badge className="max-w-full [overflow-wrap:anywhere]">
                         Now: {now.slice(0, 4).map((d) => `${d.name} ${d.temperature} °C`).join(" · ")}
                         {now.length > 4 ? ` · +${now.length - 4}` : ""}
                       </Badge>
@@ -195,8 +195,8 @@ function ThresholdsCard() {
         })}
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 border-t border-zinc-100 py-3 dark:border-white/5">
           <div className="min-w-0">
-            <div className="truncate text-sm font-medium">Bad sectors</div>
-            <div className="truncate text-[13px] text-zinc-500 dark:text-zinc-400">Warn as soon as a disk reports reallocated or pending sectors</div>
+            <div className="[overflow-wrap:anywhere] text-sm font-medium">Bad sectors</div>
+            <div className="[overflow-wrap:anywhere] text-[13px] text-zinc-500 dark:text-zinc-400">Warn as soon as a disk reports reallocated or pending sectors</div>
           </div>
           <Switch checked={f.bad_sectors} onChange={(v) => setF({ ...f, bad_sectors: v })} label="Bad sectors" />
         </div>

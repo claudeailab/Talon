@@ -360,7 +360,7 @@ export default function FilesPage() {
                     <td>
                       <div className="flex min-w-0 items-center gap-2.5">
                         <FileIcon item={it} />
-                        <span className={cx("truncate", it.folder && "font-medium")} title={it.name}>
+                        <span className={cx("[overflow-wrap:anywhere]", it.folder && "font-medium")} title={it.name}>
                           {it.name}
                         </span>
                         {it.custom && (
@@ -616,8 +616,8 @@ function RecycleBin({ volume, name, onClose, onDone }: { volume: string; name: s
             <li key={it.id} className="flex items-center gap-3 px-3 py-2.5">
               <input type="checkbox" className="size-4 shrink-0 accent-brand-600" checked={sel.has(it.id)} onChange={() => toggle(it.id)} aria-label={`Select ${it.name}`} />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-medium">{it.name}</div>
-                <div className="truncate text-xs text-zinc-500">
+                <div className="[overflow-wrap:anywhere] text-sm font-medium">{it.name}</div>
+                <div className="[overflow-wrap:anywhere] text-xs text-zinc-500">
                   {it.was_in === "." ? name : it.was_in} · {it.by} · {dateTime(it.deleted)} · {bytes(it.size)}
                 </div>
               </div>
@@ -783,7 +783,7 @@ function MoveDialog({ volumes, volume, start, items, onClose, onDone }: { volume
                 )}
               >
                 <FolderOpen className="size-4 shrink-0 text-amber-500" />
-                <span className={cx("truncate", on && "font-medium")}>{f.name}</span>
+                <span className={cx("[overflow-wrap:anywhere]", on && "font-medium")}>{f.name}</span>
                 <IconButton
                   label={`Open ${f.name}`}
                   className="ml-auto size-7"
@@ -810,7 +810,7 @@ function UploadPanel({ uploads, where, onClose }: { uploads: Upload[]; where: st
   return (
     <div className="fixed right-4 bottom-4 z-40 w-[22rem] max-w-[calc(100vw-2rem)] rounded-2xl bg-white p-4 shadow-xl ring-1 ring-zinc-900/10 dark:bg-zinc-800 dark:ring-white/10">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <span className="truncate text-sm font-semibold">
+        <span className="[overflow-wrap:anywhere] text-sm font-semibold">
           {busy ? "Uploading" : "Uploaded"} to {where}
         </span>
         <IconButton label="Close" className="size-7" disabled={busy} onClick={onClose}>
@@ -821,13 +821,13 @@ function UploadPanel({ uploads, where, onClose }: { uploads: Upload[]; where: st
         {uploads.map((u) => (
           <li key={u.id}>
             <div className="flex items-center justify-between gap-3">
-              <span className="truncate">{u.name}</span>
+              <span className="[overflow-wrap:anywhere]">{u.name}</span>
               <span className={cx("shrink-0", u.status === "error" ? "text-rose-600" : u.status === "done" ? "text-emerald-600" : "text-zinc-500")} title={u.error}>
                 {u.status === "uploading" ? `${Math.round((u.sent / Math.max(u.size, 1)) * 100)}%` : u.status === "done" ? "Done" : u.status === "error" ? "Failed" : "Waiting"}
               </span>
             </div>
             {u.status === "uploading" && <Progress value={(u.sent / Math.max(u.size, 1)) * 100} tone="blue" className="mt-1 h-1" />}
-            {u.status === "error" && <div className="truncate text-xs text-rose-600">{u.error}</div>}
+            {u.status === "error" && <div className="[overflow-wrap:anywhere] text-xs text-rose-600">{u.error}</div>}
           </li>
         ))}
       </ul>
@@ -862,7 +862,7 @@ function LocationPicker({ locs, value, onChange }: { locs: Loc[]; value: string;
             {list.map((l) => (
               <MenuItem key={l.id} icon={<LocIcon kind={l.kind} />} onClick={() => onChange(l.id)}>
                 <span className={cx("flex min-w-56 items-center justify-between gap-6", l.id === value && "text-brand-700 dark:text-brand-300")}>
-                  <span className="truncate">{l.name}</span>
+                  <span className="[overflow-wrap:anywhere]">{l.name}</span>
                   <span className="text-xs font-normal whitespace-nowrap text-zinc-400">{l.detail}</span>
                 </span>
               </MenuItem>

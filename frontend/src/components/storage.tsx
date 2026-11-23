@@ -79,7 +79,7 @@ export function MemberList({ members, onRemove }: { members: Member[]; onRemove?
               <span className="font-mono text-[13px] font-semibold">{m.disk}</span>
               <Badge tone={memberTone(m.state)}>{m.state}</Badge>
             </div>
-            <div className="truncate text-xs text-zinc-500">
+            <div className="[overflow-wrap:anywhere] text-xs text-zinc-500">
               {m.model} · {bytes(m.size, 0)}
             </div>
           </div>
@@ -133,7 +133,7 @@ export function DiskRow({
           {d.status === "raid_member" && <Badge tone="amber">Foreign RAID</Badge>}
           {d.health === "failing" && <Badge tone="red">SMART failing</Badge>}
         </div>
-        <div className="truncate text-xs text-zinc-500">
+        <div className="[overflow-wrap:anywhere] text-xs text-zinc-500">
           {d.model}
           {d.serial && ` · ${d.serial}`}
           {disabled && d.status_detail && ` · ${d.status_detail}`}
@@ -183,7 +183,7 @@ export function Stepper({ steps, step }: { steps: string[]; step: number }) {
           >
             {i < step ? <Check className="size-3.5" strokeWidth={3} /> : i + 1}
           </div>
-          <span className={cx("hidden truncate text-[13px] font-medium sm:inline", i === step ? "text-zinc-900 dark:text-white" : "text-zinc-500")}>{s}</span>
+          <span className={cx("hidden [overflow-wrap:anywhere] text-[13px] font-medium sm:inline", i === step ? "text-zinc-900 dark:text-white" : "text-zinc-500")}>{s}</span>
           {i < steps.length - 1 && <div className={cx("h-px min-w-3 flex-1", i < step ? "bg-brand-500" : "bg-zinc-200 dark:bg-white/10")} />}
         </li>
       ))}

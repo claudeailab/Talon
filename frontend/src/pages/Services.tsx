@@ -45,7 +45,7 @@ export default function ServicesPage() {
               <div className="flex min-w-0 items-center gap-3">
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600 dark:bg-white/5 dark:text-zinc-300">{ICONS[s.id]}</div>
                 <div className="min-w-0">
-                  <div className="truncate font-semibold">{s.label}</div>
+                  <div className="[overflow-wrap:anywhere] font-semibold">{s.label}</div>
                   <div className="flex items-center gap-1.5 text-xs whitespace-nowrap text-zinc-500">
                     <StatusDot tone={s.active ? "green" : "zinc"} pulse={s.active} />
                     {!s.installed ? "Not installed" : s.active ? "Running" : "Stopped"}

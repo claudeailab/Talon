@@ -131,11 +131,11 @@ export function CardHeader({
           </div>
         )}
         <div className="min-w-0">
-          <h3 className="truncate text-[15px] font-semibold tracking-tight">
+          <h3 className="[overflow-wrap:anywhere] text-[15px] font-semibold tracking-tight">
             {title}
           </h3>
           {subtitle && (
-            <p className="truncate text-[13px] text-zinc-500 dark:text-zinc-400">
+            <p className="[overflow-wrap:anywhere] text-[13px] text-zinc-500 dark:text-zinc-400">
               {subtitle}
             </p>
           )}

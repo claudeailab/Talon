@@ -1,3 +1,6 @@
+## 1.0.134
+- Disk models, names and other text wrap instead of being cut off, for example in RAID member disks
+
 ## 1.0.133
 - RAID, volume, disk and folder permission tasks show their steps with a progress bar instead of a terminal
 - The commands they run are folded away under Details

@@ -151,7 +151,7 @@ export default function DashboardPage() {
                       <TileHead name={v.name} badge={levelLabel[v.level] ?? v.level} status={<VolumeStatusBadge v={v} />} />
                       <TileLine left={`${p.toFixed(0)}% used`} right={`${bytes(v.free)} free`} />
                       <Progress value={p} tone={usageTone(p)} className="mt-1.5" />
-                      {v.sync?.sync_progress != null && <div className="mt-2 truncate text-xs text-zinc-500">{v.status_detail}</div>}
+                      {v.sync?.sync_progress != null && <div className="mt-2 [overflow-wrap:anywhere] text-xs text-zinc-500">{v.status_detail}</div>}
                     </Tile>
                   );
                 })}
@@ -217,7 +217,7 @@ export default function DashboardPage() {
             ].map(([k, v]) => (
               <div key={k} className="flex justify-between gap-4">
                 <dt className="text-zinc-500">{k}</dt>
-                <dd className="truncate text-right font-medium">{v}</dd>
+                <dd className="[overflow-wrap:anywhere] text-right font-medium">{v}</dd>
               </div>
             ))}
             <div className="flex justify-between gap-4">
@@ -275,7 +275,7 @@ export default function DashboardPage() {
                     <span className="font-mono text-[13px] font-semibold">{d.name}</span>
                     <span className="tabular text-xs text-zinc-500">{bytes(d.size, 0)}</span>
                   </div>
-                  <div className="truncate text-xs text-zinc-500">{d.model}</div>
+                  <div className="[overflow-wrap:anywhere] text-xs text-zinc-500">{d.model}</div>
                   <div className="mt-1 flex items-center gap-2">
                     {/* without SMART (e.g. virtual disks) show what the disk is used for */}
                     {d.health === "unknown" ? <DiskStatusBadge d={d} /> : <HealthBadge health={d.health} />}
@@ -329,7 +329,7 @@ function TileHead({ name, badge, status }: { name: string; badge: string; status
   return (
     <div className="flex items-center justify-between gap-2">
       <div className="flex min-w-0 items-center gap-2">
-        <span className="truncate font-semibold">{name}</span>
+        <span className="[overflow-wrap:anywhere] font-semibold">{name}</span>
         <Badge>{badge}</Badge>
       </div>
       {status}
@@ -340,7 +340,7 @@ function TileHead({ name, badge, status }: { name: string; badge: string; status
 function TileLine({ left, right }: { left: string; right: string }) {
   return (
     <div className="mt-3 flex items-baseline justify-between gap-3 text-[13px]">
-      <span className="tabular truncate font-medium">{left}</span>
+      <span className="tabular [overflow-wrap:anywhere] font-medium">{left}</span>
       <span className="tabular shrink-0 text-zinc-500">{right}</span>
     </div>
   );
@@ -353,7 +353,7 @@ function Chips({ items }: { items: { key: string; label: string; bad?: boolean; 
         <span
           key={i.key}
           className={cx(
-            "max-w-40 truncate rounded-md px-1.5 text-[11px] leading-5 ring-1 ring-inset",
+            "max-w-40 [overflow-wrap:anywhere] rounded-md px-1.5 text-[11px] leading-5 ring-1 ring-inset",
             i.mono && "font-mono",
             i.bad
               ? "bg-rose-50 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-400/20"
@@ -405,7 +405,7 @@ function MetricCard({
             {icon} {label}
           </div>
           <div className="tabular mt-2 text-2xl font-semibold tracking-tight">{value}</div>
-          <div className="tabular mt-0.5 truncate text-xs text-zinc-500">{sub}</div>
+          <div className="tabular mt-0.5 [overflow-wrap:anywhere] text-xs text-zinc-500">{sub}</div>
         </div>
         <Ring value={ring} size={52} stroke={6} />
       </div>

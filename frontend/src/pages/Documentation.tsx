@@ -143,12 +143,12 @@ export default function DocumentationPage() {
                     className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-zinc-50 dark:hover:bg-white/[0.03]"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 truncate text-sm font-semibold">
+                      <div className="flex items-center gap-1.5 [overflow-wrap:anywhere] text-sm font-semibold">
                         <span className="text-zinc-500">{r.topic.title}</span>
                         <ChevronRight className="size-3.5 shrink-0 text-zinc-400" />
                         <Highlight text={r.title} terms={terms} />
                       </div>
-                      <div className="truncate text-[13px] text-zinc-500">
+                      <div className="[overflow-wrap:anywhere] text-[13px] text-zinc-500">
                         <Highlight text={r.snippet} terms={terms} />
                       </div>
                     </div>
@@ -165,14 +165,14 @@ export default function DocumentationPage() {
               {index > 0 ? (
                 <button onClick={() => open(GUIDE[index - 1].id)} className="flex min-w-0 items-center gap-2 text-left text-[13px] text-zinc-500 hover:text-brand-600">
                   <ArrowLeft className="size-4 shrink-0" />
-                  <span className="truncate">{GUIDE[index - 1].title}</span>
+                  <span className="[overflow-wrap:anywhere]">{GUIDE[index - 1].title}</span>
                 </button>
               ) : (
                 <span />
               )}
               {index < GUIDE.length - 1 && (
                 <button onClick={() => open(GUIDE[index + 1].id)} className="flex min-w-0 items-center justify-end gap-2 text-right text-[13px] text-zinc-500 hover:text-brand-600">
-                  <span className="truncate">{GUIDE[index + 1].title}</span>
+                  <span className="[overflow-wrap:anywhere]">{GUIDE[index + 1].title}</span>
                   <ArrowRight className="size-4 shrink-0" />
                 </button>
               )}
