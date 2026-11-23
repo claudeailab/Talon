@@ -763,15 +763,15 @@
      },
      {
       "steps": [
-       "Plug in a USB disk, or use an internal disk (SATA or NVMe) that has a filesystem and is not used by a volume. On the [Backup](/backup) page, click **New backup**.",
-       "**Disk**: choose the disk. Each disk shows its type, for example **USB disk** or **SATA hard disk**.",
+       "Plug in a USB disk, or use an internal disk (SATA, eSATA or NVMe) that is not in a RAID array or used by a volume. On the [Backup](/backup) page, click **New backup**.",
+       "**Disk**: choose the disk. **Ready** disks already have a filesystem and are used as they are. **Prepared when chosen** are empty disks and disks Talon cannot write to: tick **Erase … and prepare it for backups**, and Talon formats the disk (ext4, label Talon Backup) before the first backup.",
        "**Folders**: keep **All shared folders** or choose some.",
        "**When**: **Whenever I plug in the disk**, **Every day** at a time you choose, or both. Turn on **Eject the disk when done** to unplug it safely afterwards, and choose how long to **Keep earlier versions**.",
        "**Name**: check the summary and click **Create and back up now**."
       ]
      },
      {
-      "p": "The disk is recognised wherever you connect it. Backups are in the folder **Talon Backup** on the disk, as normal files that any computer can open. You get an email when a backup completes or fails."
+      "p": "The disk is recognised wherever you connect it. Backups are in the folder **Talon Backup** on the disk, as normal files. A prepared disk uses ext4: Linux opens it directly, Windows and macOS need an extra tool; restoring through Talon always works. You get an email when a backup completes or fails."
      }
     ]
    },

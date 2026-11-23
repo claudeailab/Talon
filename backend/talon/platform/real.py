@@ -507,6 +507,13 @@ class RealPlatform:
             return int(cp.stdout.strip() or 0) if cp.returncode == 0 else 0
         return int(read_file(f"/sys/class/block/{dev}/size", "0").strip() or 0) * 512
 
+    def format_backup_disk(self, disk: str, label: str, log: Logger) -> str:
+        """Erase a disk and give it one ext4 partition for backups; returns the partition."""
+        self.wipe_disk(disk, log)
+        part = self.make_partition(disk, False, log)
+        self.mkfs(part, "ext4", label, log)
+        return part
+
     # ------------------------------------------------------------ LVM: several volumes on one RAID
     def lvm_info(self, md: str) -> Optional[dict]:
         """The LVM pool on a RAID array: its volume group, size and free space (bytes).

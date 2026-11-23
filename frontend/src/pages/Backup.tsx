@@ -26,7 +26,8 @@ type Task = {
   snapshots: string[];
   progress: { state: "idle" | "running" | "success" | "error" | "stopped"; share?: string; index?: number; total?: number; percent?: number; speed?: number | null };
 };
-type Info = { tasks: Task[]; disks: Disk[]; shares: string[]; backup_dir: string };
+type Blank = { disk: string; name: string; media: string; size: number; kind: string; state: "Empty" | "Has data" | "Old RAID" };
+type Info = { tasks: Task[]; disks: Disk[]; prepare: Blank[]; shares: string[]; backup_dir: string };
 const KEEP = [7, 14, 30, 90, 365];
 const whenText = (t: Pick<Task, "when" | "time">) =>
   t.when === "plug" ? "Runs when the disk is plugged in" : t.when === "daily" ? `Runs every day at ${t.time}` : `Runs when plugged in and every day at ${t.time}`;
@@ -199,6 +200,15 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
   const [step, setStep] = useState(editing ? 1 : 0);
   // a disk that can keep earlier versions first
   const [disk, setDisk] = useState<string>(task?.disk_uuid ?? (info.disks.find((x) => x.versions) ?? info.disks[0])?.uuid ?? "");
+  // an empty disk Talon erases and formats for backups (ext4) when the backup is created
+  const [prep, setPrep] = useState<string | null>(null);
+  const [erase, setErase] = useState(false);
+  const blank = info.prepare.find((b) => b.disk === prep);
+  const pick = (uuid: string | null, dev: string | null) => {
+    setDisk(uuid ?? "");
+    setPrep(dev);
+    setErase(false);
+  };
   const [shares, setShares] = useState<string[]>(task?.shares ?? []);
   const [when, setWhen] = useState<Task["when"]>(task?.when ?? "plug");
   const [time, setTime] = useState(task?.time ?? "02:00");
@@ -206,17 +216,21 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
   const [keep, setKeep] = useState(task?.keep_days ?? 30);
   const d = info.disks.find((x) => x.uuid === disk);
   const [name, setName] = useState(task?.name ?? "");
-  const versions = task ? task.versions : !!d?.versions;
+  const versions = task ? task.versions : blank ? true : !!d?.versions;
   const timeOk = /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
-  const fallback = !d ? "Backup" : /backup/i.test(d.name) ? d.name : `Backup to ${d.name}`;
+  const target = blank?.name ?? d?.name;
+  const fallback = !target ? "Backup" : /backup/i.test(target) ? target : `Backup to ${target}`;
   const body = { name: name.trim() || (task?.name ?? fallback), disk_uuid: disk, shares, when, time, eject, keep_days: keep };
-  const save = useAction(() => (editing ? api.put(`/backup/${task!.id}`, body) : api.post("/backup", { ...body, run_now: d ? true : false })), {
-    invalidate: ["backup"],
-    success: editing ? "Backup saved" : "Backup created; the first run has started",
-    onSuccess: onClose,
-  });
+  const save = useAction(
+    () => (editing ? api.put(`/backup/${task!.id}`, body) : api.post("/backup", { ...body, ...(blank ? { prepare_disk: blank.disk } : {}), run_now: true })),
+    {
+      invalidate: ["backup"],
+      success: editing ? "Backup saved" : blank ? `Preparing ${blank.disk}; the first backup follows` : "Backup created; the first run has started",
+      onSuccess: onClose,
+    },
+  );
   const steps = ["Disk", "Folders", "When", "Name"];
-  const canNext = step === 0 ? !!d : step === 2 ? timeOk || when === "plug" : true;
+  const canNext = step === 0 ? !!d || (!!blank && erase) : step === 2 ? timeOk || when === "plug" : true;
   const chip = (on: boolean) =>
     cx(
       "rounded-full px-3 py-1 text-[12.5px] font-semibold ring-1 ring-inset transition",
@@ -228,7 +242,7 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
       onClose={onClose}
       size="lg"
       title={editing ? `Edit ${task!.name}` : "New backup"}
-      description={`Step ${step + 1} of 4: ${steps[step]}`}
+      description={`Step ${step + 1} of 4 · ${steps[step]}`}
       footer={
         <>
           {step > (editing ? 1 : 0) ? (
@@ -253,44 +267,46 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
       }
     >
       {step === 0 && (
-        <div className="space-y-3">
-          <p className="text-[13px] text-zinc-500">Which disk? USB and internal disks with a filesystem are listed; a USB disk appears as soon as you plug it in.</p>
-          {info.disks.length === 0 ? (
-            <Callout tone="info">No disk found. Plug in a USB disk, or connect an internal disk with a filesystem; it appears here within a few seconds.</Callout>
-          ) : (
-            <div className="grid gap-2">
-              {info.disks.map((x) => (
-                <button
-                  key={x.uuid}
-                  type="button"
-                  onClick={() => setDisk(x.uuid)}
-                  className={cx(
-                    "flex items-center gap-3 rounded-xl p-3 text-left ring-1 transition ring-inset",
-                    disk === x.uuid ? "bg-brand-50/60 ring-2 ring-brand-500 dark:bg-brand-500/10" : "ring-zinc-200 hover:bg-zinc-50 dark:ring-white/10 dark:hover:bg-white/5",
-                  )}
-                >
-                  {x.kind === "usb" ? <Usb className="size-5 shrink-0 text-zinc-500" /> : <HardDrive className="size-5 shrink-0 text-zinc-500" />}
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-[13.5px] font-semibold break-words">{x.name}</span>
-                    <span className="block text-xs text-zinc-500">
-                      {x.media} · {bytes(x.size)} · {x.fs_label}
-                      {!x.versions && <span className="text-amber-600 dark:text-amber-400"> · one copy, no earlier versions</span>}
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-          {d && !d.versions && (
-            <p className="text-xs text-zinc-500">
-              {d.fs_label} cannot keep earlier versions: the backup is one copy, kept up to date. To keep earlier versions, use a disk formatted as ext4, XFS or NTFS.
-            </p>
+        <div className="space-y-2">
+          {info.disks.length === 0 && info.prepare.length === 0 && <Callout tone="info">Plug in a USB disk; it appears here within a few seconds.</Callout>}
+          {info.disks.length > 0 && <Heading>Ready</Heading>}
+          {info.disks.map((x) => (
+            <DiskChoice
+              key={x.uuid}
+              on={disk === x.uuid && !prep}
+              onClick={() => pick(x.uuid, null)}
+              usb={x.kind === "usb"}
+              name={x.name}
+              chip={<Badge tone="green">{x.fs_label}</Badge>}
+              detail={`${x.media} · ${x.versions ? "keeps earlier versions" : "one copy, no versions"}`}
+              size={x.size}
+            />
+          ))}
+          {info.prepare.length > 0 && <Heading>Prepared when chosen</Heading>}
+          {info.prepare.map((x) => (
+            <DiskChoice
+              key={x.disk}
+              on={prep === x.disk}
+              onClick={() => pick(null, x.disk)}
+              usb={x.kind === "usb"}
+              name={x.name}
+              chip={<Badge tone="amber">{x.state}</Badge>}
+              detail={`${x.media} · ${x.disk}`}
+              size={x.size}
+            />
+          ))}
+          {blank && (
+            <label className="mt-1 flex cursor-pointer items-center gap-3 rounded-xl bg-rose-50 p-3 text-[13px] text-rose-800 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/20">
+              <input type="checkbox" className="size-4 accent-rose-600" checked={erase} onChange={(e) => setErase(e.target.checked)} />
+              <span>
+                Erase <b>{blank.disk}</b> and prepare it for backups
+              </span>
+            </label>
           )}
         </div>
       )}
       {step === 1 && (
         <div className="space-y-3">
-          <p className="text-[13px] text-zinc-500">What should be copied?</p>
           <div className="flex flex-wrap gap-1.5">
             <button type="button" className={chip(shares.length === 0)} onClick={() => setShares([])}>
               All shared folders
@@ -304,17 +320,15 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
               );
             })}
           </div>
-          <p className="text-xs text-zinc-500">Recycle bins are not copied.</p>
         </div>
       )}
       {step === 2 && (
         <div className="space-y-3">
-          <p className="text-[13px] text-zinc-500">When should it run?</p>
           {(
             [
-              ["plug", "Whenever I plug in the disk", "Good for a disk you take home or keep in a drawer"],
+              ["plug", "Whenever I plug in the disk", "For a disk you keep elsewhere"],
               ["daily", "Every day", "For a disk that stays connected"],
-              ["both", "Both", "When plugged in, and every day while it stays connected"],
+              ["both", "Both", "When plugged in, and every day"],
             ] as const
           ).map(([v, t, s]) => (
             <button
@@ -340,7 +354,7 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
           <div className="flex items-start justify-between gap-4 rounded-xl bg-zinc-50 p-3 dark:bg-white/[0.03]">
             <div>
               <div className="text-[13.5px] font-medium">Eject the disk when done</div>
-              <div className="text-xs text-zinc-500">Then it is safe to unplug; you get an email</div>
+              <div className="text-xs text-zinc-500">Safe to unplug afterwards</div>
             </div>
             <Switch checked={eject} onChange={setEject} label="Eject the disk when done" />
           </div>
@@ -348,7 +362,7 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-zinc-50 p-3 dark:bg-white/[0.03]">
               <div>
                 <div className="text-[13.5px] font-medium">Keep earlier versions</div>
-                <div className="text-xs text-zinc-500">Each version only stores what changed</div>
+                <div className="text-xs text-zinc-500">Only changes take space</div>
               </div>
               <Select value={keep} onChange={(e) => setKeep(Number(e.target.value))} className="w-36" aria-label="Keep versions">
                 {KEEP.map((k) => (
@@ -367,16 +381,44 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
             <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={body.name} maxLength={60} />
           </Field>
           <dl className="space-y-1.5 rounded-xl bg-zinc-50 p-3.5 text-[13px] dark:bg-white/[0.03]">
-            <Row k="Disk" v={task ? task.disk_name : d ? `${d.name} (${d.fs_label})` : "—"} />
+            <Row k="Disk" v={task ? task.disk_name : blank ? `${blank.name} (erased and prepared)` : d ? `${d.name} (${d.fs_label})` : "—"} />
             <Row k="Folders" v={shares.length ? shares.join(", ") : "All shared folders"} />
             <Row k="When" v={whenText({ when, time })} />
             <Row k="Versions" v={versions ? `Kept for ${keep === 365 ? "1 year" : `${keep} days`}` : "One copy, kept up to date"} />
             <Row k="Afterwards" v={eject ? "Eject the disk" : "Leave it connected"} />
           </dl>
-          <p className="text-xs text-zinc-500">On the disk, backups are in the folder Talon Backup.</p>
         </div>
       )}
     </Modal>
+  );
+}
+
+function Heading({ children }: { children: string }) {
+  return <div className="pt-1 text-[11px] font-semibold tracking-wider text-zinc-400 uppercase first:pt-0 dark:text-zinc-500">{children}</div>;
+}
+
+function DiskChoice({ on, onClick, usb, name, chip, detail, size }: { on: boolean; onClick: () => void; usb: boolean; name: string; chip: React.ReactNode; detail: string; size: number }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cx(
+        "flex w-full items-center gap-3 rounded-xl p-3 text-left ring-1 transition ring-inset",
+        on ? "bg-brand-50/60 ring-2 ring-brand-500 dark:bg-brand-500/10" : "ring-zinc-200 hover:bg-zinc-50 dark:ring-white/10 dark:hover:bg-white/5",
+      )}
+    >
+      <span className={cx("size-4 shrink-0 rounded-full ring-1", on ? "bg-brand-600 ring-brand-600 shadow-[inset_0_0_0_3px_white] dark:shadow-[inset_0_0_0_3px_#18181b]" : "ring-zinc-300 dark:ring-white/20")} />
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-500 dark:bg-white/5">
+        {usb ? <Usb className="size-4.5" /> : <HardDrive className="size-4.5" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-1.5 text-[13.5px] font-semibold break-words">
+          {name} {chip}
+        </span>
+        <span className="block text-xs text-zinc-500">{detail}</span>
+      </span>
+      <span className="tabular shrink-0 text-[13px] font-semibold">{bytes(size)}</span>
+    </button>
   );
 }
 

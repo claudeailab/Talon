@@ -1,3 +1,7 @@
+## 1.0.138
+- New backup also offers empty disks: Talon erases and prepares the chosen one (ext4) before the first backup
+- Shorter texts in the New backup steps
+
 ## 1.0.137
 - Backup: a USB disk that was read before it was fully detected no longer stays hidden until Talon restarts
 

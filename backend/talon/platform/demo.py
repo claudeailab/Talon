@@ -394,6 +394,16 @@ class DemoPlatform:
                     f["size"] = int(self.block_size(dev) * 0.98)
             log(f"$ resize2fs /dev/{dev}" if fs == "ext4" else f"$ xfs_growfs {mountpoint}")
 
+    def format_backup_disk(self, disk, label, log) -> str:
+        self.wipe_disk(disk, log)
+        part = self.make_partition(disk, False, log)
+        self.mkfs(part, "ext4", label, log)
+        with self.lock:
+            p = self.disks[disk]["parts"][0]
+            p["fstype"], p["label"] = "ext4", label
+            self.disks[disk]["signature"] = True
+        return part
+
     # ----------------------------------------------------------- LVM
     def lvm_info(self, md) -> Optional[dict]:
         g = self.vgs.get(md)

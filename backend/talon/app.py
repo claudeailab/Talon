@@ -374,7 +374,7 @@ def create_app(cfg, platform) -> FastAPI:
     @app.post("/api/backup")
     def backup_create(body: dict = Body(...), user: str = Depends(current_user)):
         t = nas.backup.create(body, user)
-        if body.get("run_now"):
+        if body.get("run_now") and not body.get("prepare_disk"):     # a prepared disk runs once it is ready
             nas.backup.run_now(t["id"], user)
         return t
 

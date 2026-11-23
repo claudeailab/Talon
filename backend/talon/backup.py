@@ -79,10 +79,23 @@ class Backup:
             u = self._uuid(e["dev"], e["fstype"])
             if not u:
                 continue
-            out.append({"uuid": u, "id": e["id"], "dev": e["dev"], "name": e["name"], "fstype": e["fstype"],
+            out.append({"uuid": u, "id": e["id"], "dev": e["dev"], "name": e["name"], "fstype": e["fstype"], "disk": e.get("disk"),
                         "media": MEDIA.get(e.get("disk_kind", ""), "Disk"),
                         "fs_label": e["detail"].split(" · ")[-1], "size": e["size"], "kind": e["kind"],
                         "versions": e["fstype"] in LINKS_FS})
+        return out
+
+    def blank_disks(self) -> List[dict]:
+        """Disks Talon can prepare for backups (erase and format as ext4): empty ones, ones
+        without a filesystem Talon can write to, and old RAID disks from another system."""
+        ready = {e.get("disk") for e in self.nas.files.externals()}
+        out = []
+        for d in self.nas.disks():
+            if d["name"] in ready or not d["selectable"] or d["status"] not in ("available", "has_data", "raid_member"):
+                continue
+            out.append({"disk": d["name"], "name": d["model"], "media": MEDIA.get(d["kind"], "Disk"), "size": d["size"],
+                        "kind": "usb" if d["kind"] == "usb" else "disk",
+                        "state": {"available": "Empty", "raid_member": "Old RAID"}.get(d["status"], "Has data")})
         return out
 
     # ------------------------------------------------------------ tasks
@@ -96,17 +109,17 @@ class Backup:
             d = disks.get(t["disk_uuid"])
             tasks.append({**t, "connected": bool(d), "disk": d, "progress": self.progress.get(t["id"], {"state": "idle"}),
                           "snapshots": self._snapshots(t, d) if d else t.get("snapshots_seen", [])})
-        return {"tasks": tasks, "disks": list(disks.values()),
+        return {"tasks": tasks, "disks": list(disks.values()), "prepare": self.blank_disks(),
                 "shares": [s["name"] for s in self.nas.shares() if s.get("path")],
                 "backup_dir": os.path.relpath(self._base("/"), "/")}
 
-    def _clean(self, data: dict, old: Optional[dict]) -> dict:
+    def _clean(self, data: dict, old: Optional[dict], preparing: bool = False) -> dict:
         name = str(data.get("name", (old or {}).get("name", ""))).strip()
         if not name or len(name) > 60:
             raise UserError("Enter a name (up to 60 characters)")
         disk_uuid = str(data.get("disk_uuid", (old or {}).get("disk_uuid", "")))
         disks = {d["uuid"]: d for d in self.disks()}
-        if not old and disk_uuid not in disks:
+        if not old and not preparing and disk_uuid not in disks:
             raise UserError("Plug in the disk and choose it")
         known = {s["name"] for s in self.nas.shares()}
         shares = [s for s in data.get("shares", (old or {}).get("shares", [])) if s in known]
@@ -128,10 +141,42 @@ class Backup:
                 "keep_days": keep}
 
     def create(self, data: dict, actor: str) -> dict:
-        task = {"id": uuid.uuid4().hex[:10], **self._clean(data, None), "created": time.time(), "last": None}
+        prep = str(data.get("prepare_disk") or "")
+        if prep:
+            blank = next((b for b in self.blank_disks() if b["disk"] == prep), None)
+            if not blank:
+                raise UserError(f"Disk {prep} cannot be prepared for backups")
+            data = {**data, "disk_uuid": ""}
+        task = {"id": uuid.uuid4().hex[:10], **self._clean(data, None, preparing=bool(prep)), "created": time.time(), "last": None}
+        if prep:
+            task.update(disk_name=blank["name"], disk_size=blank["size"], versions=True)
         self.state.update(lambda d: d.setdefault("usb_backup", {}).__setitem__(task["id"], task))
         self.state.log_activity(actor, f"Created backup {task['name']}", "info", "backup")
+        if prep:
+            with self._lock:
+                self.progress[task["id"]] = {"state": "running", "share": "Preparing the disk", "index": 0, "total": 0,
+                                             "percent": 0, "started": time.time(), "speed": None}
+            threading.Thread(target=self._prepare, args=(task, prep, bool(data.get("run_now")), actor),
+                             daemon=True, name=f"backup-prepare-{task['id']}").start()
         return task
+
+    def _prepare(self, task: dict, disk: str, run_now: bool, actor: str) -> None:
+        """Erase and format the chosen disk as ext4, then (optionally) run the first backup."""
+        tid = task["id"]
+        try:
+            part = self.nas.p.format_backup_disk(disk, "Talon Backup", lambda _l: None)
+            self._uuid_cache.clear()
+            u = self._uuid(part, "ext4")
+            if not u:
+                raise UserError(f"Disk {disk} was formatted but did not appear; unplug it and plug it in again")
+            self.state.update(lambda d: d["usb_backup"][tid].__setitem__("disk_uuid", u))
+            self.state.log_activity(actor, f"Prepared disk {disk} ({task['disk_name']}) for backup {task['name']}", "info", "backup")
+            self.progress[tid] = {"state": "idle"}
+            if run_now:
+                self.run_now(tid, actor)
+        except Exception as e:   # noqa: BLE001 - shown on the backup's card
+            self.progress[tid] = {"state": "error", "error": f"Could not prepare disk {disk}: {e}", "finished": time.time()}
+            self.state.log_activity(actor, f"Could not prepare disk {disk} for backup {task['name']}: {e}", "error", "backup")
 
     def update(self, tid: str, data: dict, actor: str) -> dict:
         old = self._get(tid)

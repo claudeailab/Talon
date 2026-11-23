@@ -72,7 +72,7 @@ class FileBrowser:
                        for m in mps):
                     continue
                 mounted = bool(mps) or (self.demo and name in self._demo_mounted)
-                out.append({"id": EXTERNAL + name, "kind": "usb" if d["kind"] == "usb" else "disk", "disk_kind": d["kind"],
+                out.append({"id": EXTERNAL + name, "kind": "usb" if d["kind"] == "usb" else "disk", "disk_kind": d["kind"], "disk": d["name"],
                             "name": label or d["model"], "dev": name, "fstype": fs, "size": size,
                             "detail": f"{name} · {FS_LABEL.get(fs, fs)}", "mounted": mounted,
                             "mountpoint": mps[0] if mps else None,
