@@ -1,3 +1,6 @@
+## 1.0.129
+- System updates: the Security and Other lists start closed; click a heading to open it
+
 ## 1.0.128
 - Updates: the first tab is named Settings
 - System updates: Other updates are highlighted in yellow, Security updates in red

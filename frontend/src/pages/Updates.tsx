@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronRight, Download, ExternalLink, Package, RefreshCw, RotateCcw, ShieldAlert } from "lucide-react";
+import { ChevronDown, ChevronRight, Download, ExternalLink, Package, RefreshCw, RotateCcw, ShieldAlert } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, cx, date } from "../lib/format";
 import { useAction } from "../lib/hooks";
@@ -370,6 +370,8 @@ function SystemTab() {
   const reboot = useAction(() => restartNas(), { onSuccess: () => setRestart(false) });
   const [confirm, setConfirm] = useState(false);
   const [restart, setRestart] = useState(false);
+  // both lists start closed; a click on a heading opens it
+  const [open, setOpen] = useState({ security: false, other: false });
   useOnOpen(() => check.mutate());
   if (!q.data) return <PageLoader />;
   const d = q.data;
@@ -461,14 +463,23 @@ function SystemTab() {
                 tone="security"
                 title={`Security updates · ${sec.length}`}
                 text="Fix known security holes; install these soon"
+                open={open.security}
+                onToggle={() => setOpen({ ...open, security: !open.security })}
               />
-              <PkgList pkgs={sec} />
+              {open.security && <PkgList pkgs={sec} />}
             </>
           )}
           {other.length > 0 && (
             <>
-              <PkgHeader icon={<Package className="size-4" />} tone="other" title={`Other updates · ${other.length}`} text="Bug fixes and improvements" />
-              <PkgList pkgs={other} />
+              <PkgHeader
+                icon={<Package className="size-4" />}
+                tone="other"
+                title={`Other updates · ${other.length}`}
+                text="Bug fixes and improvements"
+                open={open.other}
+                onToggle={() => setOpen({ ...open, other: !open.other })}
+              />
+              {open.other && <PkgList pkgs={other} />}
             </>
           )}
         </>
@@ -495,12 +506,29 @@ function SystemTab() {
   );
 }
 
-/** The heading of a group of package updates: what kind they are and why it matters. */
-function PkgHeader({ icon, tone, title, text }: { icon: ReactNode; tone: "security" | "other"; title: string; text: string }) {
+/** The heading of a group of package updates: what kind they are and why it matters; a click shows the list. */
+function PkgHeader({
+  icon,
+  tone,
+  title,
+  text,
+  open,
+  onToggle,
+}: {
+  icon: ReactNode;
+  tone: "security" | "other";
+  title: string;
+  text: string;
+  open: boolean;
+  onToggle: () => void;
+}) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-expanded={open}
       className={cx(
-        "flex items-center gap-3 border-t px-5 py-2.5",
+        "flex w-full items-center gap-3 border-t px-5 py-2.5 text-left transition hover:brightness-[0.98]",
         tone === "security"
           ? "border-rose-100 bg-rose-50/70 dark:border-rose-400/10 dark:bg-rose-500/10"
           : "border-amber-100 bg-amber-50/70 dark:border-amber-400/10 dark:bg-amber-500/10",
@@ -520,7 +548,10 @@ function PkgHeader({ icon, tone, title, text }: { icon: ReactNode; tone: "securi
         </span>
         <span className="block text-xs text-zinc-500 dark:text-zinc-400">{text}</span>
       </span>
-    </div>
+      <ChevronDown
+        className={cx("ml-auto size-4 shrink-0 transition", open && "rotate-180", tone === "security" ? "text-rose-500" : "text-amber-500")}
+      />
+    </button>
   );
 }
 
