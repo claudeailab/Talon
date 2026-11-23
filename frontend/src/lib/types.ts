@@ -161,7 +161,6 @@ export interface Service {
   label: string;
   description: string;
   app?: boolean;
-  detail?: string | null;   // a status line under the description
   // SD-card protection: what is written to the system disk now, or what it saved
   writes?: {
     disk: string;
@@ -170,6 +169,9 @@ export interface Service {
     used_mb: number | null;
     size_mb: number;
     synced_at: number | null;
+    restart_needed: boolean;
+    recommended: string | null;
+    active_since: number | null;
   };
 }
 

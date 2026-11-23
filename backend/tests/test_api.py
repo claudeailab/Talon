@@ -284,7 +284,7 @@ def test_alert_thresholds(client):
 
 def test_sd_card_protection_is_a_service(client):
     svc = next(s for s in client.get("/api/services").json() if s["id"] == "sdcard")
-    assert not svc["enabled"] and "SD card" in svc["detail"]                 # off by default, recommended
+    assert not svc["enabled"] and "SD card" in svc["writes"]["recommended"]   # off by default, recommended
     assert client.post("/api/services/sdcard/enable").status_code == 200
     svc = next(s for s in client.get("/api/services").json() if s["id"] == "sdcard")
     assert svc["enabled"]

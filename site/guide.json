@@ -1268,7 +1268,7 @@
        "**OneDrive**: backup and sync with Microsoft OneDrive. See [OneDrive](/documentation?topic=onedrive).",
        "**WebDAV**: shared folders over HTTPS for apps and remote access.",
        "**Antivirus**: virus scans of volumes with ClamAV. See [Antivirus](/documentation?topic=antivirus).",
-       "**SD-card protection**: keeps the system logs in memory and writes them to the disk once a day and when the NAS shuts down or restarts, so an SD card or USB flash drive lasts much longer. Recommended when Talon runs from one; it applies after the next restart. After a power cut, up to a day of system logs can be lost; your files are not affected. Its card shows how much is written to the disk a day and how much of it are system logs, so you can see what it would save; once it runs, it shows what it saved."
+       "**SD-card protection**: keeps the system logs in memory and writes them to the disk once a day and when the NAS shuts down or restarts, so an SD card or USB flash drive lasts much longer. Recommended when Talon runs from one; it applies after the next restart. After a power cut, up to a day of system logs can be lost; your files are not affected. **Statistics** on its card shows how much is written to the disk a day and how much of it are system logs, so you can see what it would save; once it runs, it shows what it saved."
       ]
      },
      {

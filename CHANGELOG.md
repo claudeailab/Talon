@@ -1,3 +1,6 @@
+## 1.0.122
+- SD-card protection uses the same card as the other services; Statistics opens its numbers in a window
+
 ## 1.0.121
 - SD-card protection shows what is written to the system disk and what it would save, or saved
 - Services are listed as Enabled and Disabled

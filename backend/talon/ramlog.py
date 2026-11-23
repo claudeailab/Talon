@@ -284,21 +284,20 @@ class RamLog:
         """The Services page: off by default, recommended when the system disk is flash."""
         st = self.status()
         what = {"sd": "an SD card", "usb": "a USB flash drive"}.get(st["flash"])
-        detail = ("Applies after the next restart" if st["restart_needed"]
-                  else None if st["active"]
-                  else f"Recommended: the system runs from {what}" if what else None)
         if st["active"] and not (self.state.get("ramlog") or {}).get("active_since"):
             # the first look after the restart that turned it on: from now on it saves
-            self.state.update(lambda d: d.setdefault("ramlog", {}).__setitem__("active_since", time.time()))
+            since = time.time() - (7 * 86400 if self.demo else 0)      # the demo pretends it has run for a week
+            self.state.update(lambda d: d.setdefault("ramlog", {}).__setitem__("active_since", since))
         disk_label = {"sd": "SD card", "usb": "USB flash drive"}.get(st["flash"], "system disk")
         return {"id": "sdcard", "unit": None, "installed": True, "active": st["active"], "enabled": st["enabled"],
                 "writes": {"disk": disk_label, "measured": None if st["active"] else self.measured(),
                            "saved": self.saved() if st["active"] else None,
-                           "used_mb": st["used_mb"], "size_mb": st["size_mb"], "synced_at": st["synced_at"]},
+                           "used_mb": st["used_mb"], "size_mb": st["size_mb"], "synced_at": st["synced_at"],
+                           "restart_needed": st["restart_needed"], "recommended": f"Recommended: the system runs from {what}" if what and not st["enabled"] else None,
+                           "active_since": (self.state.get("ramlog") or {}).get("active_since")},
                 "label": "SD-card protection",
-                "description": "Keeps the system logs in memory and writes them to the disk once a day, "
-                               "so an SD card or USB flash drive lasts longer",
-                "detail": detail, "app": True}
+                "description": "Fewer writes to an SD card or USB flash drive",
+                "app": True}
 
     # ------------------------------------------------------------ on / off
     def set_enabled(self, enabled: bool, actor: str) -> dict:
