@@ -1,3 +1,6 @@
+## 1.0.140
+- Checkboxes have Talon's own look in light and dark mode, instead of a black square in some browsers
+
 ## 1.0.139
 - Backup: choose whole volumes or folders on them, with their sizes, instead of shared folders
 - Existing backups keep copying the same folders

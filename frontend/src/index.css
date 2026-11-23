@@ -41,6 +41,37 @@
   /* nothing is wider than the screen: no sideways rubber-banding either */
   html, body { overscroll-behavior-x: none; }
   body { overflow-x: clip; }
+  /* checkboxes in Talon's own look, the same in every browser and theme (native ones
+     follow the operating system and can show as a black square in the light theme) */
+  input[type="checkbox"] {
+    appearance: none;
+    display: inline-grid;
+    place-content: center;
+    flex-shrink: 0;
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+    border-radius: 0.3rem;
+    border: 1.5px solid var(--color-zinc-300);
+    background-color: #fff;
+    cursor: pointer;
+    transition: background-color 0.12s, border-color 0.12s;
+  }
+  input[type="checkbox"]::after {
+    content: "";
+    width: 0.65rem;
+    height: 0.65rem;
+    background: #fff;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / contain no-repeat;
+    transform: scale(0);
+    transition: transform 0.12s;
+  }
+  input[type="checkbox"]:checked { background-color: var(--color-brand-600); border-color: var(--color-brand-600); }
+  input[type="checkbox"]:checked::after { transform: scale(1); }
+  input[type="checkbox"].accent-rose-600 { border-color: var(--color-rose-300); }
+  input[type="checkbox"].accent-rose-600:checked { background-color: var(--color-rose-600); border-color: var(--color-rose-600); }
+  input[type="checkbox"]:disabled { opacity: 0.5; cursor: default; }
+  .dark input[type="checkbox"]:not(:checked) { background-color: transparent; border-color: rgb(255 255 255 / 0.25); }
 }
 
 @utility tabular { font-variant-numeric: tabular-nums; }
