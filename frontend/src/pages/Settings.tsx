@@ -63,7 +63,7 @@ function GeneralTab() {
   return (
     <RowCard>
       <Section title="This NAS" />
-      <Row label="Name" hint={`Reachable as ${form.hostname}.local`}>
+      <Row label="Name" hint={`Reachable as ${form.hostname}.local when Bonjour is on under Services`}>
         <Input value={form.hostname} onChange={(e) => set("hostname", e.target.value)} className={W} aria-label="Name" />
       </Row>
       <Section title="Date and time" />

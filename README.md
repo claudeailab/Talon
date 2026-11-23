@@ -53,7 +53,7 @@ https://<nas-ip>/
 
 </div>
 
-- **Dashboard:** live system stats, storage health and alerts
+- **Dashboard:** live system stats and storage health; issues in one place, the bell
 - **Disks:** S.M.A.R.T. health, temperatures, self-tests and wipe
 - **RAID:** hot spares, expansion, disk replacement and data scrub
 - **Volumes:** ext4 or XFS on a RAID array or a single disk
@@ -64,11 +64,11 @@ https://<nas-ip>/
 - **Shared Folders:** SMB, NFS and Time Machine, with folder permissions
 - **WebDAV:** shared folders over HTTPS for apps and remote access
 - **Users & Groups:** accounts and groups for shared folders and the web interface
-- **EntraID Users:** people from your organization sign in with Microsoft
+- **Entra ID users:** people from your organization sign in with Microsoft
 - **Discovery:** appears in Windows Network, and in macOS Finder with Bonjour on
 - **Activity:** one searchable log of everything Talon and the system do
 - **Usage history:** a year of CPU, memory, network, disk and storage graphs
-- **Updates:** Talon and the operating system, optionally automatic
+- **Updates:** Talon and the operating system, each with its own schedule, optionally automatic
 - **Antivirus:** ClamAV scans of volumes with quarantine
 - **Network:** DHCP or static IP, HTTPS on or off
 - **Scheduled:** scripts on a schedule, with live output and progress
@@ -87,16 +87,24 @@ Click a screenshot to open the [gallery](https://claudeailab.github.io/Talon/scr
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/screenshots.html#raid-wizard"><img src="docs/screenshots/raid-wizard.png" alt="RAID wizard"></a><br><sub>RAID wizard</sub></td>
   </tr>
   <tr>
-    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/screenshots.html#files"><img src="docs/screenshots/files.png" alt="Files on volumes, USB disks and OneDrive"></a><br><sub>Files on volumes, USB disks and OneDrive</sub></td>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/screenshots.html#files"><img src="docs/screenshots/files.png" alt="Browser: volumes, USB disks and OneDrive"></a><br><sub>Browser: volumes, USB disks and OneDrive</sub></td>
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/screenshots.html#recycle-bin"><img src="docs/screenshots/recycle-bin.png" alt="Recycle bin"></a><br><sub>Recycle bin</sub></td>
   </tr>
   <tr>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/screenshots.html#backup"><img src="docs/screenshots/backup.png" alt="Backup to a USB or internal disk"></a><br><sub>Backup to a USB or internal disk</sub></td>
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/screenshots.html#onedrive"><img src="docs/screenshots/onedrive.png" alt="OneDrive backup and sync"></a><br><sub>OneDrive backup and sync</sub></td>
-    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/screenshots.html#onedrive-wizard"><img src="docs/screenshots/onedrive-wizard.png" alt="OneDrive task wizard"></a><br><sub>OneDrive task wizard</sub></td>
   </tr>
   <tr>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/screenshots.html#onedrive-wizard"><img src="docs/screenshots/onedrive-wizard.png" alt="OneDrive task wizard"></a><br><sub>OneDrive task wizard</sub></td>
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/screenshots.html#share-permissions"><img src="docs/screenshots/share-permissions.png" alt="Shared folder permissions"></a><br><sub>Shared folder permissions</sub></td>
+  </tr>
+  <tr>
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/screenshots.html#users"><img src="docs/screenshots/users.png" alt="Users &amp; Groups"></a><br><sub>Users &amp; Groups</sub></td>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/screenshots.html#services"><img src="docs/screenshots/services.png" alt="Services"></a><br><sub>Services</sub></td>
+  </tr>
+  <tr>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/screenshots.html#antivirus"><img src="docs/screenshots/antivirus.png" alt="Antivirus"></a><br><sub>Antivirus</sub></td>
+    <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/screenshots.html#updates"><img src="docs/screenshots/updates.png" alt="Updates"></a><br><sub>Updates</sub></td>
   </tr>
   <tr>
     <td width="50%" align="center"><a href="https://claudeailab.github.io/Talon/screenshots.html#activity"><img src="docs/screenshots/activity.png" alt="Activity log"></a><br><sub>Activity log</sub></td>

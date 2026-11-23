@@ -47,6 +47,8 @@ export default function SharesPage() {
   const shares = useQuery({ queryKey: ["shares"], queryFn: () => api.get<Share[]>("/shares") });
   const vols = useQuery({ queryKey: ["volumes"], queryFn: () => api.get<Volume[]>("/volumes") });
   const host = useQuery({ queryKey: ["system"], queryFn: () => api.get<{ hostname: string; addresses: { address: string; family: number }[] }>("/system") });
+  // <name>.local only works with Bonjour on (Services); without it, macOS uses the IP address too
+  const services = useQuery({ queryKey: ["services"], queryFn: () => api.get<{ id: string; active: boolean }[]>("/services") });
   const [edit, setEdit] = useState<{ share: Share; isNew: boolean } | null>(null);
   const [del, setDel] = useState<Share | null>(null);
   const remove = useAction((n: string) => api.del(`/shares/${n}`), {
@@ -57,6 +59,7 @@ export default function SharesPage() {
   if (!shares.data || !vols.data) return <PageLoader />;
   const mounted = vols.data.filter((v) => v.mounted);
   const hostname = host.data?.hostname ?? "nas";
+  const bonjour = !!services.data?.find((x) => x.id === "mdns")?.active;
   const ip = host.data?.addresses.find((a) => a.family === 4)?.address ?? hostname;
 
   return (
@@ -82,7 +85,7 @@ export default function SharesPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
           {shares.data.map((s) => (
-            <ShareCard key={s.name} s={s} ip={ip} hostname={hostname} onEdit={() => setEdit({ share: s, isNew: false })} onDelete={() => setDel(s)} />
+            <ShareCard key={s.name} s={s} ip={ip} mac={bonjour ? `${hostname}.local` : ip} onEdit={() => setEdit({ share: s, isNew: false })} onDelete={() => setDel(s)} />
           ))}
         </div>
       )}
@@ -127,7 +130,7 @@ function CopyLine({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ShareCard({ s, ip, hostname, onEdit, onDelete }: { s: Share; ip: string; hostname: string; onEdit: () => void; onDelete: () => void }) {
+function ShareCard({ s, ip, mac, onEdit, onDelete }: { s: Share; ip: string; mac: string; onEdit: () => void; onDelete: () => void }) {
   const principals = [
     ...Object.entries(s.groups).map(([n, a]) => ({ n: n === USERS_GROUP ? "All NAS users" : n, a, g: true })),
     ...Object.entries(s.users).map(([n, a]) => ({ n, a, g: false })),
@@ -191,7 +194,7 @@ function ShareCard({ s, ip, hostname, onEdit, onDelete }: { s: Share; ip: string
         {s.smb.enabled && (
           <>
             <CopyLine label="Windows" value={`\\\\${ip}\\${s.name}`} />
-            <CopyLine label="macOS" value={`smb://${hostname}.local/${s.name}`} />
+            <CopyLine label="macOS" value={`smb://${mac}/${s.name}`} />
           </>
         )}
         {s.nfs.enabled && <CopyLine label="NFS" value={`${ip}:${s.path}`} />}

@@ -60,10 +60,13 @@ function urlFor(host: string): string {
 export default function NetworkTab() {
   const q = useQuery({ queryKey: ["network"], queryFn: () => api.get<NetInfo>("/network") });
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.get<Settings>("/settings") });
+  // <name>.local only resolves with Bonjour (mDNS) on
+  const services = useQuery({ queryKey: ["services"], queryFn: () => api.get<{ id: string; active: boolean }[]>("/services") });
+  const bonjour = !!services.data?.find((x) => x.id === "mdns")?.active;
   const [name, setName] = useState<string | null>(null);
   const [f, setF] = useState<Form | null>(null);
   const [confirm, setConfirm] = useState(false);
-  const [moving, setMoving] = useState<{ url: string; mode: "dhcp" | "static" } | null>(null);
+  const [moving, setMoving] = useState<{ url: string | null; mode: "dhcp" | "static" } | null>(null);
   const iface = q.data?.interfaces.find((i) => i.name === name) ?? q.data?.interfaces[0];
   useEffect(() => {
     if (iface) {
@@ -80,8 +83,8 @@ export default function NetworkTab() {
   const apply = useAction(() => api.put<NetInfo>("/network", body()), {
     onSuccess: () => {
       setConfirm(false);
-      const host = f!.mode === "static" ? f!.address.trim() : `${settings.data?.hostname ?? location.hostname}.local`;
-      setMoving({ url: urlFor(host), mode: f!.mode });
+      const host = f!.mode === "static" ? f!.address.trim() : bonjour ? `${settings.data?.hostname ?? location.hostname}.local` : null;
+      setMoving({ url: host ? urlFor(host) : null, mode: f!.mode });
     },
   });
 
@@ -201,8 +204,17 @@ export default function NetworkTab() {
             )
           ) : (
             <>
-              Talon gets its address from your router again; it may change. Open it at <b>{settings.data?.hostname ?? "your NAS"}.local</b> within 3 minutes, or the
-              previous settings come back.
+              Talon gets its address from your router again; it may change.{" "}
+              {bonjour ? (
+                <>
+                  Open it at <b>{settings.data?.hostname ?? "your NAS"}.local</b> within 3 minutes, or the previous settings come back.
+                </>
+              ) : (
+                <>
+                  Look up the new address in your router and open Talon there within 3 minutes, or the previous settings come back. Turn on Bonjour under
+                  Services first to open it as <b>{settings.data?.hostname ?? "your NAS"}.local</b> instead.
+                </>
+              )}
             </>
           )
         }
@@ -274,7 +286,7 @@ function WebRows() {
 }
 
 /** Shown after applying: waits until the NAS is reached again, or the change is undone. */
-function Moving({ target, onDone }: { target: { url: string; mode: "dhcp" | "static" }; onDone: () => void }) {
+function Moving({ target, onDone }: { target: { url: string | null; mode: "dhcp" | "static" }; onDone: () => void }) {
   const toast = useToast();
   const qc = useQueryClient();
   const [now, setNow] = useState(Date.now() / 1000);
@@ -306,16 +318,22 @@ function Moving({ target, onDone }: { target: { url: string; mode: "dhcp" | "sta
           </Callout>
         ) : (
           <>
-            <p className="text-zinc-600 dark:text-zinc-400">
-              {target.mode === "static" ? "Open Talon at its new address:" : "Open Talon by its name; your router has given it a new address:"}
-            </p>
-            <a
-              href={target.url}
-              className="flex items-center justify-between gap-3 rounded-xl bg-brand-50 px-4 py-3 font-mono text-[15px] font-semibold text-brand-700 ring-1 ring-brand-200 hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20"
-            >
-              <span className="truncate">{target.url.replace(/\/settings\?tab=network$/, "/")}</span>
-              <ExternalLink className="size-4 shrink-0" />
-            </a>
+            {target.url ? (
+              <>
+                <p className="text-zinc-600 dark:text-zinc-400">
+                  {target.mode === "static" ? "Open Talon at its new address:" : "Open Talon by its name; your router has given it a new address:"}
+                </p>
+                <a
+                  href={target.url}
+                  className="flex items-center justify-between gap-3 rounded-xl bg-brand-50 px-4 py-3 font-mono text-[15px] font-semibold text-brand-700 ring-1 ring-brand-200 hover:bg-brand-100 dark:bg-brand-500/10 dark:text-brand-300 dark:ring-brand-400/20"
+                >
+                  <span className="break-all">{target.url.replace(/\/settings\?tab=network$/, "/")}</span>
+                  <ExternalLink className="size-4 shrink-0" />
+                </a>
+              </>
+            ) : (
+              <p className="text-zinc-600 dark:text-zinc-400">Your router has given Talon a new address. Look it up in your router and open Talon there.</p>
+            )}
             <p className="text-[13px] text-zinc-500">
               {left === null
                 ? "Applying the new settings…"

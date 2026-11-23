@@ -344,13 +344,16 @@ echo "  Open in your browser:"
 for ip in $(hostname -I 2>/dev/null); do
   case "$ip" in *:*) ;; *) echo "    ${SCHEME}://${ip}${PORT_SUFFIX}/" ;; esac
 done
-echo "    ${SCHEME}://${HOST}.local${PORT_SUFFIX}/"
+# <name>.local needs Bonjour (avahi), which is off until it is turned on under Services
+if command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet avahi-daemon 2>/dev/null; then
+  echo "    ${SCHEME}://${HOST}.local${PORT_SUFFIX}/"
+fi
 echo
 [ "$SCHEME" = https ] && echo "  The certificate is self-signed: accept the browser warning on first visit."
 if [ -n "$NEW_ADMIN_PW" ]; then
   echo
   echo "  Administrator login:  ${c_yellow}${ADMIN}${c_off} / ${c_yellow}${NEW_ADMIN_PW}${c_off}"
-  echo "  Change this password in Users & groups after signing in."
+  echo "  Change this password in Users & Groups after signing in."
 else
   echo "  Sign in as '${ADMIN}' with its Linux password."
 fi

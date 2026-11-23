@@ -60,14 +60,14 @@ export const GUIDE: Topic[] = [
               "Connect from your computers and phones. See [Connect from your devices](" + t("connect") + ").",
             ],
           },
-          { tip: "Optional extras: email alerts ([Email notifications](" + t("email") + ")) and OneDrive backup ([OneDrive](" + t("onedrive") + "))." },
+          { tip: "Optional extras: a backup to a USB or internal disk ([Backup](" + t("backup") + ")), email alerts ([Email notifications](" + t("email") + ")) and OneDrive backup ([OneDrive](" + t("onedrive") + "))." },
         ],
       },
       {
         id: "signin",
         title: "Signing in",
         blocks: [
-          { p: "Open the address the installer shows at the end in a browser, for example **https://192.168.1.50/** or **https://<hostname>.local/**." },
+          { p: "Open the address the installer shows at the end in a browser, for example **https://192.168.1.50/**. With **Bonjour (mDNS)** turned on under [Services](/services), **https://<hostname>.local/** works too." },
           { p: "The installer shows how to sign in when it finishes:" },
           {
             list: [
@@ -462,7 +462,7 @@ export const GUIDE: Topic[] = [
           {
             steps: [
               "In Finder, choose **Go → Connect to Server**.",
-              "Enter **smb://<hostname>.local** and click **Connect**. The NAS also appears under **Network** in the Finder sidebar.",
+              "Enter the macOS address shown on the shared folder's card, for example **smb://192.168.1.50/Documents**, and click **Connect**. With **Bonjour (mDNS)** on under [Services](/services), the address is **smb://<hostname>.local/…** and the NAS also appears under **Network** in the Finder sidebar.",
               "Sign in with your NAS user name and password and pick the shared folders.",
             ],
           },
@@ -585,6 +585,7 @@ export const GUIDE: Topic[] = [
         id: "create",
         title: "Create a backup",
         blocks: [
+          { img: "backup", alt: "Backup" },
           { p: "RAID keeps the NAS running when a disk fails, but it is not a backup. A copy on another disk protects against deleted files and a broken array; a USB disk you keep elsewhere also protects against ransomware, theft or a broken NAS." },
           {
             steps: [
@@ -679,7 +680,7 @@ export const GUIDE: Topic[] = [
   },
   {
     id: "entra",
-    title: "EntraID (Microsoft sign-in)",
+    title: "Entra ID (Microsoft sign-in)",
     group: "Cloud and alerts",
     summary: "The one-time Microsoft app registration that OneDrive, and signing in with Microsoft, need.",
     page: { to: "/settings?tab=entra", label: "Open Settings → Entra ID" },
@@ -782,7 +783,7 @@ export const GUIDE: Topic[] = [
             steps: [
               "Open the [Notifications](/notifications?tab=notifications) page, tab **Notifications**. The tab appears once email is set up.",
               "Enter one or more addresses under **Send to**, separated by commas.",
-              "Under **Send an email when**, choose the events: RAID degraded or failed, disk health warning, disk too hot, volume almost full, background task failed, OneDrive task failed, software update available, and failed sign-in attempt. All are on by default.",
+              "Under **Send an email when**, choose the events: RAID degraded or failed, disk health warning or failure, disk too hot, volume almost full, background task failed, OneDrive task failed, software update available, operating system security updates, virus found, backup completed or failed, and failed sign-in attempt. All are on by default.",
               "Click **Save**, then **Send test** to send a test email.",
             ],
           },
@@ -822,6 +823,7 @@ export const GUIDE: Topic[] = [
         id: "install",
         title: "Install ClamAV",
         blocks: [
+          { img: "antivirus", alt: "Antivirus with a file in quarantine" },
           { p: "Talon uses **ClamAV**, a free, open-source antivirus by Cisco Talos. It is off until you want it: on the [Services](/services) page, turn on **Antivirus**. Talon installs ClamAV and the **Antivirus** page appears in the menu. It downloads about 300 MB, including the virus definitions, with a progress bar. The virus definitions then update automatically every hour; ClamAV itself updates with the [operating system updates](" + t("updates") + ")." },
           { p: "A scan loads the virus definitions into memory while it runs, about 1.5 GB, and frees it afterwards. ClamAV needs at least 2 GB of memory and recommends 3 GB or more; Talon tells you when the NAS has too little." },
         ],
@@ -863,7 +865,7 @@ export const GUIDE: Topic[] = [
           { img: "activity", alt: "Activity" },
           { p: "The **Activity Log** lists everything that happens in Talon: every change made in the web interface, sign-ins, OneDrive and scheduled task runs with their results, alerts and emails, updates and restarts, with who did it and when. **Details** next to a background task, such as creating a RAID array or wiping a disk, shows each step it ran, also after a restart." },
           { p: "It also shows the **system logs**: what the operating system and its services wrote to the system journal, such as Samba, NFS, SSH, disks (S.M.A.R.T. and RAID), the kernel and Talon's own service. **Everything** shows both, newest first." },
-          { p: "Choose what to show in the first list: **Everything**, **All Talon activity** or one kind of operation (for example OneDrive or Scheduled), or **All system logs** or one service (for example Samba when a computer cannot connect to a shared folder). Show **Warnings and errors** or **Errors only**, and **Search** for words. Tap an entry to read it in full; **Newer** and **Older** page through the list. The newest 20,000 Talon entries are kept." },
+          { p: "Choose what to show in the first list: **Everything**, **All Talon activity** or one kind of operation (for example OneDrive or Scheduled), or **All system logs** or one service (for example Samba when a computer cannot connect to a shared folder). Show **Warnings and errors** or **Errors only**, and **Search** for words. Tap an entry to read it in full; **Newer** and **Older** page through the list, and **Per page** sets how many entries a page shows (10 by default). The newest 20,000 Talon entries are kept." },
         ],
       },
     ],
@@ -911,7 +913,7 @@ export const GUIDE: Topic[] = [
   },
   {
     id: "settings",
-    title: "Settings and updates",
+    title: "Settings",
     group: "System",
     summary: "Name, time zone, network address, HTTPS, Windows and macOS options, and the Entra ID app.",
     page: { to: "/settings", label: "Open Settings" },
@@ -923,7 +925,7 @@ export const GUIDE: Topic[] = [
           { img: "settings-general", alt: "General settings" },
           {
             list: [
-              "**Name**: the NAS's name on the network. It is reachable as <name>.local.",
+              "**Name**: the NAS's name on the network. With **Bonjour (mDNS)** on under [Services](/services), it is reachable as <name>.local.",
               "**Time zone**: used for schedules and times shown in Talon.",
               "**Format**: how dates and times are shown and typed everywhere in Talon and in its emails, for example 22-11-2026 or 11/22/2026, and 17:45 or 5:45 PM.",
               "**Workgroup**: the Windows workgroup. WORKGROUP is the Windows default.",
@@ -942,14 +944,14 @@ export const GUIDE: Topic[] = [
             steps: [
               "Open [Settings → Network](/settings?tab=network). It shows the current address, subnet mask, gateway and DNS servers.",
               "Choose **Static**. The fields start with the current values.",
-              "Enter the **IP address**, **Subnet mask** (usually 255.255.255.0), **Gateway** (usually your router) and a **DNS server** (your router or, for example, 1.1.1.1). A **Second DNS server** is optional.",
-              "Click **Save**, then **Apply**.",
+              "Enter the **Address**, **Subnet mask** (usually 255.255.255.0), **Gateway** (usually your router) and a **DNS server** (your router or, for example, 1.1.1.1). A **Second DNS server** is optional.",
+              "Click **Save** in the bar at the bottom of the card, then **Apply**.",
               "Open Talon at the new address shown, for example https://192.168.1.60/.",
             ],
           },
           { img: "settings-network", alt: "Network settings" },
           { warn: "Pick an address outside the range your router hands out, or reserve it in the router, so no other device gets the same address." },
-          { p: "To go back, choose **Automatic** and click **Save**. The router may then give the NAS a different address; open it at **https://<hostname>.local/**." },
+          { p: "To go back, choose **Automatic** and click **Save**. The router may then give the NAS a different address: find it in your router, or open **https://<hostname>.local/** when Bonjour is on." },
           { tip: "If Talon is not opened at its new address within 3 minutes, for example because the gateway was wrong, the previous settings come back by themselves." },
         ],
       },
@@ -965,7 +967,7 @@ export const GUIDE: Topic[] = [
         id: "other",
         title: "Entra ID",
         blocks: [
-          { p: "**EntraID** is the Microsoft sign-in for OneDrive ([EntraID](" + t("entra") + ")). The SMTP server for emails is under [Notifications → Email](" + t("email") + "); the Talon version is under [Updates](/updates) and the hardware on the Dashboard." },
+          { p: "**Entra ID** is the Microsoft sign-in for OneDrive and for people from your organization ([Entra ID](" + t("entra") + ")). The SMTP server for emails is under [Notifications → Email](" + t("email") + "); the Talon version is under [Updates](/updates) and the hardware on the Dashboard." },
         ],
       },
     ],
