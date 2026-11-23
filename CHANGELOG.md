@@ -1,7 +1,10 @@
+## 1.0.132
+- Corrected the release notes of 1.0.131
+
 ## 1.0.131
 - All screenshots, the website gallery and the README are up to date, with Backup, Antivirus, Services and Updates added
 - Guide reviewed: Settings, Updates, Notifications and Entra ID match the interface
-- <name>.local is only offered when Bonjour is on; fixed a blank Shared Folders page
+- <name>.local is only offered when Bonjour is on (Shared Folders, Network settings and the installer)
 
 ## 1.0.130
 - System updates: the confirmation says when Samba or NFS restarts and shared folders are briefly unavailable
