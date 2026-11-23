@@ -27,6 +27,7 @@ import zipfile
 from typing import Dict, Optional
 
 from . import entra
+from .jobs import steps
 from .util import UserError, date_pattern, write_atomic
 
 # rclone's exit codes (https://rclone.org/docs/#exit-code), used when it printed no error
@@ -323,6 +324,7 @@ class CloudSync:
 
             def work(log):
                 try:
+                    steps(log, ["Downloading and installing rclone"])(1)
                     self._install_rclone(log)
                 finally:
                     self._installing = False

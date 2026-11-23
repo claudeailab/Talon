@@ -16,6 +16,7 @@ import os
 import time
 from typing import Dict, List, Optional
 
+from .jobs import steps
 from .util import UserError, run
 
 ORDER = {"none": 0, "ro": 1, "rw": 2}
@@ -152,7 +153,10 @@ class FolderPerms:
         what = "custom permissions" if custom else "the shared folder's permissions"
 
         def work(log):
+            go = steps(log, ["Setting the permissions on the folder and everything in it", "Keeping the folders inside that have their own"])
+            go(1)
             self._apply(volume, rel, rule, log)
+            go(2)
             # folders inside with their own rule: the recursive change above overwrote them
             for k, r in sorted(self.rules().items(), key=lambda kv: kv[0].count("/")):
                 v, _, sub = k.partition(":")

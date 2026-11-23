@@ -13,7 +13,7 @@ from . import raid, sharecfg
 from .cloudsync import CloudSync
 from .files import FileBrowser
 from .folderperms import FolderPerms
-from .jobs import JobRunner
+from .jobs import JobRunner, steps
 from .network import Network
 from .antivirus import Antivirus
 from .history import History
@@ -376,8 +376,9 @@ class Nas:
         if not d["selectable"]:
             raise UserError(f"Disk {name} is in use ({d['status_detail']})")
         def work(log):
-            # "STEP n" lines tell the web interface which step is running
-            self.p.wipe_disk(name, log, step=lambda n: log(f"STEP {n}"))       # stops an old RAID array on it first
+            go = steps(log, ["Stopping anything that uses the disk", "Removing RAID and filesystem signatures",
+                             "Reading the empty disk again"])
+            self.p.wipe_disk(name, log, step=go)       # stops an old RAID array on it first
             if d["status"] == "raid_member":
                 self.p.save_mdadm_conf(log)
 
@@ -485,18 +486,21 @@ class Nas:
         label = raid.LEVELS[level].label
 
         def work(log):
-            for n in disks + spares:
-                log(f"-- preparing disk {n}")
+            go = steps(log, ["Preparing the disks", f"Creating the {label} array", "Saving the RAID configuration"])
+            every = disks + spares
+            for i, n in enumerate(every, 1):
+                go(1, f"{n} · {i} of {len(every)}")
                 self.p.wipe_disk(n, log)
             parts = [self.p.make_partition(n, True, log) for n in disks]
             sparts = [self.p.make_partition(n, True, log) for n in spares]
-            log(f"-- creating {label} array")
+            go(2)
             md = self.p.md_create(name, level, parts, sparts, log)
             record = {"name": name, "level": level, "md_uuid": md["uuid"], "created": time.time(),
                       "synced": level == "raid0"}       # False until the first build has finished
             self.state.update(lambda d: d["arrays"].__setitem__(name, record))
+            go(3)
             self.p.save_mdadm_conf(log)
-            log("RAID array created. Create a volume on it to store data.")
+            log("RESULT RAID array created. Create a volume on it to store data.")
 
         return self.jobs.submit(f"Create RAID {name} ({label}, {len(disks)} disks)", user, work)
 
@@ -519,12 +523,17 @@ class Nas:
             raise UserError(f"Delete volume {used} first")
 
         def work(log):
+            go = steps(log, ["Stopping the array", "Erasing its disks", "Saving the RAID configuration"])
             a = self._live(r, self.p.md_arrays())
             if a:
+                go(1)
                 self.p.md_destroy(a["dev"], [m["part"] for m in a["members"]], log)
-                for disk in unique([m["disk"] for m in a["members"]]):
+                members = unique([m["disk"] for m in a["members"]])
+                for i, disk in enumerate(members, 1):
+                    go(2, f"{disk} · {i} of {len(members)}")
                     self.p.wipe_disk(disk, log)
             self.state.update(lambda d: d["arrays"].pop(name, None))
+            go(3)
             self.p.save_mdadm_conf(log)
 
         return self.jobs.submit(f"Delete RAID {name}", user, work)
@@ -557,16 +566,27 @@ class Nas:
             raise UserError("Invalid mode")
 
         def work(log):
+            labels = (["Removing the failed disk"] if mode == "replace" else []) + [
+                f"Preparing {disk}", "Adding it as a hot spare" if mode == "spare" else "Adding it to the array"] + (
+                ["Starting the expansion"] if mode == "grow" else []) + ["Saving the RAID configuration"]
+            go = steps(log, labels)
+            n = 1
             if mode == "replace":
+                go(n)
+                n += 1
                 self.p.md_remove_failed(a["dev"], log)
+            go(n)
             self.p.wipe_disk(disk, log)
             part = self.p.make_partition(disk, True, log)
+            go(n + 1)
             self.p.md_add(a["dev"], part, log)
             if mode == "grow":
+                go(n + 2)
                 self.p.md_grow(a["dev"], a["raid_disks"] + 1, log)
-                log("Array reshape started. When it finishes, use 'Expand filesystem' on "
+                log("RESULT The expansion runs in the background. When it finishes, use Expand filesystem on "
                     "the volume to make the new space available." if level != "raid1" else
-                    "Disk added as an additional mirror.")
+                    "RESULT Disk added as an additional mirror.")
+            go(len(labels))
             self.p.save_mdadm_conf(log)
 
         return self.jobs.submit(title, user, work)
@@ -583,8 +603,12 @@ class Nas:
                 raise UserError("Removing this disk would destroy the array")
 
         def work(log):
+            go = steps(log, ["Taking the disk out of the array", "Erasing the disk", "Saving the RAID configuration"])
+            go(1)
             self.p.md_fail_remove(a["dev"], part, log)
+            go(2)
             self.p.wipe_disk(member["disk"], log)
+            go(3)
             self.p.save_mdadm_conf(log)
 
         return self.jobs.submit(f"Remove disk {member['disk']} from {name}", user, work)
@@ -685,18 +709,21 @@ class Nas:
         def work(log):
             record = {"name": name, "fs": fs, "mountpoint": mountpoint, "created": time.time(),
                       "uuid": None, "array": array}
+            go = steps(log, ([] if array else [f"Preparing disk {disk}"]) + [
+                f"Creating the {fs} filesystem", f"Mounting it at {mountpoint}"])
             if array:
                 _, a = self._array(array)
                 dev = a["dev"]
             else:
-                log(f"-- preparing disk {disk}")
+                go(1)
                 self.p.wipe_disk(disk, log)
                 dev = self.p.make_partition(disk, False, log)
-            log(f"-- creating {fs} filesystem on {dev}")
+            first = 1 if array else 2
+            go(first)
             record["uuid"] = self.p.mkfs(dev, fs, name, log)
             record["fs_dev_size"] = self.p.block_size(dev)
             self.state.update(lambda d: d["volumes"].__setitem__(name, dict(record)))
-            log(f"-- mounting at {mountpoint}")
+            go(first + 1)
             self.p.mount_persist(record["uuid"], fs, mountpoint, log)
 
         where = f"RAID {array}" if array else f"disk {disk}"
@@ -709,8 +736,11 @@ class Nas:
             raise UserError("Delete these shares first: " + ", ".join(sorted(used_by)))
 
         def work(log):
+            go = steps(log, ["Unmounting the volume", "Erasing it"])
+            go(1)
             info = self.p.fs_info(v.get("uuid")) if v.get("uuid") else None
             self.p.unmount_remove(v.get("uuid"), v["mountpoint"], log)
+            go(2)
             if v.get("array"):
                 r = self.state.get("arrays").get(v["array"])
                 a = self._live(r, self.p.md_arrays()) if r else None
@@ -732,6 +762,7 @@ class Nas:
         _, a = self._array(v["array"])
 
         def work(log):
+            steps(log, ["Expanding the filesystem to the full RAID size"])(1)
             self.p.fs_grow(a["dev"], v["fs"], v["mountpoint"], log)
             size = self.p.block_size(a["dev"])
             self.state.update(lambda d: d["volumes"][name].__setitem__("fs_dev_size", size))

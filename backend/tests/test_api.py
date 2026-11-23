@@ -1,3 +1,4 @@
+import json
 from conftest import wait_job
 
 
@@ -377,3 +378,12 @@ def test_alerts_have_action_and_since(client):
     if first:
         assert all(a["action"] and a["since"] for a in first)
         assert [a["since"] for a in nas.alerts()] == [a["since"] for a in first]   # kept while it lasts
+
+
+def test_jobs_report_their_steps(client):
+    """Storage jobs declare their steps, so the web interface shows a progress bar instead of a terminal."""
+    j = wait_job(client, client.post("/api/disks/sdd/wipe").json())
+    assert j["status"] == "success"
+    steps = [l for l in j["log"] if l.startswith("STEPS ")]
+    assert len(steps) == 1 and json.loads(steps[0][6:])[0] == "Stopping anything that uses the disk"
+    assert [l for l in j["log"] if l.startswith("STEP ")][-1].startswith("STEP 3")

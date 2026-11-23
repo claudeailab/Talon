@@ -1,3 +1,7 @@
+## 1.0.133
+- RAID, volume, disk and folder permission tasks show their steps with a progress bar instead of a terminal
+- The commands they run are folded away under Details
+
 ## 1.0.132
 - Corrected the release notes of 1.0.131
 

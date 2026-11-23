@@ -133,7 +133,7 @@ export function UpdateOverlay() {
               <ChevronDown className={cx("size-3.5 transition", showLog && "rotate-180")} /> Details
             </button>
             {showLog && (
-              <pre className="mt-2 max-h-48 overflow-auto rounded-xl bg-zinc-950 p-3 font-mono text-[11px] leading-relaxed text-zinc-300">
+              <pre className="mt-2 max-h-48 overflow-auto rounded-xl bg-zinc-50 p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-zinc-600 ring-1 ring-zinc-200 [overflow-wrap:anywhere] dark:bg-white/[0.03] dark:text-zinc-300 dark:ring-white/10">
                 {st.log!.slice(-80).join("\n")}
               </pre>
             )}

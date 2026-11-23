@@ -1,12 +1,13 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Activity, Check, CheckCircle2, Eraser, HardDrive, Loader2, MoreHorizontal, Thermometer } from "lucide-react";
+import { Activity, CheckCircle2, Eraser, HardDrive, MoreHorizontal, Thermometer } from "lucide-react";
 import { api } from "../lib/api";
-import { bytes, cx } from "../lib/format";
+import { bytes } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Disk, Job } from "../lib/types";
 import { DiskIcon, DiskStatusBadge, HealthBadge, kindLabel } from "../components/disk";
-import { Badge, Button, Callout, Card, Empty, IconButton, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Spinner } from "../components/ui";
+import { JobProgress } from "../components/jobs";
+import { Badge, Button, Card, Empty, IconButton, Menu, MenuItem, Modal, PageHeader, PageLoader, Spinner } from "../components/ui";
 
 interface Smart {
   available: boolean;
@@ -242,15 +243,11 @@ function SmartDialog({ disk, onClose }: { disk: Disk; onClose: () => void }) {
   );
 }
 
-/** Wiping one disk of an old RAID stops that whole array first. */
-const WIPE_STEPS = ["Stopping anything that uses the disk", "Removing RAID and filesystem signatures", "Reading the empty disk again"];
-
 /** Wipe a disk in one window: confirm, the steps as they run, then done (no terminal). */
 function WipeDialog({ disk, disks, onClose }: { disk: Disk; disks: Disk[]; onClose: () => void }) {
   const qc = useQueryClient();
   const [sure, setSure] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
-  const [details, setDetails] = useState(false);
   const start = useAction(() => api.post<Job>(`/disks/${disk.name}/wipe`), { onSuccess: (j) => setJobId(j.id) });
   const job = useQuery({
     queryKey: ["job", jobId],
@@ -263,8 +260,6 @@ function WipeDialog({ disk, disks, onClose }: { disk: Disk; disks: Disk[]; onClo
   useEffect(() => {
     if (finished) qc.invalidateQueries({ queryKey: ["disks"] });
   }, [finished, qc]);
-  const lines = j?.log ?? [];
-  const step = Math.max(0, ...lines.map((l) => Number(/^STEP (\d)$/.exec(l)?.[1] ?? 0)));
   const what = `${disk.model} · ${bytes(disk.size)} · ${kindLabel[disk.kind] ?? disk.kind}`;
 
   if (j?.status === "success")
@@ -292,43 +287,7 @@ function WipeDialog({ disk, disks, onClose }: { disk: Disk; disks: Disk[]; onClo
           </Button>
         }
       >
-        {j?.status === "error" && <Callout tone="danger">{j.error}</Callout>}
-        <ol className="mt-1 space-y-2.5">
-          {WIPE_STEPS.map((label, i) => {
-            const n = i + 1;
-            const failed = j?.status === "error" && n === Math.max(1, step);
-            const done = !failed && n < step;
-            const active = !failed && n === Math.max(1, step) && j?.status !== "error";
-            return (
-              <li key={label} className="flex items-center gap-3 text-[13.5px]">
-                <span
-                  className={cx(
-                    "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
-                    done && "bg-emerald-500 text-white",
-                    active && "bg-brand-600 text-white",
-                    failed && "bg-rose-500 text-white",
-                    !done && !active && !failed && "bg-zinc-100 text-zinc-400 dark:bg-white/5",
-                  )}
-                >
-                  {done ? <Check className="size-3.5" strokeWidth={3} /> : active ? <Loader2 className="size-3.5 animate-spin" /> : failed ? "!" : n}
-                </span>
-                <span className={cx(active ? "font-semibold" : done ? "text-zinc-700 dark:text-zinc-300" : "text-zinc-400")}>{label}</span>
-              </li>
-            );
-          })}
-        </ol>
-        {j?.status !== "error" && <Progress value={(Math.max(0, step - 1) / WIPE_STEPS.length) * 100 + 100 / WIPE_STEPS.length / 2} className="mt-4 h-2" />}
-        <div className="mt-3 text-xs text-zinc-500">
-          {j?.status !== "error" && "Takes a few seconds. "}
-          <button type="button" className="underline" onClick={() => setDetails(!details)}>
-            Details
-          </button>
-        </div>
-        {details && (
-          <pre className="mt-2 max-h-48 overflow-auto rounded-xl bg-zinc-100 p-3 font-mono text-[11px] whitespace-pre-wrap text-zinc-600 dark:bg-white/5 dark:text-zinc-300">
-            {lines.filter((l) => !/^STEP \d$/.test(l)).join("\n")}
-          </pre>
-        )}
+        <JobProgress job={j} hint="Takes a few seconds." />
       </Modal>
     );
   return (

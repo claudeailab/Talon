@@ -1,6 +1,7 @@
 """Background job runner for long storage operations (create volume, wipe...)."""
 from __future__ import annotations
 
+import json
 import threading
 import time
 import traceback
@@ -8,6 +9,17 @@ import uuid
 from typing import Callable, Dict, List, Optional
 
 from .util import CommandError, UserError
+
+
+def steps(log: Callable[[str], None], labels: List[str]) -> Callable[..., None]:
+    """Tell the web interface the steps of a job; it shows them with a progress bar.
+    Returns go(n, detail=""), which marks step n (from 1) as running.
+    A line starting with "RESULT " is shown when the job has finished."""
+    log("STEPS " + json.dumps(labels))
+
+    def go(n: int, detail: str = "") -> None:
+        log(f"STEP {n}" + (f" {detail}" if detail else ""))
+    return go
 
 
 class Job:
