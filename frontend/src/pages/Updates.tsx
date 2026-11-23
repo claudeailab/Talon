@@ -25,9 +25,9 @@ type OsInfo = {
   last_install: { at: number; ok: boolean; count: number; error?: string } | null;
 };
 
-type TabId = "general" | "talon" | "system";
+type TabId = "settings" | "talon" | "system";
 const TABS: { value: TabId; label: string }[] = [
-  { value: "general", label: "General" },
+  { value: "settings", label: "Settings" },
   { value: "talon", label: "Talon" },
   { value: "system", label: "System" },
 ];
@@ -52,7 +52,7 @@ const useOs = () =>
 export default function UpdatesPage() {
   const tabOf = (search: string): TabId => {
     const t = new URLSearchParams(search).get("tab");
-    return t === "talon" || t === "system" ? t : "general";
+    return t === "talon" || t === "system" ? t : "settings";
   };
   const [tab, setTab] = useState<TabId>(() => tabOf(location.search));
   // links from the bell or the menu (?tab=talon) while the page is open
@@ -60,7 +60,7 @@ export default function UpdatesPage() {
   useEffect(() => setTab(tabOf(search)), [search]);
   const change = (t: TabId) => {
     setTab(t);
-    history.replaceState(null, "", t === "general" ? location.pathname : `${location.pathname}?tab=${t}`);
+    history.replaceState(null, "", t === "settings" ? location.pathname : `${location.pathname}?tab=${t}`);
   };
   return (
     <>
@@ -68,16 +68,16 @@ export default function UpdatesPage() {
       <div className="mb-5">
         <Tabs value={tab} onChange={change} tabs={TABS} />
       </div>
-      {tab === "general" && <GeneralTab open={change} />}
+      {tab === "settings" && <SettingsTab open={change} />}
       {tab === "talon" && <TalonTab />}
       {tab === "system" && <SystemTab />}
     </>
   );
 }
 
-/* ---------------------------------------------------------------- General */
+/* ---------------------------------------------------------------- Settings */
 
-function GeneralTab({ open }: { open: (t: TabId) => void }) {
+function SettingsTab({ open }: { open: (t: TabId) => void }) {
   const talon = useTalon();
   const os = useOs();
   if (!talon.data || !os.data) return <PageLoader />;
@@ -503,19 +503,19 @@ function PkgHeader({ icon, tone, title, text }: { icon: ReactNode; tone: "securi
         "flex items-center gap-3 border-t px-5 py-2.5",
         tone === "security"
           ? "border-rose-100 bg-rose-50/70 dark:border-rose-400/10 dark:bg-rose-500/10"
-          : "border-zinc-100 bg-zinc-50 dark:border-white/5 dark:bg-white/[0.03]",
+          : "border-amber-100 bg-amber-50/70 dark:border-amber-400/10 dark:bg-amber-500/10",
       )}
     >
       <span
         className={cx(
           "flex size-7 shrink-0 items-center justify-center rounded-lg",
-          tone === "security" ? "bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-300" : "bg-zinc-200/70 text-zinc-600 dark:bg-white/10 dark:text-zinc-300",
+          tone === "security" ? "bg-rose-100 text-rose-600 dark:bg-rose-500/20 dark:text-rose-300" : "bg-amber-100 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300",
         )}
       >
         {icon}
       </span>
       <span className="min-w-0">
-        <span className={cx("block text-[13.5px] font-semibold", tone === "security" ? "text-rose-700 dark:text-rose-300" : "text-zinc-800 dark:text-zinc-100")}>
+        <span className={cx("block text-[13.5px] font-semibold", tone === "security" ? "text-rose-700 dark:text-rose-300" : "text-amber-700 dark:text-amber-300")}>
           {title}
         </span>
         <span className="block text-xs text-zinc-500 dark:text-zinc-400">{text}</span>

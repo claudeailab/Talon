@@ -1,3 +1,7 @@
+## 1.0.128
+- Updates: the first tab is named Settings
+- System updates: Other updates are highlighted in yellow, Security updates in red
+
 ## 1.0.127
 - Updates is listed below Settings; the Talon card no longer shows a restart option
 - System updates: clear Security and Other headings, both always shown

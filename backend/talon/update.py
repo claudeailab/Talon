@@ -17,7 +17,7 @@ from typing import Optional
 from . import __version__
 from .util import UserError, read_file, run, write_atomic
 
-CHECK_INTERVAL = 6 * 3600                 # default; changeable under Updates → General
+CHECK_INTERVAL = 6 * 3600                 # default; changeable under Updates → Settings
 INTERVAL_CHOICES = (0, 1, 6, 12, 24, 168)   # hours; 0 = only when "Check now" is clicked
 HEARTBEAT_TIMEOUT = 180
 AUTO_HOURS = (3, 5)                        # automatic installs start between 03:00 and 05:00

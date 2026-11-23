@@ -876,10 +876,10 @@ export const GUIDE: Topic[] = [
     page: { to: "/updates", label: "Open Updates" },
     sections: [
       {
-        id: "general",
-        title: "General",
+        id: "settings",
+        title: "Settings",
         blocks: [
-          { img: "updates", alt: "Updates, General tab" },
+          { img: "updates", alt: "Updates, Settings tab" },
           { p: "The first card shows whether **Talon** and the **System** (the operating system: Debian, Ubuntu or Raspberry Pi OS) are up to date: green when they are, yellow with the number of waiting updates when not. Click one to open its tab." },
           {
             list: [
@@ -902,7 +902,7 @@ export const GUIDE: Topic[] = [
         id: "system",
         title: "System",
         blocks: [
-          { p: "Opening the **System** tab checks for operating system updates straight away, with a progress bar. **Security updates** fix known security holes and are listed first; **Other updates** are bug fixes and improvements." },
+          { p: "Opening the **System** tab checks for operating system updates straight away, with a progress bar. **Security updates** (red) fix known security holes and are listed first; **Other updates** (yellow) are bug fixes and improvements." },
           { p: "**Install all** installs them with a progress bar. Shared folders keep working, and configuration files you changed are kept. When an update needs a restart, for example a new Linux kernel, **Restart to finish** appears here and in the bell." },
           { p: "Waiting security updates show in the bell, and you get an email about new ones unless they install automatically." },
         ],

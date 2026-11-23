@@ -27,7 +27,7 @@ TALON_FILE = "/etc/apt/apt.conf.d/52talon-unattended-upgrades"
 UU_LOG = "/var/log/unattended-upgrades/unattended-upgrades.log"
 RESTART_PACKAGES = re.compile(r"^(linux-image|linux-headers|raspberrypi-kernel|linux-.*rpi|libc6$|systemd$|dbus$|firmware-)")
 INST_RE = re.compile(r"^Inst (\S+)(?: \[([^\]]+)\])? \((\S+) ([^\[)]*?)(?: \[[^\]]*\])?\)")
-CHECK_HOURS = 24                       # default; changeable under Updates → General
+CHECK_HOURS = 24                       # default; changeable under Updates → Settings
 INTERVAL_CHOICES = (0, 1, 6, 12, 24, 168)   # hours; 0 = only when "Check now" is clicked
 AUTO_MODES = {"off": "off", "security": "security updates only", "all": "all updates"}
 
@@ -263,7 +263,7 @@ class OsUpdate:
                 raise UserError("Could not install unattended-upgrades: " + (_first_error(cp.stderr) or "apt-get failed"))
         on = "0" if mode == "off" else "1"
         write_atomic(AUTO_FILE, f'APT::Periodic::Update-Package-Lists "{on}";\nAPT::Periodic::Unattended-Upgrade "{on}";\n')
-        lines = ["// Talon: Updates → General → System",
+        lines = ["// Talon: Updates → Settings → System",
                  f'Unattended-Upgrade::Automatic-Reboot "{"true" if restart else "false"}";',
                  f'Unattended-Upgrade::Automatic-Reboot-Time "{t}";',
                  'Unattended-Upgrade::Automatic-Reboot-WithUsers "true";']
