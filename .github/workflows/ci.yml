@@ -122,7 +122,7 @@ jobs:
       id-token: write
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.first.outputs.page_url || steps.second.outputs.page_url }}
     steps:
       - uses: actions/checkout@v7
         with: { ref: "${{ needs.test.outputs.sha }}" }
@@ -150,5 +150,13 @@ jobs:
             sleep 2
           done
           echo "::warning::The upload is still not listed; trying to publish anyway"
-      - id: deployment
+      # GitHub sometimes still reports the upload as missing for a short while: try
+      # again after a pause instead of failing the run
+      - id: first
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+      - if: steps.first.outcome == 'failure'
+        run: sleep 30
+      - id: second
+        if: steps.first.outcome == 'failure'
         uses: actions/deploy-pages@v5

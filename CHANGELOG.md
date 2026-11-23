@@ -1,3 +1,6 @@
+## 1.0.119
+- Website publishing retries when GitHub is slow to list the upload
+
 ## 1.0.118
 - Antivirus is a service (off by default) with a single, compact page
 - Tabs show a hand and a highlight on hover; OneDrive shows matching files as OK, not as a warning
