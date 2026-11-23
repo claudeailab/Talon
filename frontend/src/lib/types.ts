@@ -271,6 +271,7 @@ export interface UpdateStatus {
 export interface UpdateInfo {
   current: string;
   interval_hours: number;
+  auto_install: boolean;
   latest: string | null;
   available: boolean;
   name: string | null;

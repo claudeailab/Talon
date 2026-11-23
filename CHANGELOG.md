@@ -1,3 +1,8 @@
+## 1.0.126
+- New Updates page: General (status and settings for Talon and the system), Talon and System tabs that check when opened
+- Notifications: Email, Notifications and Thresholds tabs; failed sign-in emails on by default
+- More compact Create RAID levels and Dashboard Services card
+
 ## 1.0.125
 - Settings: tidier tabs with one card of rows each, and a Save bar that only appears after a change
 - SMTP moved to Notifications → Email; About removed (version under Update, hardware on the Dashboard)

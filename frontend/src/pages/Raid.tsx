@@ -6,7 +6,6 @@ import { bytes, cx, dateTime, levelLabel } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import { Link } from "../lib/router";
 import type { Disk, Job, Member, RaidArray, RaidOption } from "../lib/types";
-import { CapacityBar } from "../components/charts";
 import { JobDialog } from "../components/jobs";
 import { DiskRow, Dots, MemberList, NAME_HINT, NAME_RE, Stat, StatusBadge, Stepper, SyncProgress, statusTone } from "../components/storage";
 import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Segmented } from "../components/ui";
@@ -310,6 +309,9 @@ function CreateRaidWizard({ disks, existing, onClose, onJob }: { disks: Disk[]; 
     enabled: sel.length > 1,
   });
   const chosen = opts.data?.find((o) => o.id === level);
+  // a warning every available level has (disks of different sizes) is shown once, above the list
+  const avail = opts.data?.filter((o) => o.available) ?? [];
+  const common = avail.length > 1 ? avail[0].warnings.filter((w) => avail.every((o) => o.warnings.includes(w))) : [];
 
   useEffect(() => {
     if (!opts.data) return;
@@ -429,11 +431,20 @@ function CreateRaidWizard({ disks, existing, onClose, onJob }: { disks: Disk[]; 
           {!opts.data ? (
             <PageLoader />
           ) : (
-            <div className="grid gap-3 md:grid-cols-2">
-              {opts.data.map((o) => (
-                <LevelCard key={o.id} o={o} selected={level === o.id} onClick={() => setLevel(o.id)} />
-              ))}
-            </div>
+            <>
+              {common.length > 0 && (
+                <Callout tone="warning">
+                  {common.map((w) => (
+                    <div key={w}>{fmtWarning(w)}</div>
+                  ))}
+                </Callout>
+              )}
+              <div className="divide-y divide-zinc-100 overflow-hidden rounded-2xl ring-1 ring-zinc-200 dark:divide-white/5 dark:ring-white/10">
+                {opts.data.map((o) => (
+                  <LevelRow key={o.id} o={o} selected={level === o.id} hide={common} onClick={() => setLevel(o.id)} />
+                ))}
+              </div>
+            </>
           )}
           {maxSpares > 0 && (
             <Card className="flex flex-wrap items-center justify-between gap-3 p-4">
@@ -509,45 +520,45 @@ function CreateRaidWizard({ disks, existing, onClose, onJob }: { disks: Disk[]; 
   );
 }
 
-function LevelCard({ o, selected, onClick }: { o: RaidOption; selected: boolean; onClick: () => void }) {
+const fmtWarning = (w: string) => w.replace(/(\d{6,}) bytes/, (_m, n) => bytes(Number(n)));
+
+function LevelRow({ o, selected, hide, onClick }: { o: RaidOption; selected: boolean; hide: string[]; onClick: () => void }) {
+  const warnings = o.warnings.filter((w) => !hide.includes(w) && !(o.fault_tolerance === 0 && /redundancy/i.test(w)));
   return (
     <button
       type="button"
       disabled={!o.available}
       onClick={onClick}
       className={cx(
-        "relative rounded-2xl p-4 text-left ring-1 transition",
-        !o.available && "cursor-not-allowed opacity-45 ring-zinc-200 dark:ring-white/5",
-        o.available && selected && "bg-brand-50/60 ring-2 ring-brand-500 dark:bg-brand-500/10",
-        o.available && !selected && "ring-zinc-200 hover:ring-zinc-300 dark:ring-white/10 dark:hover:ring-white/20",
+        "flex w-full items-start gap-3 px-4 py-2.5 text-left transition",
+        !o.available && "cursor-not-allowed opacity-50",
+        o.available && selected && "bg-brand-50/70 dark:bg-brand-500/10",
+        o.available && !selected && "hover:bg-zinc-50 dark:hover:bg-white/[0.03]",
       )}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-semibold">{o.label}</span>
+      <span
+        className={cx(
+          "mt-1 flex size-4 shrink-0 items-center justify-center rounded-full ring-1",
+          selected ? "bg-brand-600 ring-brand-600" : "ring-zinc-300 dark:ring-white/20",
+        )}
+      >
+        {selected && <span className="size-1.5 rounded-full bg-white" />}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-sm font-semibold">{o.label}</span>
           {o.recommended && (
             <Badge tone="violet">
               <Sparkles className="size-3" /> Recommended
             </Badge>
           )}
-        </div>
-        {o.available && <span className="tabular shrink-0 text-sm font-semibold">{bytes(o.usable_bytes)}</span>}
-      </div>
-      <p className="mt-1.5 text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">{o.description}</p>
-      {o.available ? (
-        <>
-          <div className="mt-3">
-            <CapacityBar
-              parts={[
-                { value: o.usable_bytes, className: "bg-gradient-to-r from-brand-500 to-violet-500", label: "Usable" },
-                { value: Math.max(0, o.raw_bytes - o.usable_bytes), className: "bg-zinc-300 dark:bg-white/20", label: "Redundancy / spare / unused" },
-              ]}
-            />
-          </div>
-          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-zinc-500">
+        </span>
+        <span className="block text-xs text-zinc-500 dark:text-zinc-400">{o.description}</span>
+        {o.available ? (
+          <span className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-zinc-500">
             <span className="flex items-center gap-1">
               <ShieldCheck className={cx("size-3.5", o.fault_tolerance ? "text-emerald-500" : "text-rose-500")} />
-              {o.fault_tolerance ? `Survives ${o.fault_tolerance} disk failure${o.fault_tolerance > 1 ? "s" : ""}` : "No protection"}
+              {o.fault_tolerance ? `Survives ${o.fault_tolerance} disk failure${o.fault_tolerance > 1 ? "s" : ""}` : "No protection: one failed disk loses everything"}
             </span>
             <span className="flex items-center gap-1.5">
               <Zap className="size-3.5" /> Read <Dots n={o.read_perf} />
@@ -555,15 +566,21 @@ function LevelCard({ o, selected, onClick }: { o: RaidOption; selected: boolean;
             <span className="flex items-center gap-1.5">
               Write <Dots n={o.write_perf} />
             </span>
-          </div>
-          {o.warnings.map((w) => (
-            <div key={w} className="mt-2 text-xs text-amber-600 dark:text-amber-400">
-              ⚠ {w.replace(/(\d{6,}) bytes/, (_m, n) => bytes(Number(n)))}
-            </div>
-          ))}
-        </>
-      ) : (
-        <div className="mt-3 text-xs font-medium text-zinc-500">{o.reason}</div>
+          </span>
+        ) : (
+          <span className="mt-0.5 block text-xs font-medium text-zinc-500">{o.reason}</span>
+        )}
+        {warnings.map((w) => (
+          <span key={w} className="mt-1 block text-xs text-amber-600 dark:text-amber-400">
+            ⚠ {fmtWarning(w)}
+          </span>
+        ))}
+      </span>
+      {o.available && (
+        <span className="shrink-0 text-right">
+          <span className="tabular block text-sm font-semibold">{bytes(o.usable_bytes)}</span>
+          <span className="block text-[11px] text-zinc-500">usable</span>
+        </span>
       )}
     </button>
   );

@@ -1,6 +1,6 @@
 """Operating system updates: Debian / Ubuntu / Raspberry Pi OS packages.
 
-Settings → Update → Operating system lists the waiting package updates (security
+Updates → System lists the waiting package updates (security
 updates first), installs them with a progress bar instead of a terminal, says when
 a restart is needed, and turns automatic security updates on or off
 (unattended-upgrades, with an optional automatic restart at 04:00).
@@ -27,7 +27,8 @@ TALON_FILE = "/etc/apt/apt.conf.d/52talon-unattended-upgrades"
 UU_LOG = "/var/log/unattended-upgrades/unattended-upgrades.log"
 RESTART_PACKAGES = re.compile(r"^(linux-image|linux-headers|raspberrypi-kernel|linux-.*rpi|libc6$|systemd$|dbus$|firmware-)")
 INST_RE = re.compile(r"^Inst (\S+)(?: \[([^\]]+)\])? \((\S+) ([^\[)]*?)(?: \[[^\]]*\])?\)")
-CHECK_HOURS = 24
+CHECK_HOURS = 24                       # default; changeable under Updates → General
+INTERVAL_CHOICES = (0, 1, 6, 12, 24, 168)   # hours; 0 = only when "Check now" is clicked
 AUTO_MODES = {"off": "off", "security": "security updates only", "all": "all updates"}
 
 
@@ -153,7 +154,7 @@ class OsUpdate:
         if new_security and self.notifier and self.auto_settings()["mode"] == "off":
             self.notifier.send("os_updates", f"{len(new_security)} security update(s) for the operating system",
                                "Security updates are waiting: " + ", ".join(new_security) +
-                               "\nInstall them in Talon under Settings → Update → Operating system.")
+                               "\nInstall them in Talon under Updates → System.")
         return self.info()
 
     # ------------------------------------------------------------ install
@@ -222,8 +223,10 @@ class OsUpdate:
     def auto_settings(self) -> dict:
         a = self._saved().get("auto") or {}
         mode = a.get("mode", "off")
+        h = a.get("interval_hours", CHECK_HOURS)
         return {"mode": mode if mode in AUTO_MODES else "off", "restart": bool(a.get("restart")),
-                "restart_time": a.get("restart_time", "04:00")}
+                "restart_time": a.get("restart_time", "04:00"),
+                "interval_hours": h if h in INTERVAL_CHOICES else CHECK_HOURS}
 
     def set_auto(self, data: dict, actor: str) -> dict:
         cur = self.auto_settings()
@@ -234,12 +237,21 @@ class OsUpdate:
         t = str(data.get("restart_time", cur["restart_time"]))
         if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", t):
             raise UserError("Enter the time as hh:mm (24-hour)")
+        try:
+            hours = int(data.get("interval_hours", cur["interval_hours"]))
+        except (TypeError, ValueError):
+            hours = -1
+        if hours not in INTERVAL_CHOICES:
+            raise UserError("Choose how often to check for updates")
         if not self.demo:
             self._apply_auto(mode, restart, t)
         self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}),
-                                                                 "auto": {"mode": mode, "restart": restart, "restart_time": t}}))
+                                                                 "auto": {"mode": mode, "restart": restart, "restart_time": t,
+                                                                          "interval_hours": hours}}))
         if mode != cur["mode"]:
             self.state.log_activity(actor, f"Automatic updates: {AUTO_MODES[mode]}", "info", "updates")
+        if hours != cur["interval_hours"]:
+            self.state.log_activity(actor, "System update checks: " + (f"every {hours} hour(s)" if hours else "only when checked manually"), "info", "updates")
         if restart != cur["restart"] or (restart and t != cur["restart_time"]):
             self.state.log_activity(actor, f"Automatic restart after updates: {'at ' + t if restart else 'off'}", "info", "updates")
         return self.info()
@@ -251,7 +263,7 @@ class OsUpdate:
                 raise UserError("Could not install unattended-upgrades: " + (_first_error(cp.stderr) or "apt-get failed"))
         on = "0" if mode == "off" else "1"
         write_atomic(AUTO_FILE, f'APT::Periodic::Update-Package-Lists "{on}";\nAPT::Periodic::Unattended-Upgrade "{on}";\n')
-        lines = ["// Talon: Settings → Update → Operating system",
+        lines = ["// Talon: Updates → General → System",
                  f'Unattended-Upgrade::Automatic-Reboot "{"true" if restart else "false"}";',
                  f'Unattended-Upgrade::Automatic-Reboot-Time "{t}";',
                  'Unattended-Upgrade::Automatic-Reboot-WithUsers "true";']
@@ -286,7 +298,8 @@ class OsUpdate:
         stop.wait(120)
         while not stop.is_set():
             last = self._saved().get("checked_at") or 0
-            if time.time() - last > CHECK_HOURS * 3600:
+            hours = self.auto_settings()["interval_hours"]
+            if hours and time.time() - last > hours * 3600:
                 try:
                     self.check()
                 except Exception:   # noqa: BLE001

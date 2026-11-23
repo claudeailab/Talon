@@ -9,38 +9,39 @@ import { Row, RowCard, SaveBar, Section } from "../components/rows";
 import type { NotificationSettings } from "../lib/types";
 import { Badge, Button, Card, CardHeader, Input, PageHeader, PageLoader, Switch, Tabs } from "../components/ui";
 
-type TabId = "email" | "thresholds";
+type TabId = "email" | "notifications" | "thresholds";
 
 export default function NotificationsPage() {
+  const q = useQuery({ queryKey: ["notifications"], queryFn: () => api.get<NotificationSettings>("/notifications") });
   const initial = new URLSearchParams(location.search).get("tab");
-  const [tab, setTab] = useState<TabId>(initial === "thresholds" ? "thresholds" : "email");
+  const [tab, setTab] = useState<TabId>(initial === "thresholds" || initial === "notifications" ? initial : "email");
   const change = (t: TabId) => {
     setTab(t);
     history.replaceState(null, "", t === "email" ? location.pathname : `${location.pathname}?tab=${t}`);
   };
-  const header = (
+  // the Notifications tab appears once email (SMTP) is set up
+  const smtp = !!q.data?.smtp;
+  const shown = tab === "notifications" && q.data && !smtp ? "email" : tab;
+  return (
     <>
       <PageHeader title="Notifications" description="Choose when Talon warns you" />
       <div className="mb-5">
         <Tabs
-          value={tab}
+          value={shown}
           onChange={change}
           tabs={[
             { value: "email", label: "Email" },
+            ...(smtp ? [{ value: "notifications" as const, label: "Notifications" }] : []),
             { value: "thresholds", label: "Thresholds" },
           ]}
         />
       </div>
-    </>
-  );
-  return (
-    <>
-      {header}
-      {tab === "email" ? <EmailTab /> : <ThresholdsCard />}
+      {shown === "email" ? <SmtpCard /> : shown === "notifications" ? <EmailTab /> : <ThresholdsCard />}
     </>
   );
 }
 
+/** Notifications → Notifications: who gets emails, and for what. */
 function EmailTab() {
   const q = useQuery({ queryKey: ["notifications"], queryFn: () => api.get<NotificationSettings>("/notifications") });
   const [recipients, setRecipients] = useState("");
@@ -58,44 +59,39 @@ function EmailTab() {
   const test = useAction(() => api.post("/notifications/test"), { success: "Test notification sent" });
   if (!q.data) return <PageLoader />;
 
-  if (!q.data.smtp) return <SmtpCard />;
-
   const changed = !sameSet(list, q.data.recipients) || !sameValue(events, q.data.events);
   return (
-    <div className="space-y-5">
-      <SmtpCard />
-      <RowCard>
-        <Section
-          title="Email notifications"
-          right={
-            <Button size="sm" variant="ghost" icon={<Send className="size-3.5" />} disabled={changed || !q.data.recipients.length} loading={test.isPending} onClick={() => test.mutate()}>
-              Send test
-            </Button>
-          }
-        />
-        <Row label="Send to" hint="Separate several addresses with commas; each alert is sent once, and again if it comes back">
-          <Input value={recipients} onChange={(e) => setRecipients(e.target.value)} placeholder="you@example.com" className="w-full sm:w-72" aria-label="Send to" />
-        </Row>
-        <Section title="Send an email when" />
-        <div className="grid md:grid-cols-2">
-          {Object.entries(q.data.labels).map(([id, label]) => (
-            <div key={id} className="flex min-h-11 items-center justify-between gap-4 border-t border-zinc-100 px-5 py-2 first:border-t-0 md:[&:nth-child(2)]:border-t-0 dark:border-white/5">
-              <span className="min-w-0 text-[13.5px] font-medium break-words">{label}</span>
-              <Switch checked={!!events[id]} onChange={(v) => setEvents({ ...events, [id]: v })} label={label} />
-            </div>
-          ))}
-        </div>
-        <SaveBar
-          show={changed}
-          onDiscard={() => {
-            setRecipients(q.data!.recipients.join(", "));
-            setEvents(q.data!.events);
-          }}
-          loading={save.isPending}
-          onSave={() => save.mutate()}
-        />
-      </RowCard>
-    </div>
+    <RowCard>
+      <Section
+        title="Email notifications"
+        right={
+          <Button size="sm" variant="ghost" icon={<Send className="size-3.5" />} disabled={changed || !q.data.recipients.length} loading={test.isPending} onClick={() => test.mutate()}>
+            Send test
+          </Button>
+        }
+      />
+      <Row label="Send to" hint="Separate several addresses with commas; each alert is sent once, and again if it comes back">
+        <Input value={recipients} onChange={(e) => setRecipients(e.target.value)} placeholder="you@example.com" className="w-full sm:w-72" aria-label="Send to" />
+      </Row>
+      <Section title="Send an email when" />
+      <div className="grid md:grid-cols-2">
+        {Object.entries(q.data.labels).map(([id, label]) => (
+          <div key={id} className="flex min-h-11 items-center justify-between gap-4 border-t border-zinc-100 px-5 py-2 first:border-t-0 md:[&:nth-child(2)]:border-t-0 dark:border-white/5">
+            <span className="min-w-0 text-[13.5px] font-medium break-words">{label}</span>
+            <Switch checked={!!events[id]} onChange={(v) => setEvents({ ...events, [id]: v })} label={label} />
+          </div>
+        ))}
+      </div>
+      <SaveBar
+        show={changed}
+        onDiscard={() => {
+          setRecipients(q.data!.recipients.join(", "));
+          setEvents(q.data!.events);
+        }}
+        loading={save.isPending}
+        onSave={() => save.mutate()}
+      />
+    </RowCard>
   );
 }
 

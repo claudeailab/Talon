@@ -616,7 +616,7 @@ export const GUIDE: Topic[] = [
     summary: "Back up or sync folders between this NAS and Microsoft OneDrive.",
     page: { to: "/onedrive", label: "Open OneDrive" },
     before: [
-      "A Microsoft Entra ID app, set up once in **Settings → EntraID**. See [EntraID](" + t("entra") + "). OneDrive cannot sign in without it.",
+      "A Microsoft Entra ID app, set up once in **Settings → Entra ID**. See [EntraID](" + t("entra") + "). OneDrive cannot sign in without it.",
       "The **OneDrive** service turned on in [Services](/services).",
     ],
     sections: [
@@ -682,7 +682,7 @@ export const GUIDE: Topic[] = [
     title: "EntraID (Microsoft sign-in)",
     group: "Cloud and alerts",
     summary: "The one-time Microsoft app registration that OneDrive, and signing in with Microsoft, need.",
-    page: { to: "/settings?tab=entra", label: "Open Settings → EntraID" },
+    page: { to: "/settings?tab=entra", label: "Open Settings → Entra ID" },
     sections: [
       {
         id: "why",
@@ -695,7 +695,7 @@ export const GUIDE: Topic[] = [
         id: "steps",
         title: "Step by step",
         blocks: [
-          { p: "Talon shows the same steps under **Settings → EntraID → Setup guide**, with your exact redirect address and a **Copy** button. Talon needs three values from the app: the **Application (client) ID**, the **Directory (tenant) ID** and a **client secret**. It works out by itself which accounts the app allows." },
+          { p: "Talon shows the same steps under **Settings → Entra ID → Setup guide**, with your exact redirect address and a **Copy** button. Talon needs three values from the app: the **Application (client) ID**, the **Directory (tenant) ID** and a **client secret**. It works out by itself which accounts the app allows." },
           {
             steps: [
               "**Open the Entra admin center**: go to **entra.microsoft.com** and sign in.",
@@ -729,7 +729,7 @@ export const GUIDE: Topic[] = [
         blocks: [
           {
             steps: [
-              "In [Settings → EntraID](/settings?tab=entra), under **Client secret**, enter the date in **Expires on**. Entra shows it under **Certificates & secrets**.",
+              "In [Settings → Entra ID](/settings?tab=entra), under **Client secret**, enter the date in **Expires on**. Entra shows it under **Certificates & secrets**.",
               "Under **Reminder**, choose when: 7 to 90 days before.",
               "Next to it, enter the addresses, separated by commas. Leave it empty to use the recipients from the [Notifications](/notifications) page.",
               "Click **Save**.",
@@ -764,7 +764,7 @@ export const GUIDE: Topic[] = [
         blocks: [
           {
             steps: [
-              "Open [Notifications → Email](/notifications). The **SMTP server** section is at the top.",
+              "Open [Notifications → Email](/notifications).",
               "Enter the **SMTP server** and **Port** from your email provider, and the **Connection security**: **STARTTLS** (usually port 587), **SSL/TLS** (usually 465) or **None**.",
               "Enter the **Sender address** the emails come from.",
               "Enter the **User name** and **Password**, or leave them empty if the server needs no sign-in. Many providers require an app password here instead of your normal password.",
@@ -780,9 +780,9 @@ export const GUIDE: Topic[] = [
         blocks: [
           {
             steps: [
-              "Open the [Notifications](/notifications) page, tab **Email**.",
+              "Open the [Notifications](/notifications?tab=notifications) page, tab **Notifications**. The tab appears once email is set up.",
               "Enter one or more addresses under **Send to**, separated by commas.",
-              "Under **Send an email when**, choose the events: RAID degraded or failed, disk health warning, disk too hot, volume almost full, background task failed, OneDrive task failed, software update available, and failed sign-in attempt.",
+              "Under **Send an email when**, choose the events: RAID degraded or failed, disk health warning, disk too hot, volume almost full, background task failed, OneDrive task failed, software update available, and failed sign-in attempt. All are on by default.",
               "Click **Save**, then **Send test** to send a test email.",
             ],
           },
@@ -822,7 +822,7 @@ export const GUIDE: Topic[] = [
         id: "install",
         title: "Install ClamAV",
         blocks: [
-          { p: "Talon uses **ClamAV**, a free, open-source antivirus by Cisco Talos. It is off until you want it: on the [Services](/services) page, turn on **Antivirus**. Talon installs ClamAV and the **Antivirus** page appears in the menu. It downloads about 300 MB, including the virus definitions, with a progress bar. The virus definitions then update automatically every hour; ClamAV itself updates with the [operating system updates](" + t("settings") + ")." },
+          { p: "Talon uses **ClamAV**, a free, open-source antivirus by Cisco Talos. It is off until you want it: on the [Services](/services) page, turn on **Antivirus**. Talon installs ClamAV and the **Antivirus** page appears in the menu. It downloads about 300 MB, including the virus definitions, with a progress bar. The virus definitions then update automatically every hour; ClamAV itself updates with the [operating system updates](" + t("updates") + ")." },
           { p: "A scan loads the virus definitions into memory while it runs, about 1.5 GB, and frees it afterwards. ClamAV needs at least 2 GB of memory and recommends 3 GB or more; Talon tells you when the NAS has too little." },
         ],
       },
@@ -869,10 +869,51 @@ export const GUIDE: Topic[] = [
     ],
   },
   {
+    id: "updates",
+    title: "Updates",
+    group: "System",
+    summary: "Updates of Talon and of the operating system: checking, installing, and installing automatically.",
+    page: { to: "/updates", label: "Open Updates" },
+    sections: [
+      {
+        id: "general",
+        title: "General",
+        blocks: [
+          { img: "updates", alt: "Updates, General tab" },
+          { p: "The first card shows whether **Talon** and the **System** (the operating system: Debian, Ubuntu or Raspberry Pi OS) are up to date: green when they are, yellow with the number of waiting updates when not. Click one to open its tab." },
+          {
+            list: [
+              "**How often to check**: every hour up to every week, or **Never** to check only with **Check now**. Talon checks every 6 hours by default, the system once a day.",
+              "**Install automatically**: for Talon **Off** or **On** (a new version installs at night, between 03:00 and 05:00); for the system **Off**, **Security** or **All** (every night, with an email when something was installed, once email is set up).",
+              "**Restart when needed** (system only): restarts the NAS at the time you choose (04:00 by default), only when an update needs it. Talon updates never need one: only Talon itself restarts, for a few seconds.",
+            ],
+          },
+        ],
+      },
+      {
+        id: "talon",
+        title: "Talon",
+        blocks: [
+          { p: "Opening the **Talon** tab checks for a new version straight away; the arrows next to **Check now** spin while it checks. It shows the installed version and, when there is one, the new version with its release notes and an **Install** button. A button at the bottom of the menu also says when a new version is available." },
+          { p: "An update takes about 1–3 minutes. The web interface restarts and reloads by itself. Shared folders stay available and volumes are not touched. If anything fails, the previous version is restored automatically." },
+        ],
+      },
+      {
+        id: "system",
+        title: "System",
+        blocks: [
+          { p: "Opening the **System** tab checks for operating system updates straight away, with a progress bar. Security updates are listed first; **Other** shows the rest." },
+          { p: "**Install all** installs them with a progress bar. Shared folders keep working, and configuration files you changed are kept. When an update needs a restart, for example a new Linux kernel, **Restart to finish** appears here and in the bell." },
+          { p: "Waiting security updates show in the bell, and you get an email about new ones unless they install automatically." },
+        ],
+      },
+    ],
+  },
+  {
     id: "settings",
     title: "Settings and updates",
     group: "System",
-    summary: "Name, time zone, network address, Windows and macOS options, and updates of Talon and the operating system.",
+    summary: "Name, time zone, network address, HTTPS, Windows and macOS options, and the Entra ID app.",
     page: { to: "/settings", label: "Open Settings" },
     sections: [
       {
@@ -921,34 +962,10 @@ export const GUIDE: Topic[] = [
         ],
       },
       {
-        id: "update",
-        title: "Software updates",
-        blocks: [
-          { img: "settings-update", alt: "Software update" },
-          { p: "Talon checks for a new version every 6 hours; change this under **Check for updates** (every hour up to every week, or **Never** to check only with **Check now**). Nothing installs by itself. When a new version is available, a button at the bottom of the menu says so. Open [Settings → Update](/settings?tab=update) and click **Install**." },
-          { p: "An update takes about 1–3 minutes. The web interface restarts and reloads by itself. Shared folders stay available and volumes are not touched. If anything fails, the previous version is restored automatically." },
-        ],
-      },
-      {
-        id: "os-update",
-        title: "Operating system updates",
-        blocks: [
-          { p: "[Settings → Update](/settings?tab=update) shows **Talon** and the **Operating system** on one page. The operating system (Debian, Ubuntu or Raspberry Pi OS) is checked once a day; **Check now** checks straight away, with a progress bar. Security updates are listed first; **Other** shows the rest." },
-          { p: "**Install all** installs them with a progress bar. Shared folders keep working, and configuration files you changed are kept. When an update needs a restart, for example a new Linux kernel, **Restart to finish** appears here and in the bell." },
-          {
-            list: [
-              "**Install automatically**: **Off**, **Security** or **All**. They install every night, with an email when something was installed (set up SMTP first).",
-              "**Restart when needed**: only when an update needs it, at the time you choose (04:00 by default).",
-            ],
-          },
-          { p: "Waiting security updates show in the bell, and you get an email about new ones unless they install automatically." },
-        ],
-      },
-      {
         id: "other",
-        title: "EntraID",
+        title: "Entra ID",
         blocks: [
-          { p: "**EntraID** is the Microsoft sign-in for OneDrive ([EntraID](" + t("entra") + ")). The SMTP server for emails is under [Notifications → Email](" + t("email") + "); the Talon version is under **Update** and the hardware on the Dashboard." },
+          { p: "**EntraID** is the Microsoft sign-in for OneDrive ([EntraID](" + t("entra") + ")). The SMTP server for emails is under [Notifications → Email](" + t("email") + "); the Talon version is under [Updates](/updates) and the hardware on the Dashboard." },
         ],
       },
     ],
@@ -1085,12 +1102,12 @@ export const GUIDE: Topic[] = [
       {
         id: "onedrive",
         title: "OneDrive does not connect",
-        blocks: [{ p: "First check **Settings → EntraID → Test**. Most problems are a redirect URI that does not match the address you use, or the Secret ID pasted instead of the secret Value. See [EntraID](" + t("entra") + ")." }],
+        blocks: [{ p: "First check **Settings → Entra ID → Test**. Most problems are a redirect URI that does not match the address you use, or the Secret ID pasted instead of the secret Value. See [EntraID](" + t("entra") + ")." }],
       },
       {
         id: "mail",
         title: "Emails do not arrive",
-        blocks: [{ p: "Run **Test** in **Settings → SMTP** and fix the step that fails. Then send a test from the [Notifications](/notifications) page and check your spam folder." }],
+        blocks: [{ p: "Run **Test** in **Notifications → Email** and fix the step that fails. Then send a test from the [Notifications](/notifications) page and check your spam folder." }],
       },
       {
         id: "uninstall",

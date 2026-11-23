@@ -216,7 +216,7 @@ class CloudSync:
                    "OneDrive tasks cannot sign in until it is replaced.\n\n"
         body += ("To replace it: in entra.microsoft.com open the app > Certificates & secrets > "
                  "New client secret, then paste the new Value and its expiry date in "
-                 "Talon > Settings > EntraID and click Save.")
+                 "Talon > Settings > Entra ID and click Save.")
         to = e.get("remind_to") or self.nas.notifier.settings()["recipients"]
         if not to or not (self.state.get("smtp") or {}).get("host"):
             return                      # nowhere to send it yet; try again later

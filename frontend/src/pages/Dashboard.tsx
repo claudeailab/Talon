@@ -252,7 +252,7 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid items-start gap-4 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader
             icon={<HardDrive className="size-4.5" />}
@@ -290,15 +290,16 @@ export default function DashboardPage() {
           <CardHeader
             icon={<Server className="size-4.5" />}
             title="Services"
+            subtitle={`${data.services.filter((s) => s.active).length} of ${data.services.length} running`}
             actions={
               <Link to="/services" className="text-[13px] font-medium text-brand-600 hover:text-brand-500 dark:text-brand-400">
                 Manage
               </Link>
             }
           />
-          <ul className="divide-y divide-zinc-100 px-5 pb-3 dark:divide-white/5">
+          <ul className="divide-y divide-zinc-100 px-5 pb-2 dark:divide-white/5">
             {data.services.map((s) => (
-              <li key={s.id} className="flex items-center justify-between py-2.5 text-[13px]">
+              <li key={s.id} className="flex items-center justify-between gap-3 py-1.5 text-[13px]">
                 <span className="font-medium">{s.label}</span>
                 <span className="flex items-center gap-2 text-zinc-500">
                   <StatusDot tone={!s.installed ? "zinc" : s.active ? "green" : "zinc"} />

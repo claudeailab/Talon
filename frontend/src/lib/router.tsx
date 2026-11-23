@@ -23,7 +23,7 @@ export function usePath(): string {
   return path;
 }
 
-/** The query string, updated on navigation (for example ?tab=update). */
+/** The query string, updated on navigation (for example ?tab=talon). */
 export function useSearch(): string {
   const [search, setSearch] = useState(location.search);
   useEffect(() => {

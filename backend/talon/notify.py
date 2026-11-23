@@ -27,7 +27,7 @@ EVENTS: Dict[str, tuple] = {
     "os_updates": ("Operating system security updates", True),
     "virus": ("Virus found", True),
     "usb_backup": ("Backup completed or failed", True),
-    "login_failed": ("Failed sign-in attempt", False),
+    "login_failed": ("Failed sign-in attempt", True),
 }
 
 

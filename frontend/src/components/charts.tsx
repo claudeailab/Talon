@@ -99,16 +99,3 @@ export function Ring({
   );
 }
 
-/** Horizontal stacked bar used by the RAID wizard (usable / redundancy / unused). */
-export function CapacityBar({ parts }: { parts: { value: number; className: string; label: string }[] }) {
-  const total = parts.reduce((a, p) => a + p.value, 0) || 1;
-  return (
-    <div className="flex h-2.5 w-full overflow-hidden rounded-full bg-zinc-200/70 dark:bg-white/[0.08]">
-      {parts.map((p, i) =>
-        p.value > 0 ? (
-          <div key={i} title={p.label} className={cx("h-full transition-all duration-500", p.className)} style={{ width: `${(p.value / total) * 100}%` }} />
-        ) : null,
-      )}
-    </div>
-  );
-}

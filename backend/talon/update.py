@@ -17,9 +17,10 @@ from typing import Optional
 from . import __version__
 from .util import UserError, read_file, run, write_atomic
 
-CHECK_INTERVAL = 6 * 3600                 # default; changeable in Settings > Update
+CHECK_INTERVAL = 6 * 3600                 # default; changeable under Updates → General
 INTERVAL_CHOICES = (0, 1, 6, 12, 24, 168)   # hours; 0 = only when "Check now" is clicked
 HEARTBEAT_TIMEOUT = 180
+AUTO_HOURS = (3, 5)                        # automatic installs start between 03:00 and 05:00
 USER_AGENT = f"Talon-NAS/{__version__}"
 
 
@@ -96,6 +97,21 @@ class Updater:
         self.state.update(lambda d: d.__setitem__("update_interval", hours))
         return hours
 
+    def auto_install(self) -> bool:
+        return bool(self.state.get("update_auto_install"))
+
+    def set_auto_install(self, on) -> bool:
+        on = bool(on)
+        self.state.update(lambda d: d.__setitem__("update_auto_install", on))
+        return on
+
+    def _auto_due(self) -> bool:
+        """Install by itself at night (03:00-05:00), once per new version."""
+        info = self.info()
+        return (self.auto_install() and info["available"] and not self.running()
+                and AUTO_HOURS[0] <= time.localtime().tm_hour < AUTO_HOURS[1]
+                and self.state.get("update_auto_tried") != info["latest"])
+
     def background_loop(self, stop: threading.Event) -> None:
         stop.wait(60)
         while not stop.is_set():
@@ -104,6 +120,13 @@ class Updater:
                     self.check()                  # only asks GitHub when the interval has passed
                 except Exception:
                     pass
+            try:
+                if self._auto_due():
+                    latest = self.info()["latest"]
+                    self.state.update(lambda d: d.__setitem__("update_auto_tried", latest))
+                    self.start("system")
+            except Exception:   # noqa: BLE001 - logged by the updater, retried with the next version
+                pass
             stop.wait(300)
 
     def info(self) -> dict:
@@ -114,7 +137,7 @@ class Updater:
                 "name": c.get("name"), "notes": c.get("notes"), "url": c.get("url"),
                 "published_at": c.get("published_at"), "checked_at": c.get("checked_at"),
                 "error": c.get("error"), "repo": self.cfg.repo, "status": self.status(),
-                "interval_hours": self.interval()}
+                "interval_hours": self.interval(), "auto_install": self.auto_install()}
 
     # ------------------------------------------------------------ status
     def status(self) -> dict:

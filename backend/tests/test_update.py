@@ -82,3 +82,13 @@ def test_update_check_interval(client):
     assert client.put("/api/update/settings", json={"interval_hours": 0}).json()["interval_hours"] == 0
     for bad in (5, "x", None, -1):
         assert client.put("/api/update/settings", json={"interval_hours": bad}).status_code == 400
+
+
+def test_update_auto_install_and_os_interval(client):
+    assert client.get("/api/update").json()["auto_install"] is False
+    assert client.put("/api/update/settings", json={"auto_install": True}).json()["auto_install"] is True
+    assert client.get("/api/update").json()["interval_hours"] in (0, 1, 6, 12, 24, 168)   # untouched
+    os_ = client.get("/api/os-update").json()
+    assert os_["auto"]["interval_hours"] == 24
+    assert client.put("/api/os-update/auto", json={"interval_hours": 168}).json()["auto"]["interval_hours"] == 168
+    assert client.put("/api/os-update/auto", json={"interval_hours": 5}).status_code == 400

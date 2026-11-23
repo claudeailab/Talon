@@ -147,7 +147,7 @@ class Nas:
                         self.state.get("notify_update") != latest:
                     self.notifier.send("update", f"Talon {latest} is available",
                                        f"Talon {latest} is available (you have {__version__}).\n"
-                                       "Install it in Settings > Update.")
+                                       "Install it in Talon under Updates > Talon.")
                     self.state.update(lambda d: d.__setitem__("notify_update", latest))
             except Exception:
                 pass
@@ -1076,18 +1076,18 @@ class Nas:
                         "title": "EntraID client secret " + (
                             "has expired" if exp["days"] < 0 else f"expires in {exp['days']} days"
                             if exp["days"] != 1 else "expires tomorrow"),
-                        "detail": "Create a new secret in Entra and save it in Settings › EntraID",
+                        "detail": "Create a new secret in Entra and save it in Settings › Entra ID",
                         "link": "/settings?tab=entra", "action": "Open"})
         os_up = self.osupdate.info()
         if os_up["progress"].get("state") != "running":
             if os_up["security"]:
                 out.append({"level": "warning",
                             "title": f"{os_up['security']} security update{'s' if os_up['security'] > 1 else ''} for the operating system",
-                            "detail": "", "link": "/settings?tab=update", "action": "Install"})
+                            "detail": "", "link": "/updates?tab=system", "action": "Install"})
             if os_up["restart_needed"]:
                 out.append({"level": "warning", "title": "Restart to finish the updates",
                             "detail": "Some updates are only used after a restart",
-                            "link": "/settings?tab=update", "action": "Open"})
+                            "link": "/updates?tab=system", "action": "Open"})
         return self._stamp(out)
 
     def _stamp(self, alerts: List[dict]) -> List[dict]:

@@ -82,7 +82,7 @@ class EntraUsers:
 
     def directory(self, q: str = "") -> List[dict]:
         if not self.ready():
-            raise UserError("Set up the EntraID app for your organization first (Settings → EntraID)")
+            raise UserError("Set up the EntraID app for your organization first (Settings → Entra ID)")
         people = list(DEMO_DIRECTORY) if self.demo else entra.directory_users(self._app_token())
         added = self._users()
         words = q.lower().split()

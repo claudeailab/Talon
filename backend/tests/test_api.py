@@ -319,7 +319,7 @@ def test_os_updates(client):
         time.sleep(0.1)
     assert info["progress"]["state"] == "success" and not info["packages"] and info["restart_needed"]
     auto = client.put("/api/os-update/auto", json={"mode": "all", "restart": True, "restart_time": "04:00"}).json()["auto"]
-    assert auto == {"mode": "all", "restart": True, "restart_time": "04:00"}
+    assert auto == {"mode": "all", "restart": True, "restart_time": "04:00", "interval_hours": 24}
     assert client.put("/api/os-update/auto", json={"mode": "everything"}).status_code == 400
     assert client.put("/api/os-update/auto", json={"restart_time": "25:00"}).status_code == 400
     msgs = [a["message"] for a in client.get("/api/activity", params={"category": "updates"}).json()["items"]]

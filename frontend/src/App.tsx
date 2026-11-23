@@ -28,6 +28,7 @@ import {
   Users as UsersIcon,
   X,
   AlertTriangle,
+  Download,
 } from "lucide-react";
 import { api, setUnauthorizedHandler } from "./lib/api";
 import type { Settings } from "./lib/types";
@@ -51,6 +52,7 @@ import DisksPage from "./pages/Disks";
 import SharesPage from "./pages/Shares";
 import UsersPage from "./pages/Users";
 import ServicesPage from "./pages/Services";
+import UpdatesPage from "./pages/Updates";
 import SettingsPage from "./pages/Settings";
 import ActivityPage from "./pages/Activity";
 import DocumentationPage from "./pages/Documentation";
@@ -88,6 +90,7 @@ const NAV: { section: string; items: { to: string; label: string; icon: Componen
   {
     section: "System",
     items: [
+      { to: "/updates", label: "Updates", icon: Download, page: UpdatesPage },
       { to: "/activity", label: "Activity", icon: ActivityIcon, page: ActivityPage },
       { to: "/settings", label: "Settings", icon: SettingsIcon, page: SettingsPage },
       { to: "/services", label: "Services", icon: Server, page: ServicesPage },
@@ -270,7 +273,7 @@ function Shell({ me }: { me: Me }) {
             </div>
           )}
           {update.data?.available && update.data.status.state !== "running" && (
-            <UpdatePill version={update.data.latest!} onClick={() => navigate("/settings?tab=update")} />
+            <UpdatePill version={update.data.latest!} onClick={() => navigate("/updates?tab=talon")} />
           )}
           {running.length > 0 && (
             <Menu
