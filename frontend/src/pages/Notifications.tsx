@@ -157,7 +157,7 @@ function ThresholdsCard() {
       <CardHeader
         icon={<Thermometer className="size-4.5" />}
         title="Thresholds"
-        subtitle="When the dashboard, the bell and emails warn you"
+        subtitle="When the bell and emails warn you"
         actions={
           <div className="flex gap-2">
             <Button variant="ghost" disabled={isDefault} onClick={() => load(q.data!.defaults)}>

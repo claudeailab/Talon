@@ -367,3 +367,13 @@ def test_disk_write_measuring(tmp_path):
     r._hours = {hour - i * 3600: [100 * 2 ** 20, 1000, 40 * 2 ** 20] for i in range(24)}
     m = r.measured()
     assert m["disk_bytes"] == 2400 * 2 ** 20 and m["log_bytes"] == 960 * 2 ** 20 and m["log_ops"] == 9600
+
+
+def test_alerts_have_action_and_since(client):
+    nas = client.app.state.nas
+    info = client.get("/api/thresholds").json()
+    client.put("/api/thresholds", json={**info["values"], "temp_hdd": 30, "temp_ssd": 30, "temp_nvme": 30})
+    first = nas.alerts()
+    if first:
+        assert all(a["action"] and a["since"] for a in first)
+        assert [a["since"] for a in nas.alerts()] == [a["since"] for a in first]   # kept while it lasts

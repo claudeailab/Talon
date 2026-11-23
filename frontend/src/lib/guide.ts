@@ -110,7 +110,7 @@ export const GUIDE: Topic[] = [
               "**Services**: which network services are running.",
             ],
           },
-          { p: "The badge at the top says **All systems healthy**, or how many issues need attention. Each issue appears as a card above the charts; click it to go to the page where you can fix it." },
+          { p: "Issues appear in the **bell** next to the Talon logo, with a red count. Each one shows since when it exists and a button that takes you to the fix, for example **Install** or **Replace disk**." },
           { p: "**History**: tap the CPU, Memory, Network or Disk activity card, or **History** on the Storage card, to see the last hour, 24 hours, 7 days, 30 days or year, with the average and the peak. Disk activity also shows each disk's temperature; Storage shows how fast each volume grows and when it will be full. Talon keeps a year of history, about 1 MB." },
         ],
       },
@@ -794,7 +794,7 @@ export const GUIDE: Topic[] = [
         id: "thresholds",
         title: "3. Thresholds",
         blocks: [
-          { p: "On the [Notifications](/notifications?tab=thresholds) page, the **Thresholds** tab sets when Talon warns you. The limits apply to the dashboard, the bell and emails, also without SMTP." },
+          { p: "On the [Notifications](/notifications?tab=thresholds) page, the **Thresholds** tab sets when Talon warns you. The limits apply to the bell and emails, also without SMTP." },
           {
             list: [
               "**Disk temperature**: a limit for **Hard disks (HDD)**, **SATA SSDs** and **NVMe SSDs**, because SSDs run warmer. Each shows the current temperatures of those disks.",

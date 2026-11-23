@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  AlertTriangle,
   ArrowDownRight,
   ArrowUpRight,
-  CheckCircle2,
   Cpu,
   Database,
   FolderOpen,
@@ -35,53 +33,11 @@ export default function DashboardPage() {
   const last = hist[hist.length - 1];
   const totalSize = data.volumes.reduce((a, v) => a + v.size, 0);
   const totalUsed = data.volumes.reduce((a, v) => a + v.used, 0);
-  const critical = data.alerts.filter((a) => a.level === "critical").length;
 
   return (
     <div className="space-y-5">
       {histView && <HistoryModal metric={histView} onClose={() => setHist(null)} />}
-      {/* hero */}
       <h1 className="sr-only">Dashboard</h1>
-      <div className="flex justify-center">
-        <div
-          className={cx(
-            "inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-center text-sm font-medium ring-1 ring-inset",
-            data.alerts.length === 0
-              ? "bg-emerald-50 text-emerald-700 ring-emerald-600/15 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-400/20"
-              : critical
-                ? "bg-rose-50 text-rose-700 ring-rose-600/15 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-400/20"
-                : "bg-amber-50 text-amber-700 ring-amber-600/15 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-400/20",
-          )}
-        >
-          {data.alerts.length === 0 ? <CheckCircle2 className="size-4" /> : <AlertTriangle className="size-4" />}
-          {data.alerts.length === 0 ? "All systems healthy" : `${data.alerts.length} issue${data.alerts.length > 1 ? "s" : ""} need attention`}
-        </div>
-      </div>
-
-      {/* alerts */}
-      {data.alerts.length > 0 && (
-        <div className="grid gap-3 md:grid-cols-2">
-          {data.alerts.map((a, i) => (
-            <Link
-              key={i}
-              to={a.link}
-              className={cx(
-                "flex items-start gap-3 rounded-2xl p-4 ring-1 transition ring-inset hover:shadow-sm",
-                a.level === "critical"
-                  ? "bg-rose-50 ring-rose-200 dark:bg-rose-500/10 dark:ring-rose-400/20"
-                  : "bg-amber-50 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-400/20",
-              )}
-            >
-              <AlertTriangle className={cx("mt-0.5 size-5 shrink-0", a.level === "critical" ? "text-rose-500" : "text-amber-500")} />
-              <div>
-                <div className="text-sm font-semibold">{a.title}</div>
-                <div className="text-[13px] text-zinc-600 dark:text-zinc-400">{a.detail}</div>
-              </div>
-            </Link>
-          ))}
-        </div>
-      )}
-
       {/* live metrics */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard

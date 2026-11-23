@@ -1031,6 +1031,7 @@ export function MenuItem({
   danger,
   disabled,
   hint,
+  wrap,
 }: {
   icon?: ReactNode;
   children: ReactNode;
@@ -1039,6 +1040,8 @@ export function MenuItem({
   disabled?: boolean;
   /** muted text on the right, e.g. an estimate */
   hint?: ReactNode;
+  /** let long text wrap instead of truncating it */
+  wrap?: boolean;
 }) {
   return (
     <button
@@ -1053,7 +1056,7 @@ export function MenuItem({
       )}
     >
       {icon && <span className="[&>svg]:size-4">{icon}</span>}
-      <span className="min-w-0 flex-1 truncate">{children}</span>
+      <span className={cx("min-w-0 flex-1", !wrap && "truncate")}>{children}</span>
       {hint && <span className="shrink-0 pl-3 text-xs font-normal text-zinc-500">{hint}</span>}
     </button>
   );

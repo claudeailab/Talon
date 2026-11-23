@@ -1049,47 +1049,57 @@ class Nas:
             if a["status"] in ("degraded", "failed", "missing"):
                 out.append({"level": "critical" if a["status"] in ("failed", "missing")
                             else "warning", "title": f"RAID {a['name']} is {a['status']}",
-                            "detail": a["status_detail"], "link": "/raid"})
+                            "detail": a["status_detail"], "link": "/raid", "action": "Open"})
         for v in volumes:
             if v["status"] == "unmounted" or (v["status"] == "missing" and not v["array"]):
                 out.append({"level": "critical" if v["status"] == "missing" else "warning",
                             "title": f"Volume {v['name']} is {v['status']}",
-                            "detail": v["status_detail"], "link": "/volumes"})
+                            "detail": v["status_detail"], "link": "/volumes", "action": "Open"})
             if v["size"] and v["used"] / v["size"] * 100 >= limits["volume_full"]:
                 out.append({"level": "warning", "title": f"Volume {v['name']} is almost full",
                             "detail": f"{v['used'] / v['size'] * 100:.0f}% used",
-                            "link": "/volumes"})
+                            "link": "/volumes", "action": "Open"})
         for d in disks:
             if d["health"] == "failing":
                 out.append({"level": "critical", "title": f"Disk {d['name']} is failing",
-                            "detail": f"{d['model']} - SMART health check failed. Replace it.",
-                            "link": "/disks"})
+                            "detail": f"{d['model']} - SMART health check failed",
+                            "link": "/disks", "action": "Replace disk"})
             elif d["health"] == "warning":
                 out.append({"level": "warning", "title": f"Disk {d['name']} shows wear",
-                            "detail": f"{d['model']} - check SMART details", "link": "/disks"})
+                            "detail": d["model"], "link": "/disks", "action": "Open"})
             if d.get("temperature") and d["temperature"] >= limits[f"temp_{self._temp_kind(d)}"]:
                 out.append({"level": "warning", "title": f"Disk {d['name']} is hot",
-                            "detail": f"{d['temperature']} °C", "link": "/disks"})
+                            "detail": f"{d['temperature']} °C", "link": "/disks", "action": "Open"})
         exp = self.cloud.secret_expiry()
         if exp and exp["remind"]:
             out.append({"level": "critical" if exp["days"] < 0 else "warning",
                         "title": "EntraID client secret " + (
                             "has expired" if exp["days"] < 0 else f"expires in {exp['days']} days"
                             if exp["days"] != 1 else "expires tomorrow"),
-                        "detail": "Create a new secret in Entra and save it in Settings > EntraID",
-                        "link": "/settings?tab=entra"})
+                        "detail": "Create a new secret in Entra and save it here",
+                        "link": "/settings?tab=entra", "action": "Open"})
         os_up = self.osupdate.info()
         if os_up["progress"].get("state") != "running":
             if os_up["security"]:
                 out.append({"level": "warning",
                             "title": f"{os_up['security']} security update{'s' if os_up['security'] > 1 else ''} for the operating system",
-                            "detail": "Install them in Settings > Update > Operating system",
-                            "link": "/settings?tab=update&os=1"})
+                            "detail": "", "link": "/settings?tab=update&os=1", "action": "Install"})
             if os_up["restart_needed"]:
                 out.append({"level": "warning", "title": "Restart to finish the updates",
                             "detail": "Some updates are only used after a restart",
-                            "link": "/settings?tab=update&os=1"})
-        return out
+                            "link": "/settings?tab=update&os=1", "action": "Open"})
+        return self._stamp(out)
+
+    def _stamp(self, alerts: List[dict]) -> List[dict]:
+        """Add "since": when each alert was first seen (kept while it lasts)."""
+        seen = self.state.get("alert_since") or {}
+        now = int(time.time())
+        cur = {a["title"]: seen.get(a["title"], now) for a in alerts}
+        if cur != seen:
+            self.state.update(lambda d: d.__setitem__("alert_since", cur))
+        for a in alerts:
+            a["since"] = cur[a["title"]]
+        return alerts
 
     def dashboard(self) -> dict:
         volumes = self.volumes()

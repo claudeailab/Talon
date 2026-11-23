@@ -1,3 +1,7 @@
+## 1.0.124
+- Issues are shown once, in the bell; the status badge and the yellow cards on the Dashboard are gone
+- Each issue shows since when it exists and a button that takes you to the fix
+
 ## 1.0.123
 - Wiping a disk: one window with a confirmation, the steps as they run and a clear result; no terminal
 - Disks: what a disk holds is in plain words and no longer cut off

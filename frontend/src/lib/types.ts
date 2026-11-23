@@ -207,6 +207,8 @@ export interface Alert {
   title: string;
   detail: string;
   link: string;
+  action: string;
+  since: number;
 }
 
 export interface Dashboard {

@@ -27,10 +27,11 @@ import {
   DatabaseBackup,
   Users as UsersIcon,
   X,
+  AlertTriangle,
 } from "lucide-react";
 import { api, setUnauthorizedHandler } from "./lib/api";
 import type { Settings } from "./lib/types";
-import { cx, setFormats } from "./lib/format";
+import { cx, date, setFormats } from "./lib/format";
 import { useTheme } from "./lib/hooks";
 import { Link, navigate, usePath } from "./lib/router";
 import type { Alert, Job, OneDriveStatus, UpdateInfo } from "./lib/types";
@@ -196,13 +197,26 @@ function Shell({ me }: { me: Me }) {
         </IconButton>
       }
     >
-      <div className="w-72 px-2 py-1.5 text-xs font-semibold text-zinc-500">Notifications</div>
+      <div className="flex w-full min-w-72 items-center justify-between gap-4 px-2 py-1.5 text-xs font-semibold text-zinc-500">
+        {alerts.data?.length ? `${alerts.data.length} issue${alerts.data.length > 1 ? "s" : ""}` : "Notifications"}
+        <Link to="/notifications" className="font-medium text-brand-600 hover:text-brand-500 dark:text-brand-400">
+          Settings for alerts
+        </Link>
+      </div>
       {alerts.data?.length ? (
         alerts.data.map((a, i) => (
-          <MenuItem key={i} onClick={() => navigate(a.link)}>
+          <MenuItem
+            key={i}
+            wrap
+            onClick={() => navigate(a.link)}
+            icon={<AlertTriangle className={cx("size-4", a.level === "critical" ? "text-rose-500" : "text-amber-500")} />}
+            hint={<span className="font-semibold whitespace-nowrap text-brand-600 dark:text-brand-400">{a.action} ›</span>}
+          >
             <div>
-              <div className={a.level === "critical" ? "text-rose-600 dark:text-rose-400" : "text-amber-600 dark:text-amber-400"}>{a.title}</div>
-              <div className="text-xs font-normal text-zinc-500">{a.detail}</div>
+              <div className="text-zinc-900 dark:text-zinc-100">{a.title}</div>
+              <div className="text-xs font-normal text-zinc-500">
+                {[a.detail, a.since ? `Since ${date(a.since)}` : ""].filter(Boolean).join(" · ")}
+              </div>
             </div>
           </MenuItem>
         ))
