@@ -61,12 +61,23 @@ export function SyncProgress({ sync }: { sync: SyncInfo | null }) {
 /** The card's one row: a fixed-width name column, so the middle (the bar and the details
  *  under it) takes all the room left; on phones the three parts stack. */
 export const ITEM_ROW =
-  "grid gap-x-8 gap-y-4 p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_15rem] md:items-center md:pr-16 md:[&>*:first-child]:col-span-2 xl:grid-cols-[19rem_minmax(0,1fr)_15rem] xl:[&>*:first-child]:col-span-1";
+  "grid gap-x-8 gap-y-4 p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_15rem] md:items-center md:pr-16 md:[&>*:first-child]:col-span-2 xl:col-span-full xl:grid-cols-subgrid xl:[&>*:first-child]:col-span-1";
+/* On wide screens the cards share their columns (CSS subgrid): the name column is as wide
+   as the longest name on the page (up to a limit; a name itself never wraps), so short
+   names waste no room and the bars still line up from card to card. The last column has
+   room for the ⋯ menu (the row's right padding). */
+/** The list of cards. */
+export const ITEM_LIST =
+  "grid gap-4 xl:grid-cols-[fit-content(20rem)_minmax(0,1fr)_19rem] 2xl:grid-cols-[fit-content(30rem)_minmax(0,1fr)_19rem]";
+/** A card in the list; everything in it spans the shared columns. */
+export const ITEM_CARD = "relative overflow-hidden xl:col-span-full xl:grid xl:grid-cols-subgrid xl:[&>*]:col-span-full";
+/** The box around the row and its ⋯ menu. */
+export const ITEM_WRAP = "relative xl:grid xl:grid-cols-subgrid";
 
 /** Icon, name with its status and one line of details. */
 export function ItemTitle({ icon, name, badge, children, note, tone = "brand" }: { icon: ReactNode; name: ReactNode; badge?: ReactNode; children?: ReactNode; note?: ReactNode; tone?: "brand" | "amber" }) {
   return (
-    <div className="flex min-w-0 items-center gap-3.5 pr-9 md:pr-0">
+    <div className="flex min-w-0 items-center gap-3.5 pr-9 md:pr-0 xl:min-w-auto">
       <div
         className={cx(
           "flex size-10 shrink-0 items-center justify-center rounded-xl [&>svg]:size-5",
@@ -77,9 +88,9 @@ export function ItemTitle({ icon, name, badge, children, note, tone = "brand" }:
       >
         {icon}
       </div>
-      <div className="min-w-0">
+      <div className="min-w-0 xl:min-w-auto">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <h3 className="text-[15px] font-semibold tracking-tight break-words">{name}</h3>
+          <h3 className="text-[15px] font-semibold tracking-tight break-words xl:whitespace-nowrap">{name}</h3>
           {badge}
         </div>
         {children && <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[13px] text-zinc-500">{children}</div>}

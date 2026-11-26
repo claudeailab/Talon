@@ -1,3 +1,8 @@
+## 1.0.148
+- Backup, RAID and Volumes: names stay on one line; the name column is as wide as the longest name, the same for every card
+- Backup: two lines under the bar (last backup, what, versions); the disk name is not repeated when the backup is named after it
+- A run under a minute shows its seconds instead of "0m"
+
 ## 1.0.147
 - Backup: each card shows how full the backup disk is
 - Services: one compact list with aligned columns instead of large cards

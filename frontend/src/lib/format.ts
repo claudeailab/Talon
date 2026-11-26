@@ -28,7 +28,7 @@ export function duration(seconds: number): string {
   const m = Math.floor((seconds % 3600) / 60);
   if (d) return `${d}d ${h}h`;
   if (h) return `${h}h ${m}m`;
-  return `${m}m`;
+  return m ? `${m}m` : `${Math.round(seconds)}s`;
 }
 
 export function ago(ts: number): string {

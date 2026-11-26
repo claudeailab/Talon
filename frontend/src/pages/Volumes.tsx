@@ -20,7 +20,7 @@ import {
   DiskRow,
   Detail,
   Details,
-  ITEM_MENU,
+  ITEM_CARD, ITEM_LIST, ITEM_MENU, ITEM_WRAP,
   ITEM_ROW,
   ItemTitle,
   MemberChips,
@@ -107,7 +107,7 @@ export default function VolumesPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className={ITEM_LIST}>
           {vols.data.map((v) => (
             <VolumeCard key={v.name} v={v} onJob={setJob} />
           ))}
@@ -147,8 +147,8 @@ function VolumeCard({ v, onJob }: { v: Volume; onJob: (id: string) => void }) {
   const [resize, setResize] = useState(false);
 
   return (
-    <Card className="relative overflow-hidden">
-      <div className="relative">
+    <Card className={ITEM_CARD}>
+      <div className={ITEM_WRAP}>
       <div className={ITEM_ROW}>
         <ItemTitle icon={<Database />} name={v.name} badge={<StatusBadge status={v.status} />} note={v.created ? `Created ${dateTime(v.created)}` : undefined}>
           {v.array ? (

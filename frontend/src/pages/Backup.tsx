@@ -4,7 +4,7 @@ import { Check, ChevronDown, DatabaseBackup, FileText, HardDrive, Minus, MoreHor
 import { api } from "../lib/api";
 import { ago, bytes, cx, dateTime, duration, pct, rate } from "../lib/format";
 import { useAction } from "../lib/hooks";
-import { Detail, Details, ITEM_MENU, ITEM_ROW, ItemTitle } from "../components/storage";
+import { Detail, Details, ITEM_CARD, ITEM_LIST, ITEM_MENU, ITEM_WRAP, ITEM_ROW, ItemTitle } from "../components/storage";
 import { LogList } from "../components/log";
 import { navigate } from "../lib/router";
 import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Select, Switch, usageTone } from "../components/ui";
@@ -78,7 +78,7 @@ export default function BackupPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className={ITEM_LIST}>
           {d.tasks.map((t) => (
             <TaskCard key={t.id} t={t} onEdit={() => setWizard(t)} backupDir={d.backup_dir} />
           ))}
@@ -98,8 +98,8 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
   const [log, setLog] = useState(false);
   const running = t.progress.state === "running";
   return (
-    <Card className="relative overflow-hidden">
-      <div className="relative">
+    <Card className={ITEM_CARD}>
+      <div className={ITEM_WRAP}>
       <div className={ITEM_ROW}>
         <ItemTitle
           tone="amber"
@@ -108,10 +108,11 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
           badge={t.connected ? <Badge tone="green" dot>Connected</Badge> : <Badge dot>Not connected</Badge>}
           note={whenText(t)}
         >
-          <span className="break-words">
-            {t.disk ? `${t.disk.media}: ` : ""}
-            {t.disk_name}
-            {t.disk_size ? ` · ${bytes(t.disk_size)}` : ""}
+          <span>
+            {/* the disk's name only when the backup's name does not already say it */}
+            {[t.disk?.media, t.name.toLowerCase().includes(t.disk_name.toLowerCase()) ? null : t.disk_name, t.disk_size ? bytes(t.disk_size) : null]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         </ItemTitle>
 
@@ -129,25 +130,20 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
               <Progress value={pct(t.usage.used, t.usage.total)} tone={usageTone(pct(t.usage.used, t.usage.total))} className="h-1.5" />
             </div>
           )}
-          {running ? (
-            <RunProgress p={t.progress} />
-          ) : t.last ? (
-            <div className="text-[13px]">
-              <div>
-                <span className="font-medium">Last backup</span>{" "}
-                <span className="text-zinc-500">{ago(t.last.at)}</span>
-                {t.last.ok && <span className="text-zinc-500"> · took {duration(t.last.duration)}</span>}
-              </div>
-              {!t.last.ok && (
-                <div className={cx("mt-0.5 break-words", t.last.stopped ? "text-zinc-500" : "text-rose-600 dark:text-rose-400")}>
-                  {t.last.stopped ? "Stopped before it finished" : `Failed: ${t.last.error}`}
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="text-[13px] text-zinc-500">Not backed up yet</div>
-          )}
+          {running && <RunProgress p={t.progress} />}
           <Details>
+            {!running && (
+              <Detail label="Last backup">
+                {!t.last ? (
+                  <span>Not yet</span>
+                ) : (
+                  <span className={cx("break-words", !t.last.ok && !t.last.stopped && "text-rose-600 dark:text-rose-400")}>
+                    <span className={cx("font-medium", t.last.ok && "text-zinc-700 dark:text-zinc-300")}>{ago(t.last.at)}</span>
+                    {t.last.ok ? ` · took ${duration(t.last.duration)}` : t.last.stopped ? " · stopped before it finished" : ` · failed: ${t.last.error}`}
+                  </span>
+                )}
+              </Detail>
+            )}
             <Detail label="What">
               <span className="font-medium break-words text-zinc-700 dark:text-zinc-300">{describe(t.sources)}</span>
             </Detail>

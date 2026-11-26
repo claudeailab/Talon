@@ -7,7 +7,7 @@ import { useAction } from "../lib/hooks";
 import { Link } from "../lib/router";
 import type { Disk, Job, Member, RaidArray, RaidOption } from "../lib/types";
 import { JobDialog } from "../components/jobs";
-import { Detail, Details, DiskRow, Dots, ITEM_MENU, ITEM_ROW, ItemTitle, MemberChips, NAME_HINT, NAME_RE, Stat, StatusBadge, Stepper, SyncProgress, statusTone } from "../components/storage";
+import { Detail, Details, DiskRow, Dots, ITEM_CARD, ITEM_LIST, ITEM_MENU, ITEM_WRAP, ITEM_ROW, ItemTitle, MemberChips, NAME_HINT, NAME_RE, Stat, StatusBadge, Stepper, SyncProgress, statusTone } from "../components/storage";
 import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Segmented } from "../components/ui";
 
 export default function RaidPage() {
@@ -40,7 +40,7 @@ export default function RaidPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className={ITEM_LIST}>
           {arrays.data.map((a) => (
             <RaidCard key={a.name} a={a} disks={disks.data} onJob={setJob} />
           ))}
@@ -93,8 +93,8 @@ function RaidCard({ a, disks, onJob }: { a: RaidArray; disks: Disk[]; onJob: (id
   const used = Math.max(0, a.size - a.free);
   const link = "font-medium text-brand-600 hover:underline dark:text-brand-400";
   return (
-    <Card className="relative overflow-hidden">
-      <div className="relative">
+    <Card className={ITEM_CARD}>
+      <div className={ITEM_WRAP}>
       <div className={ITEM_ROW}>
         <ItemTitle icon={<Layers />} name={a.name} badge={<StatusBadge status={a.status} />} note={a.created ? `Created ${dateTime(a.created)}` : undefined}>
           <span className="font-medium text-zinc-700 dark:text-zinc-300">{levelLabel[a.level] ?? a.level}</span>
