@@ -1,3 +1,6 @@
+## 1.0.157
+- Users & Groups: the tab is called "Entra ID Users", and Entra ID is written that way everywhere in Talon
+
 ## 1.0.156
 - Dashboard: the CPU, Memory, Network and Disk activity charts show the last 30 minutes, recorded all the time, instead of the last 3
 - Right after a restart they start from the saved history, so they are never empty

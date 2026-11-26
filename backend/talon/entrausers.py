@@ -1,15 +1,15 @@
-"""EntraID users: people from your organization's Microsoft Entra ID directory who
+"""Entra ID users: people from your organization's Microsoft Entra ID directory who
 can use Talon.
 
-Once the EntraID app is set up for one organization (a tenant ID), Users shows
-an "EntraID Users" tab: browse the directory, add people, and choose for each
+Once the Entra ID app is set up for one organization (a tenant ID), Users shows
+an "Entra ID Users" tab: browse the directory, add people, and choose for each
 whether they may sign in to the web interface ("Sign in with Microsoft"). Their
-name and password stay in EntraID.
+name and password stay in Entra ID.
 
-At least one user, local or EntraID, must always be able to sign in to the web
+At least one user, local or Entra ID, must always be able to sign in to the web
 interface. The sign-in page shows the user name and password form while an
 enabled local administrator exists, and "Sign in with Microsoft" while an
-EntraID user has web access.
+Entra ID user has web access.
 
 Microsoft sends the browser back to the OneDrive sign-in address
 (/api/onedrive/callback), so the app needs no extra redirect URI."""
@@ -50,11 +50,11 @@ class EntraUsers:
         return self.state.get("entra") or {}
 
     def configured(self) -> bool:
-        """The EntraID app is set up (for OneDrive at least)."""
+        """The Entra ID app is set up (for OneDrive at least)."""
         return entra.configured(self._entra())
 
     def ready(self) -> bool:
-        """The EntraID app is set up for one organization (a tenant ID): only then
+        """The Entra ID app is set up for one organization (a tenant ID): only then
         is there a directory of users to choose from."""
         e = self._entra()
         return entra.configured(e) and bool(entra.GUID_RE.match(entra.tenant_of(e)))
@@ -82,7 +82,7 @@ class EntraUsers:
 
     def directory(self, q: str = "") -> List[dict]:
         if not self.ready():
-            raise UserError("Set up the EntraID app for your organization first (Settings → Entra ID)")
+            raise UserError("Set up the Entra ID app for your organization first (Settings → Entra ID)")
         people = list(DEMO_DIRECTORY) if self.demo else entra.directory_users(self._app_token())
         added = self._users()
         words = q.lower().split()
@@ -110,13 +110,13 @@ class EntraUsers:
                                   "web": True, "added": time.time(), "added_by": actor}
         self.state.update(upd)
         for p in new:
-            self.state.log_activity(actor, f"Added EntraID user {p['upn']} with web interface access", "info", "users")
+            self.state.log_activity(actor, f"Added Entra ID user {p['upn']} with web interface access", "info", "users")
         return len(new)
 
     def _get(self, oid: str) -> dict:
         u = self._users().get(oid)
         if not u:
-            raise UserError("EntraID user not found")
+            raise UserError("Entra ID user not found")
         return u
 
     def set_web(self, oid: str, web: bool, actor: str) -> dict:
@@ -125,7 +125,7 @@ class EntraUsers:
             raise UserError("At least one user must be able to sign in to the web interface")
         self.state.update(lambda d: d["entra_users"][oid].__setitem__("web", bool(web)))
         self.state.log_activity(actor, f"{'Gave' if web else 'Removed'} web interface access "
-                                       f"{'to' if web else 'from'} EntraID user {u['upn']}", "info", "users")
+                                       f"{'to' if web else 'from'} Entra ID user {u['upn']}", "info", "users")
         return {**u, "web": bool(web)}
 
     def remove(self, oid: str, actor: str) -> dict:
@@ -133,7 +133,7 @@ class EntraUsers:
         if u.get("web") and self.web_access_count() <= 1:
             raise UserError("At least one user must be able to sign in to the web interface")
         self.state.update(lambda d: d["entra_users"].pop(oid, None))
-        self.state.log_activity(actor, f"Removed EntraID user {u['upn']}", "info", "users")
+        self.state.log_activity(actor, f"Removed Entra ID user {u['upn']}", "info", "users")
         return u
 
     # ------------------------------------------------------------ Sign in with Microsoft
@@ -159,7 +159,7 @@ class EntraUsers:
 
     def finish(self, code: str, state: str, error: str = "", detail: str = "") -> str:
         """Complete Sign in with Microsoft; returns the user name to sign in as
-        (the person's EntraID user principal name)."""
+        (the person's Entra ID user principal name)."""
         with self._lock:
             p = self._pending.pop(state or "", None)
         if not p or time.time() - p["created"] > PENDING_SECONDS:
@@ -177,7 +177,7 @@ class EntraUsers:
             self.state.log_activity(ident.get("email") or "?", "Failed sign-in with Microsoft: no web interface access",
                                     "warning", "signin")
             raise UserError(f"{ident.get('email') or 'This account'} may not sign in to Talon. "
-                            "An administrator can give it access under Users → EntraID Users.")
+                            "An administrator can give it access under Users → Entra ID Users.")
         return u["upn"]
 
 

@@ -2,7 +2,7 @@
 
 For apps that cannot use SMB from outside the home network, for example a photo
 backup app on a phone through a Cloudflare tunnel, and for file managers that
-speak WebDAV. Sign in with a Talon user name and password (local users; EntraID
+speak WebDAV. Sign in with a Talon user name and password (local users; Entra ID
 users have no password Talon knows). Each user sees the shared folders they may
 open, with the same Read or Read & write access as over SMB, including folder
 permissions. Deleted files go to the shared folder's recycle bin when it is on.

@@ -55,7 +55,7 @@ export default function EntraTab() {
   const expiresIso = expires.trim() === "" ? "" : dateToIso(expires);
   const body = { tenant, client_id: clientId.trim(), client_secret: secret };
   const save = useAction(() => api.put<EntraConfig>("/settings/entra", { ...body, origin: location.origin, secret_expires: expiresIso ?? "", remind_days: remindDays, remind_to: remindTo }), {
-    success: "EntraID app saved",
+    success: "Entra ID app saved",
     invalidate: ["entra", "onedrive"],
   });
   const test = useAction(() => api.post<{ checks: EntraCheck[] }>("/settings/entra/test", { config: body, origin: location.origin }), {
@@ -180,7 +180,7 @@ function ExpiryBadge({ expiry }: { expiry: EntraConfig["expiry"] }) {
 
 export function SetupGuide({ onClose }: { onClose: () => void }) {
   return (
-    <Modal open onClose={onClose} size="lg" title="Set up the EntraID app" description="One-time setup, about 5 minutes" footer={<Button variant="primary" onClick={onClose}>Done</Button>}>
+    <Modal open onClose={onClose} size="lg" title="Set up the Entra ID app" description="One-time setup, about 5 minutes" footer={<Button variant="primary" onClick={onClose}>Done</Button>}>
       <ol className="space-y-4">
         <Step n={1} title="Open the Entra admin center">
           <p>
@@ -225,7 +225,7 @@ export function SetupGuide({ onClose }: { onClose: () => void }) {
               <B>API permissions</B> → <B>Add a permission</B> → <B>Microsoft Graph</B> → <B>Application permissions</B>
             </p>
             <p>
-              Add: <B>User.Read.All</B> (Allows EntraID users to access Talon web interface)
+              Add: <B>User.Read.All</B> (Allows Entra ID users to access Talon web interface)
             </p>
           </div>
           <p>

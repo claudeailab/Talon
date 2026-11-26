@@ -40,7 +40,7 @@ def categories() -> list:
 
 # the category of a message logged outside a web request (background work)
 _RULES = [
-    (r"\bOneDrive\b|EntraID", "onedrive"),
+    (r"\bOneDrive\b|Entra ID", "onedrive"),
     (r"[Vv]irus|ClamAV|quarantine", "antivirus"),
     (r"^Backup |^Created backup|^Updated backup|^Deleted backup", "backup"),
     (r"^(Started |Created |Updated |Deleted |Paused |Resumed |Skipped )?scheduled task|^Scheduled task|^Test run as", "scheduled"),

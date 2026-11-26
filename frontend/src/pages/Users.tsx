@@ -45,7 +45,7 @@ export default function UsersPage() {
     invalidate: ["users"],
   });
   if (!users.data || !groups.data || !entra.data) return <PageLoader />;
-  // the EntraID Users tab appears once the EntraID app is set up; choosing people
+  // the Entra ID Users tab appears once the Entra ID app is set up; choosing people
   // needs the app to be set up for one organization (see EntraSetupNeeded)
   const view = tab === "entra" && !entra.data.configured ? "local" : tab;
 
@@ -65,7 +65,7 @@ export default function UsersPage() {
             </Button>
           ) : (
             <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setAddEntra(true)}>
-              Add EntraID users
+              Add Entra ID users
             </Button>
           )
         }
@@ -77,7 +77,7 @@ export default function UsersPage() {
           tabs={[
             { value: "local", label: <>Local Users <Badge>{users.data.length}</Badge></>, icon: <UserIcon className="size-4" /> },
             ...(entra.data.configured
-              ? [{ value: "entra" as const, label: <>EntraID Users <Badge>{entra.data.users.length}</Badge></>, icon: <KeyRound className="size-4" /> }]
+              ? [{ value: "entra" as const, label: <>Entra ID Users <Badge>{entra.data.users.length}</Badge></>, icon: <KeyRound className="size-4" /> }]
               : []),
             { value: "groups", label: <>Groups <Badge>{groups.data.length}</Badge></>, icon: <UsersIcon className="size-4" /> },
           ]}
@@ -336,7 +336,7 @@ function GroupDialog({ group, users, onClose }: { group: Group | null; users: Us
             ))}
             {!shown.length && <div className="px-4 py-3 text-sm text-zinc-500">No users match</div>}
           </div>
-          <p className="mt-2 text-xs text-zinc-500">Only local users can be members: EntraID users cannot open shared folders.</p>
+          <p className="mt-2 text-xs text-zinc-500">Only local users can be members: Entra ID users cannot open shared folders.</p>
         </div>
       </div>
     </Modal>
@@ -432,13 +432,13 @@ function UserDialog({ user, groups, isSelf, onClose }: { user: User | null; grou
 }
 
 
-/** People from EntraID who may use Talon. Their name and password stay in EntraID;
+/** People from Entra ID who may use Talon. Their name and password stay in Entra ID;
  * here you only choose whether they may sign in to this web interface. */
 function EntraUsersTab({ users, me, onAdd }: { users: EntraUser[]; me?: string; onAdd: () => void }) {
   const [edit, setEdit] = useState<EntraUser | null>(null);
   const [del, setDel] = useState<EntraUser | null>(null);
   const remove = useAction((oid: string) => api.del(`/entra/users/${oid}`), {
-    success: "EntraID user removed",
+    success: "Entra ID user removed",
     invalidate: ["entra-users"],
     onSuccess: () => setDel(null),
   });
@@ -447,11 +447,11 @@ function EntraUsersTab({ users, me, onAdd }: { users: EntraUser[]; me?: string; 
       <Card>
         <Empty
           icon={<UsersIcon className="size-6" />}
-          title="No EntraID users yet"
-          text="Choose people from your organization's EntraID directory."
+          title="No Entra ID users yet"
+          text="Choose people from your organization's Entra ID directory."
           action={
             <Button variant="primary" icon={<Plus className="size-4" />} onClick={onAdd}>
-              Add EntraID users
+              Add Entra ID users
             </Button>
           }
         />
@@ -523,7 +523,7 @@ function EntraUsersTab({ users, me, onAdd }: { users: EntraUser[]; me?: string; 
         danger
         title={`Remove ${del?.name}?`}
         confirmText="Remove"
-        message="They can no longer use Talon. Their account in EntraID is not changed."
+        message="They can no longer use Talon. Their account in Entra ID is not changed."
       />
     </>
   );
@@ -551,7 +551,7 @@ function EntraUserDialog({ user, isSelf, onClose }: { user: EntraUser; isSelf: b
         </>
       }
     >
-      <p className="mb-2 text-[13px] text-zinc-500">The name and password are managed in EntraID.</p>
+      <p className="mb-2 text-[13px] text-zinc-500">The name and password are managed in Entra ID.</p>
       <ToggleRow
         title="Web interface"
         description="Can sign in to this web interface with Sign in with Microsoft and manage the NAS"
@@ -563,7 +563,7 @@ function EntraUserDialog({ user, isSelf, onClose }: { user: EntraUser; isSelf: b
   );
 }
 
-/** Browse the EntraID directory and add people to Talon. */
+/** Browse the Entra ID directory and add people to Talon. */
 function AddEntraDialog({ onClose }: { onClose: () => void }) {
   const [search, setSearch] = useState("");
   const [sel, setSel] = useState<Set<string>>(new Set());
@@ -587,7 +587,7 @@ function AddEntraDialog({ onClose }: { onClose: () => void }) {
       open
       onClose={onClose}
       size="lg"
-      title="Add EntraID users"
+      title="Add Entra ID users"
       description="Choose people from your organization's directory"
       footer={
         <>
@@ -619,7 +619,7 @@ function AddEntraDialog({ onClose }: { onClose: () => void }) {
                   <span className="block text-sm font-medium break-words">{p.name}</span>
                   <span className="block text-xs break-words text-zinc-500"><Email value={p.upn} /></span>
                 </span>
-                {p.added ? <Badge>Added</Badge> : !p.enabled ? <Badge tone="amber">Disabled in EntraID</Badge> : null}
+                {p.added ? <Badge>Added</Badge> : !p.enabled ? <Badge tone="amber">Disabled in Entra ID</Badge> : null}
               </label>
             </li>
           ))}
@@ -629,7 +629,7 @@ function AddEntraDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-/** The EntraID app is set up for personal or any accounts: there is no directory
+/** The Entra ID app is set up for personal or any accounts: there is no directory
  * of people to choose from until it is set up for one organization. */
 function EntraSetupNeeded() {
   return (

@@ -1,7 +1,7 @@
 """OneDrive service: account connection, sync tasks, schedule and rclone runs.
 
 Transfers are done by rclone (https://rclone.org). Talon signs in through its
-own EntraID app (see ``entra.py``), keeps the tokens in its state file and
+own Entra ID app (see ``entra.py``), keeps the tokens in its state file and
 writes a private rclone config for every run.
 """
 from __future__ import annotations
@@ -125,7 +125,7 @@ class CloudSync:
     def _entra(self) -> dict:
         return self.state.get("entra") or {}
 
-    # ------------------------------------------------------------ EntraID settings
+    # ------------------------------------------------------------ Entra ID settings
     def entra_public(self) -> dict:
         e = self._entra()
         return {"tenant": e.get("tenant", "common"), "domain": e.get("domain", ""), "client_id": e.get("client_id", ""),
@@ -180,7 +180,7 @@ class CloudSync:
         else:
             clean["reminded"] = old.get("reminded", [])
         self.state.update(lambda d: d.__setitem__("entra", clean))
-        self.state.log_activity(user, "Updated the EntraID app settings")
+        self.state.log_activity(user, "Updated the Entra ID app settings")
         return self.entra_public()
 
     def secret_expiry(self) -> Optional[dict]:
@@ -207,13 +207,13 @@ class CloudSync:
             return
         dmy = datetime.date.fromisoformat(exp["date"]).strftime(date_pattern(self.state.get("settings")))
         if stage == "soon":
-            subject = f"EntraID client secret expires on {dmy}"
+            subject = f"Entra ID client secret expires on {dmy}"
             when = "tomorrow" if exp["days"] == 1 else ("today" if exp["days"] == 0 else f"in {exp['days']} days")
-            body = (f"The client secret of the EntraID app used by Talon for OneDrive expires {when} "
+            body = (f"The client secret of the Entra ID app used by Talon for OneDrive expires {when} "
                     f"({dmy}).\n\n")
         else:
-            subject = "EntraID client secret has expired"
-            body = f"The client secret of the EntraID app used by Talon expired on {dmy}. " \
+            subject = "Entra ID client secret has expired"
+            body = f"The client secret of the Entra ID app used by Talon expired on {dmy}. " \
                    "OneDrive tasks cannot sign in until it is replaced.\n\n"
         body += ("To replace it: in entra.microsoft.com open the app > Certificates & secrets > "
                  "New client secret, then paste the new Value and its expiry date in "
@@ -249,7 +249,7 @@ class CloudSync:
                      "detail": "Accepted by Microsoft (demo)"},
                     {"name": "Redirect URI", "ok": True, "detail": entra.redirect_uri(origin)},
                     {"name": "Accounts", "ok": True, "detail": entra.ACCOUNTS["common"] + " (demo)"}] + (
-                [{"name": "Directory users (EntraID Users)", "ok": True,
+                [{"name": "Directory users (Entra ID Users)", "ok": True,
                   "detail": "The app can read your organization's users (demo)"}]
                 if entra.GUID_RE.match(entra.tenant_of(merged)) else [])
         return entra.test(merged, origin)
@@ -360,7 +360,7 @@ class CloudSync:
     def connect_start(self, origin: str) -> str:
         e = self._entra()
         if not entra.configured(e):
-            raise UserError("Configure the EntraID app in Settings first")
+            raise UserError("Configure the Entra ID app in Settings first")
         redirect = entra.redirect_uri(origin)
         state = secrets.token_urlsafe(24)
         verifier, challenge = entra.new_pkce()
@@ -818,7 +818,7 @@ class CloudSync:
                 d["entra"]["tenant"] = tid
         self.state.update(upd)
         if tid:
-            self.state.log_activity("talon", "EntraID app: Directory (tenant) ID filled in from OneDrive",
+            self.state.log_activity("talon", "Entra ID app: Directory (tenant) ID filled in from OneDrive",
                                     "info", "settings")
 
     def start(self) -> None:

@@ -187,14 +187,14 @@ def test(cfg: dict, origin: str) -> list:
     checks.append({"name": "Redirect URI", "ok": ok,
                    "detail": redirect if ok else explain(codes, f"Microsoft returned HTTP {status}")})
     checks.append({"name": "Accounts", "ok": True, "detail": ACCOUNTS.get(authority, ACCOUNTS["tenant"])})
-    # 3. One organization: may the app read its users (Users → EntraID Users)?
+    # 3. One organization: may the app read its users (Users → Entra ID Users)?
     if GUID_RE.match(tenant):
         try:
             directory_users(app_token(cfg)["access_token"], limit=1)
-            checks.append({"name": "Directory users (EntraID Users)", "ok": True,
+            checks.append({"name": "Directory users (Entra ID Users)", "ok": True,
                            "detail": "The app can read your organization's users"})
         except UserError as e:
-            checks.append({"name": "Directory users (EntraID Users)", "ok": False, "detail": str(e)})
+            checks.append({"name": "Directory users (Entra ID Users)", "ok": False, "detail": str(e)})
     return checks
 
 
@@ -311,10 +311,10 @@ def directory_users(token: str, limit: int = 5000) -> list:
         status, text = _request(url, token=token)
         payload = _json(text)
         if status == 403:
-            raise UserError("The EntraID app may not read the directory. In the Entra portal add the "
+            raise UserError("The Entra ID app may not read the directory. In the Entra portal add the "
                             "Application permission User.Read.All (Microsoft Graph) and click Grant admin consent.")
         if status != 200:
-            raise UserError(f"EntraID: {(payload.get('error') or {}).get('message') or f'HTTP {status}'}")
+            raise UserError(f"Entra ID: {(payload.get('error') or {}).get('message') or f'HTTP {status}'}")
         for u in payload.get("value", []):
             out.append({"id": u["id"], "name": u.get("displayName") or "", "upn": u.get("userPrincipalName") or "",
                         "email": u.get("mail") or "", "enabled": u.get("accountEnabled", True)})

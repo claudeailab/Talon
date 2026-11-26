@@ -139,8 +139,8 @@ ACTIONS = {
     "PUT /api/groups/{name}": ("users", "Updated group {name}"),
     "DELETE /api/groups/{name}": ("users", "Deleted group {name}"),
     "POST /api/services/{sid}/{action}": ("services", "Service {sid}: {action}"),
-    "PUT /api/settings/entra": ("onedrive", "Updated the EntraID app settings"),
-    "POST /api/settings/entra/test": ("onedrive", "Tested the EntraID app"),
+    "PUT /api/settings/entra": ("onedrive", "Updated the Entra ID app settings"),
+    "POST /api/settings/entra/test": ("onedrive", "Tested the Entra ID app"),
     "PUT /api/settings/smtp": ("settings", "Updated the SMTP settings"),
     "POST /api/settings/smtp/test": ("alerts", "Sent a test email"),
     "PUT /api/thresholds": ("settings", "Updated the alert thresholds"),
@@ -293,7 +293,7 @@ def create_app(cfg, platform) -> FastAPI:
         except UserError as e:
             return RedirectResponse("/?login_error=" + urllib.parse.quote(str(e)), status_code=302)
 
-    # EntraID users (entrausers.py)
+    # Entra ID users (entrausers.py)
     @app.get("/api/entra/users")
     def entra_users(_u: str = Depends(current_user)):
         return {"ready": nas.entra_users.ready(), "configured": nas.entra_users.configured(),

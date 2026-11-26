@@ -1,4 +1,4 @@
-"""EntraID users and Sign in with Microsoft (demo: the directory and Microsoft are simulated)."""
+"""Entra ID users and Sign in with Microsoft (demo: the directory and Microsoft are simulated)."""
 TENANT = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 GUID = "11111111-2222-3333-4444-555555555555"
 
@@ -41,7 +41,7 @@ def test_microsoft_only_when_the_local_admin_is_disabled(client):
     assert client.put("/api/users/admin", json={"disabled": True}).status_code == 400
     client.put(f"/api/entra/users/{oid}", json={"web": True})
 
-    # sign in with Microsoft as the EntraID user, then disable the local administrator
+    # sign in with Microsoft as the Entra ID user, then disable the local administrator
     client.post("/api/auth/logout")
     start = client.get("/api/auth/microsoft", follow_redirects=False)
     cb = start.headers["location"].split("://", 1)[1].split("/", 1)[1]

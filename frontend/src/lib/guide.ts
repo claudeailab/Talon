@@ -75,7 +75,7 @@ export const GUIDE: Topic[] = [
               "Installed from your own account (asked for your password to get root access): that account is the administrator; sign in with its user name and Linux password.",
             ],
           },
-          { p: "People from your organization's EntraID can also sign in with their Microsoft account. See [Users & Groups](" + t("users") + ")." },
+          { p: "People from your organization's Entra ID can also sign in with their Microsoft account. See [Users & Groups](" + t("users") + ")." },
           { p: "Other people can sign in once they are marked as **Administrator** on the [Users & Groups](/users) page." },
           { p: "The first time, the browser warns that the connection is not private. This is expected: Talon uses its own certificate. Choose **Advanced** and continue to the site. (With HTTPS turned off in [Settings → Network](/settings?tab=network), the address starts with http:// and there is no warning.)" },
         ],
@@ -530,7 +530,7 @@ export const GUIDE: Topic[] = [
               "In the app, add a WebDAV server with that address and your Talon user name and password.",
             ],
           },
-          { p: "You see the shared folders you have access to, with the same **Read** or **Read & write** permissions as over SMB. Deleted files go to the shared folder's recycle bin when it is on. EntraID users cannot use WebDAV: Talon does not know their password." },
+          { p: "You see the shared folders you have access to, with the same **Read** or **Read & write** permissions as over SMB. Deleted files go to the shared folder's recycle bin when it is on. Entra ID users cannot use WebDAV: Talon does not know their password." },
           { warn: "Through Cloudflare's free plan, a single upload can be at most 100 MB, so very large videos may fail to upload. Over your home network there is no limit." },
         ],
       },
@@ -557,7 +557,7 @@ export const GUIDE: Topic[] = [
           },
           { img: "users", alt: "Users and groups" },
           { p: "In a user's **⋯** menu you can **Edit** them (name and password), **Disable** or **Enable** them and **Delete** them. Files a deleted user created stay on the volumes." },
-          { p: "At least one user must always be able to sign in to the web interface: a local administrator or an EntraID user with web access. The sign-in page shows the user name and password only while an enabled local administrator exists." },
+          { p: "At least one user must always be able to sign in to the web interface: a local administrator or an Entra ID user with web access. The sign-in page shows the user name and password only while an enabled local administrator exists." },
         ],
       },
       {
@@ -573,23 +573,23 @@ export const GUIDE: Topic[] = [
               "Click **Create group**, then give the group access under a shared folder's **Permissions → Groups**.",
             ],
           },
-          { p: "Click a group to change its description and members. **Delete** removes the group; its members stay but lose the access they had through it. Only local users can be members: EntraID users cannot open shared folders." },
+          { p: "Click a group to change its description and members. **Delete** removes the group; its members stay but lose the access they had through it. Only local users can be members: Entra ID users cannot open shared folders." },
         ],
       },
       {
         id: "entra-users",
-        title: "EntraID Users",
+        title: "Entra ID Users",
         blocks: [
-          { p: "Once the [EntraID](" + t("entra") + ") app is set up for your organization, the page also has an **EntraID Users** tab." },
+          { p: "Once the [Entra ID](" + t("entra") + ") app is set up for your organization, the page also has an **Entra ID Users** tab." },
           {
             steps: [
-              "Open **EntraID Users** and click **Add EntraID users**.",
+              "Open **Entra ID Users** and click **Add Entra ID users**.",
               "Search your organization's directory, tick the people you want and click **Add**. They can now sign in to this web interface with **Sign in with Microsoft** and manage the NAS.",
               "To take away someone's access without removing them, choose **Edit** in their **⋯** menu and turn off **Web interface**.",
             ],
           },
-          { p: "Their name and password stay in EntraID and cannot be changed in Talon. **Remove** takes away their access to Talon; their EntraID account is not changed." },
-          { p: "Once an EntraID user has web access, you can disable the local administrator: the sign-in page then shows only **Sign in with Microsoft**. Enable a local administrator again and the user name and password come back." },
+          { p: "Their name and password stay in Entra ID and cannot be changed in Talon. **Remove** takes away their access to Talon; their Entra ID account is not changed." },
+          { p: "Once an Entra ID user has web access, you can disable the local administrator: the sign-in page then shows only **Sign in with Microsoft**. Enable a local administrator again and the user name and password come back." },
           { warn: "Locked out (for example the client secret expired)? On the NAS, run `sudo talon enable-local-login`. It enables the local administrators again." },
         ],
       },
@@ -642,7 +642,7 @@ export const GUIDE: Topic[] = [
     summary: "Back up or sync folders between this NAS and Microsoft OneDrive.",
     page: { to: "/onedrive", label: "Open OneDrive" },
     before: [
-      "A Microsoft Entra ID app, set up once in **Settings → Entra ID**. See [EntraID](" + t("entra") + "). OneDrive cannot sign in without it.",
+      "A Microsoft Entra ID app, set up once in **Settings → Entra ID**. See [Entra ID](" + t("entra") + "). OneDrive cannot sign in without it.",
       "The **OneDrive** service turned on in [Services](/services).",
     ],
     sections: [
@@ -652,7 +652,7 @@ export const GUIDE: Topic[] = [
         blocks: [
           {
             steps: [
-              "Set up the EntraID app and click **Test** until it passes. See [EntraID](" + t("entra") + ").",
+              "Set up the Entra ID app and click **Test** until it passes. See [Entra ID](" + t("entra") + ").",
               "On the [Services](/services) page, turn on **OneDrive**. Talon downloads the transfer tool (rclone) and opens the OneDrive page.",
               "Click **Sign in with Microsoft**, sign in and allow access to your files. You return to Talon, which shows the account as **Connected**.",
               "Click **New task** to create your first backup.",
@@ -727,12 +727,12 @@ export const GUIDE: Topic[] = [
               "**Open the Entra admin center**: go to **entra.microsoft.com** and sign in.",
               "**Register the app**: **App registrations → New registration**, name it **Talon**. Supported account types: **Any Entra ID Tenant + Personal Microsoft accounts**. Redirect URI: platform **Web**, paste the address from Talon's **Redirect URI** field, then click **Register**.",
               "**Copy the two IDs**: from the **Overview** page, copy the **Application (client) ID** and the **Directory (tenant) ID** into Talon.",
-              "**Add the permissions**: **API permissions → Add a permission → Microsoft Graph → Delegated permissions**, add **Files.ReadWrite** and **offline_access** (allows OneDrive sync). Then **API permissions → Add a permission → Microsoft Graph → Application permissions**, add **User.Read.All** (allows [EntraID users](" + t("users") + ") to access the Talon web interface). Click **Grant admin consent**.",
+              "**Add the permissions**: **API permissions → Add a permission → Microsoft Graph → Delegated permissions**, add **Files.ReadWrite** and **offline_access** (allows OneDrive sync). Then **API permissions → Add a permission → Microsoft Graph → Application permissions**, add **User.Read.All** (allows [Entra ID users](" + t("users") + ") to access the Talon web interface). Click **Grant admin consent**.",
               "**Create a client secret**: **Certificates & secrets → New client secret**, expiry **24 months**. Copy the secret **Value** (not the Secret ID) into Talon. It is shown once. In Talon, enter its **Expires** date under **Expires on**.",
               "**Save and test in Talon**: click **Save**, then **Test**.",
             ],
           },
-          { img: "entra-guide", alt: "EntraID setup guide" },
+          { img: "entra-guide", alt: "Entra ID setup guide" },
         ],
       },
       {
@@ -761,16 +761,16 @@ export const GUIDE: Topic[] = [
               "Click **Save**.",
             ],
           },
-          { img: "settings-entra", alt: "EntraID settings with the client secret expiry" },
+          { img: "settings-entra", alt: "Entra ID settings with the client secret expiry" },
           { p: "Talon sends one email when the reminder period starts and one more if the secret expires. The bell also shows the expiry as an issue. Emails need [SMTP](" + t("email") + ") to be set up." },
           { p: "After you create a new secret, paste its Value and its new expiry date and click **Save**; the reminders start again for the new date." },
         ],
       },
       {
         id: "sso",
-        title: "EntraID Users and Sign in with Microsoft",
+        title: "Entra ID Users and Sign in with Microsoft",
         blocks: [
-          { p: "People from your organization can use Talon and sign in with their Microsoft account. See [EntraID Users](" + t("users") + "). It needs the **Application permission** **User.Read.All** with **Grant admin consent** (step 5 above); **Test** then shows **Directory users** as passed." },
+          { p: "People from your organization can use Talon and sign in with their Microsoft account. See [Entra ID Users](" + t("users") + "). It needs the **Application permission** **User.Read.All** with **Grant admin consent** (step 5 above); **Test** then shows **Directory users** as passed." },
           { tip: "Open Talon at the same address as the **Redirect URI** you registered. A different address (for example a Cloudflare domain) needs its own Redirect URI in the Entra portal." },
         ],
       },
@@ -1131,7 +1131,7 @@ export const GUIDE: Topic[] = [
       {
         id: "onedrive",
         title: "OneDrive does not connect",
-        blocks: [{ p: "First check **Settings → Entra ID → Test**. Most problems are a redirect URI that does not match the address you use, or the Secret ID pasted instead of the secret Value. See [EntraID](" + t("entra") + ")." }],
+        blocks: [{ p: "First check **Settings → Entra ID → Test**. Most problems are a redirect URI that does not match the address you use, or the Secret ID pasted instead of the secret Value. See [Entra ID](" + t("entra") + ")." }],
       },
       {
         id: "mail",
