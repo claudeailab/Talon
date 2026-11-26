@@ -1,3 +1,6 @@
+## 1.0.158
+- Settings → Network: HTTPS has its own card at the top; the Save button belongs only to the network address below
+
 ## 1.0.157
 - Users & Groups: the tab is called "Entra ID Users", and Entra ID is written that way everywhere in Talon
 

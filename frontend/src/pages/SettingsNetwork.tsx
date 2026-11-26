@@ -91,9 +91,12 @@ export default function NetworkTab() {
   if (!q.data || !f) return <PageLoader />;
   if (!iface)
     return (
-      <Card className="p-5">
-        <Callout tone="warning">No wired network interface was found.</Callout>
-      </Card>
+      <div className="space-y-5">
+        <WebCard />
+        <Card className="p-5">
+          <Callout tone="warning">No wired network interface was found.</Callout>
+        </Card>
+      </div>
     );
 
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setF((x) => ({ ...x!, [k]: v }));
@@ -125,6 +128,9 @@ export default function NetworkTab() {
   const ip = (v: string | null) => <span className={cx("tabular font-mono text-[13px]", !v && "text-zinc-400")}>{v || "—"}</span>;
 
   return (
+    <div className="space-y-5">
+    {/* HTTPS applies by itself (after a confirmation); the Save bar below is only for the address */}
+    <WebCard />
     <RowCard>
       <Section
         title={
@@ -184,7 +190,6 @@ export default function NetworkTab() {
         </>
       )}
       <SaveBar show={changed} onDiscard={() => setF(start)} disabled={!valid || locked} onSave={() => setConfirm(true)} />
-      <WebRows />
       <ConfirmDialog
         open={confirm}
         onClose={() => setConfirm(false)}
@@ -221,6 +226,7 @@ export default function NetworkTab() {
       />
       {moving && <Moving target={moving} onDone={() => setMoving(null)} />}
     </RowCard>
+    </div>
   );
 }
 
@@ -228,7 +234,8 @@ export default function NetworkTab() {
 
 type Web = { https: boolean; port: number; https_port: number; serving_https: boolean };
 
-function WebRows() {
+/** HTTPS on or off, in a card of its own: it applies on its own, not with the Save button of the network settings. */
+function WebCard() {
   const q = useQuery({ queryKey: ["web"], queryFn: () => api.get<Web>("/settings/web") });
   const [ask, setAsk] = useState<boolean | null>(null);
   const [restarting, setRestarting] = useState<string | null>(null);
@@ -248,7 +255,7 @@ function WebRows() {
   if (!q.data) return null;
   const on = q.data.https;
   return (
-    <>
+    <RowCard>
       <Section title="Web interface" />
       <Row
         inline
@@ -281,7 +288,7 @@ function WebRows() {
           </p>
         </Modal>
       )}
-    </>
+    </RowCard>
   );
 }
 
