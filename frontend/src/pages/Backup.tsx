@@ -4,7 +4,7 @@ import { Check, ChevronDown, DatabaseBackup, FileText, HardDrive, Minus, MoreHor
 import { api } from "../lib/api";
 import { ago, bytes, cx, dateTime, duration, rate } from "../lib/format";
 import { useAction } from "../lib/hooks";
-import { FootItem, ITEM_FOOT, ITEM_MENU, ITEM_ROW, ItemTitle } from "../components/storage";
+import { Detail, Details, ITEM_MENU, ITEM_ROW, ItemTitle } from "../components/storage";
 import { LogList } from "../components/log";
 import { navigate } from "../lib/router";
 import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Select, Switch } from "../components/ui";
@@ -104,6 +104,7 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
           icon={t.disk && t.disk.kind !== "usb" ? <HardDrive /> : <Usb />}
           name={t.name}
           badge={t.connected ? <Badge tone="green" dot>Connected</Badge> : <Badge dot>Not connected</Badge>}
+          note={whenText(t)}
         >
           <span className="break-words">
             {t.disk ? `${t.disk.media}: ` : ""}
@@ -112,7 +113,7 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
           </span>
         </ItemTitle>
 
-        <div className="min-w-0">
+        <div className="min-w-0 space-y-3">
           {running ? (
             <RunProgress p={t.progress} />
           ) : t.last ? (
@@ -131,6 +132,20 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
           ) : (
             <div className="text-[13px] text-zinc-500">Not backed up yet</div>
           )}
+          <Details>
+            <Detail label="What">
+              <span className="font-medium break-words text-zinc-700 dark:text-zinc-300">{describe(t.sources)}</span>
+            </Detail>
+            <Detail label="Versions">
+              {t.disk && !t.disk.versions ? (
+                <span className="text-amber-600 dark:text-amber-400">{t.disk.fs_label} keeps one copy</span>
+              ) : (
+                <span>
+                  {t.snapshots.length ? `${t.snapshots.length} kept · ` : ""}up to {t.keep_days} days
+                </span>
+              )}
+            </Detail>
+          </Details>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -170,21 +185,6 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
       </div>
       </div>
 
-      <div className={ITEM_FOOT}>
-        <FootItem label="What">
-          <span className="font-medium break-words text-zinc-700 dark:text-zinc-300">{describe(t.sources)}</span>
-        </FootItem>
-        <FootItem label="Versions">
-          {t.disk && !t.disk.versions ? (
-            <span className="text-amber-600 dark:text-amber-400">{t.disk.fs_label} keeps one copy</span>
-          ) : (
-            <span>
-              {t.snapshots.length ? `${t.snapshots.length} kept · ` : ""}up to {t.keep_days} days
-            </span>
-          )}
-        </FootItem>
-        <span className="ml-auto">{whenText(t)}</span>
-      </div>
       {restore && t.disk && (
         <Modal open onClose={() => setRestore(false)} title="Restore" description="Choose a version; it opens in Files, where you can copy back a file, a folder or everything">
           <div className="flex flex-wrap gap-2">

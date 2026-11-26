@@ -18,8 +18,8 @@ import type { Job, Volume, VolumeSources } from "../lib/types";
 import { JobDialog } from "../components/jobs";
 import {
   DiskRow,
-  FootItem,
-  ITEM_FOOT,
+  Detail,
+  Details,
   ITEM_MENU,
   ITEM_ROW,
   ItemTitle,
@@ -150,7 +150,7 @@ function VolumeCard({ v, onJob }: { v: Volume; onJob: (id: string) => void }) {
     <Card className="relative overflow-hidden">
       <div className="relative">
       <div className={ITEM_ROW}>
-        <ItemTitle icon={<Database />} name={v.name} badge={<StatusBadge status={v.status} />}>
+        <ItemTitle icon={<Database />} name={v.name} badge={<StatusBadge status={v.status} />} note={v.created ? `Created ${dateTime(v.created)}` : undefined}>
           {v.array ? (
             <Link to="/raid" className="font-medium whitespace-nowrap text-zinc-700 hover:text-brand-600 dark:text-zinc-300">
               {levelLabel[v.level] ?? v.level} on {v.array}
@@ -176,6 +176,16 @@ function VolumeCard({ v, onJob }: { v: Volume; onJob: (id: string) => void }) {
             <Progress value={p} tone={usageTone(p)} className="h-1.5" />
           </div>
           {v.sync && v.sync.sync_action !== "idle" && <SyncProgress sync={v.sync} />}
+          <Details>
+            {v.members.length > 0 && (
+              <Detail label="Disks">
+                <MemberChips members={v.members} />
+              </Detail>
+            )}
+            <Detail label="Shared folders">
+              {v.shares.length ? <span className="font-medium text-zinc-700 dark:text-zinc-300">{v.shares.join(", ")}</span> : <span>None</span>}
+            </Detail>
+          </Details>
         </div>
 
         <div className="grid w-60 max-w-full grid-cols-2 gap-4">
@@ -217,18 +227,6 @@ function VolumeCard({ v, onJob }: { v: Volume; onJob: (id: string) => void }) {
           <Callout tone={statusTone(v.status)}>{v.status_detail}</Callout>
         </div>
       )}
-
-      <div className={ITEM_FOOT}>
-        {v.members.length > 0 && (
-          <FootItem label="Disks">
-            <MemberChips members={v.members} />
-          </FootItem>
-        )}
-        <FootItem label="Shared folders">
-          {v.shares.length ? <span className="font-medium text-zinc-700 dark:text-zinc-300">{v.shares.join(", ")}</span> : <span>None</span>}
-        </FootItem>
-        {v.created && <span className="ml-auto text-zinc-400">Created {dateTime(v.created)}</span>}
-      </div>
 
       {resize && (
         <ResizeDialog

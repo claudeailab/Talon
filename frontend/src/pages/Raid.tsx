@@ -7,7 +7,7 @@ import { useAction } from "../lib/hooks";
 import { Link } from "../lib/router";
 import type { Disk, Job, Member, RaidArray, RaidOption } from "../lib/types";
 import { JobDialog } from "../components/jobs";
-import { DiskRow, Dots, FootItem, ITEM_FOOT, ITEM_MENU, ITEM_ROW, ItemTitle, MemberChips, NAME_HINT, NAME_RE, Stat, StatusBadge, Stepper, SyncProgress, statusTone } from "../components/storage";
+import { Detail, Details, DiskRow, Dots, ITEM_MENU, ITEM_ROW, ItemTitle, MemberChips, NAME_HINT, NAME_RE, Stat, StatusBadge, Stepper, SyncProgress, statusTone } from "../components/storage";
 import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Segmented } from "../components/ui";
 
 export default function RaidPage() {
@@ -96,7 +96,7 @@ function RaidCard({ a, disks, onJob }: { a: RaidArray; disks: Disk[]; onJob: (id
     <Card className="relative overflow-hidden">
       <div className="relative">
       <div className={ITEM_ROW}>
-        <ItemTitle icon={<Layers />} name={a.name} badge={<StatusBadge status={a.status} />}>
+        <ItemTitle icon={<Layers />} name={a.name} badge={<StatusBadge status={a.status} />} note={a.created ? `Created ${dateTime(a.created)}` : undefined}>
           <span className="font-medium text-zinc-700 dark:text-zinc-300">{levelLabel[a.level] ?? a.level}</span>
           <span aria-hidden>·</span>
           <span>
@@ -141,6 +141,11 @@ function RaidCard({ a, disks, onJob }: { a: RaidArray; disks: Disk[]; onJob: (id
             <Progress value={a.size ? (used / a.size) * 100 : 0} className="h-1.5" />
           </div>
           {a.sync && a.sync.sync_action !== "idle" && <SyncProgress sync={a.sync} />}
+          <Details>
+            <Detail label="Disks">
+              <MemberChips members={a.members} onRemove={a.members.length > 1 ? setRemove : undefined} />
+            </Detail>
+          </Details>
         </div>
 
         <div className="grid w-60 max-w-full grid-cols-2 gap-4">
@@ -184,13 +189,6 @@ function RaidCard({ a, disks, onJob }: { a: RaidArray; disks: Disk[]; onJob: (id
           <Callout tone={statusTone(a.status)}>{a.status_detail}</Callout>
         </div>
       )}
-
-      <div className={ITEM_FOOT}>
-        <FootItem label="Disks">
-          <MemberChips members={a.members} onRemove={a.members.length > 1 ? setRemove : undefined} />
-        </FootItem>
-        {a.created && <span className="ml-auto text-zinc-400">Created {dateTime(a.created)}</span>}
-      </div>
 
       <ConfirmDialog
         open={confirmDelete}

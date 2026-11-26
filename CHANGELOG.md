@@ -1,3 +1,7 @@
+## 1.0.146
+- RAID, Volumes and Backup: each card is one row; disks, shared folders and backup contents sit under the bar, no empty gaps
+- On laptops the name runs across the top, with the bar and its facts side by side below
+
 ## 1.0.145
 - RAID, Volumes and Backup: compact cards with aligned columns, about a third of the height, on wide screens, laptops and phones
 - The menu fits on shorter screens without hiding its last entries

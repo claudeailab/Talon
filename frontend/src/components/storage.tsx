@@ -58,15 +58,13 @@ export function SyncProgress({ sync }: { sync: SyncInfo | null }) {
    up from card to card: who it is | the main bar | a fixed column of facts or buttons,
    with the ⋯ menu in the corner and a slim footer (member disks, folders, dates). */
 
-/** The card's main row; on phones its three parts stack. */
+/** The card's one row: a fixed-width name column, so the middle (the bar and the details
+ *  under it) takes all the room left; on phones the three parts stack. */
 export const ITEM_ROW =
-  "grid gap-x-8 gap-y-4 p-4 sm:p-5 md:grid-cols-2 md:items-center md:pr-16 md:[&>*:first-child]:row-span-2 xl:grid-cols-[minmax(0,6fr)_minmax(0,5fr)_15rem] xl:[&>*:first-child]:row-span-1";
-/** The slim footer under the main row. */
-export const ITEM_FOOT =
-  "flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-zinc-100 bg-zinc-50/60 px-4 py-3 text-xs text-zinc-500 sm:px-5 dark:border-white/5 dark:bg-white/[0.015]";
+  "grid gap-x-8 gap-y-4 p-4 sm:p-5 md:grid-cols-[minmax(0,1fr)_15rem] md:items-center md:pr-16 md:[&>*:first-child]:col-span-2 xl:grid-cols-[19rem_minmax(0,1fr)_15rem] xl:[&>*:first-child]:col-span-1";
 
 /** Icon, name with its status and one line of details. */
-export function ItemTitle({ icon, name, badge, children, tone = "brand" }: { icon: ReactNode; name: ReactNode; badge?: ReactNode; children?: ReactNode; tone?: "brand" | "amber" }) {
+export function ItemTitle({ icon, name, badge, children, note, tone = "brand" }: { icon: ReactNode; name: ReactNode; badge?: ReactNode; children?: ReactNode; note?: ReactNode; tone?: "brand" | "amber" }) {
   return (
     <div className="flex min-w-0 items-center gap-3.5 pr-9 md:pr-0">
       <div
@@ -85,6 +83,7 @@ export function ItemTitle({ icon, name, badge, children, tone = "brand" }: { ico
           {badge}
         </div>
         {children && <div className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[13px] text-zinc-500">{children}</div>}
+        {note && <div className="mt-0.5 text-xs text-zinc-400 dark:text-zinc-500">{note}</div>}
       </div>
     </div>
   );
@@ -100,8 +99,13 @@ export function Stat({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
-/** A labelled group in an item's footer. */
-export function FootItem({ label, children }: { label: string; children: ReactNode }) {
+/** The details under an item's bar: labelled groups side by side. */
+export function Details({ children }: { children: ReactNode }) {
+  return <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-zinc-500">{children}</div>;
+}
+
+/** One labelled group in Details. */
+export function Detail({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1.5">
       <span className="text-[11px] font-medium tracking-wide text-zinc-400 uppercase">{label}</span>
