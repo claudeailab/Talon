@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, Download, ExternalLink, Package, RefreshCw, RotateCcw, ShieldAlert } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Package, RefreshCw, RotateCcw, ShieldAlert } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, clock, cx, date } from "../lib/format";
 import { useAction } from "../lib/hooks";
@@ -607,16 +607,24 @@ function dayLabel(ts: number): { name: string; date: string } {
   return { name: days < 7 ? name : "", date: date(ts) };
 }
 
-/** Every Talon version and what it changed, by day, newest first; or only the versions after the installed one. */
+const PER_PAGE = [10, 25, 50, 100];
+
+/** Every Talon version and what it changed, by day, newest first; or only the versions after the installed one. A page at a time. */
 function ChangelogTab() {
   const q = useQuery({ queryKey: ["update-changelog"], queryFn: () => api.get<Changelog>("/update/changelog"), staleTime: 300_000 });
   const [since, setSince] = useState<"all" | "since">("all");
+  const [perPage, setPerPage] = useState(10);
+  const [page, setPage] = useState(0);
+  useEffect(() => setPage(0), [since, perPage]);
   if (!q.data) return <PageLoader />;
   const { current, versions, error } = q.data;
   const list = since === "since" ? versions.filter((v) => newer(v.version, current)) : versions;
+  const pages = Math.max(1, Math.ceil(list.length / perPage));
+  const at = Math.min(page, pages - 1);
+  const shown = list.slice(at * perPage, (at + 1) * perPage);
   // consecutive versions released on the same day share a heading; undated ones one at the end
   const groups: { key: string; head: { name: string; date: string } | null; items: Release[] }[] = [];
-  for (const v of list) {
+  for (const v of shown) {
     const head = v.date ? dayLabel(v.date) : null;
     const key = head ? head.date : "undated";
     if (groups.at(-1)?.key === key) groups.at(-1)!.items.push(v);
@@ -676,6 +684,30 @@ function ChangelogTab() {
             </RowCard>
           </section>
         ))
+      )}
+      {list.length > PER_PAGE[0] && (
+        <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
+          <label className="flex items-center gap-2 text-[13px] whitespace-nowrap text-zinc-500">
+            Per page
+            <Select value={String(perPage)} onChange={(e) => setPerPage(Number(e.target.value))} className="text-[13px]" style={{ width: "5.5rem" }}>
+              {PER_PAGE.map((n) => (
+                <option key={n}>{n}</option>
+              ))}
+            </Select>
+          </label>
+          <span className="tabular text-[13px] text-zinc-500">
+            {at * perPage + 1}–{Math.min((at + 1) * perPage, list.length)} of {list.length}
+          </span>
+          <div className="flex items-center gap-2">
+            <Button size="sm" icon={<ChevronLeft className="size-4" />} disabled={at === 0} onClick={() => setPage(at - 1)}>
+              Prev
+            </Button>
+            <Button size="sm" disabled={at >= pages - 1} onClick={() => setPage(at + 1)}>
+              Next
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </div>
       )}
     </div>
   );

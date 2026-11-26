@@ -1,3 +1,6 @@
+## 1.0.155
+- Changelog: 10 versions a page, with Per page, Prev and Next at the bottom right
+
 ## 1.0.154
 - Changelog: versions that were never released are left out
 

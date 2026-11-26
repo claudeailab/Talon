@@ -1211,7 +1211,7 @@
       "p": "When it is done the ring turns green and the page reloads into the new version by itself (or click **Reload now**). If anything fails, the previous version is restored automatically; the ring turns red and shows the reason."
      },
      {
-      "p": "The **Changelog** tab lists every Talon version and what it changed, by day and newest first, with the time each was released. **Installed** marks the version you run and **New** the versions after it; **Since** your version shows only those, to see what an update brings. Without internet the changes are still shown, without dates."
+      "p": "The **Changelog** tab lists every Talon version and what it changed, by day and newest first, with the time each was released. **Installed** marks the version you run and **New** the versions after it; **Since** your version shows only those, to see what an update brings. It shows 10 versions a page: **Per page** at the bottom changes that, and **Prev** and **Next** turn the pages. Without internet the changes are still shown, without dates."
      }
     ]
    },
