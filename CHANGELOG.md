@@ -1,3 +1,7 @@
+## 1.0.150
+- Updates: a new full-screen view with the Talon logo in a ring that fills up, what is happening and the time so far
+- When done the ring turns green and the page reloads (or Reload now); if it fails it turns red with the reason
+
 ## 1.0.149
 - Documentation describes the new RAID, Volumes, Backup, Services and Activity pages
 

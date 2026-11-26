@@ -921,7 +921,8 @@ export const GUIDE: Topic[] = [
         title: "Talon",
         blocks: [
           { p: "Opening the **Talon** tab checks for a new version straight away; the arrows next to **Check now** spin while it checks. It shows the installed version and, when there is one, the new version with its release notes and an **Install** button. A button at the bottom of the menu also says when a new version is available." },
-          { p: "An update takes about 1–3 minutes. The web interface restarts and reloads by itself. Shared folders stay available and volumes are not touched. If anything fails, the previous version is restored automatically." },
+          { p: "An update takes about 1–3 minutes. While it runs, the screen shows the Talon logo in a ring that fills up, what is happening (download, back up, install, restart) and the time so far; **Details** shows the technical log. You can close the page: the update continues on the NAS. Shared folders stay available and volumes are not touched." },
+          { p: "When it is done the ring turns green and the page reloads into the new version by itself (or click **Reload now**). If anything fails, the previous version is restored automatically; the ring turns red and shows the reason." },
         ],
       },
       {
