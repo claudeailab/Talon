@@ -1,3 +1,7 @@
+## 1.0.151
+- Restarting the NAS shows the same halo as updates: the logo in a ring that fills up, then turns green when the NAS is back
+- "Reconnecting to Talon" uses the same look
+
 ## 1.0.150
 - Updates: a new full-screen view with the Talon logo in a ring that fills up, what is happening and the time so far
 - When done the ring turns green and the page reloads (or Reload now); if it fails it turns red with the reason

@@ -85,6 +85,7 @@ export const GUIDE: Topic[] = [
         title: "The account menu",
         blocks: [
           { p: "Click your name at the bottom of the menu to **Log out**, **Restart** or **Shut down** the NAS. The moon and sun button switches between dark and light mode." },
+          { p: "While the NAS restarts, the screen shows the Talon logo in a ring that fills up as it shuts down, starts up and reconnects, with the time so far. It usually takes 1–3 minutes; when the NAS is back the ring turns green and the page reloads by itself." },
           { p: "On a phone, open the menu with the button at the top left or by swiping right, and close it by swiping left. It closes by itself when you open a page." },
         ],
       },
