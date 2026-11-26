@@ -149,8 +149,19 @@ class Backup:
             out.append({"uuid": u, "id": e["id"], "dev": e["dev"], "name": e["name"], "fstype": e["fstype"], "disk": e.get("disk"),
                         "media": MEDIA.get(e.get("disk_kind", ""), "Disk"),
                         "fs_label": e["detail"].split(" · ")[-1], "size": e["size"], "kind": e["kind"],
-                        "versions": e["fstype"] in LINKS_FS})
+                        "versions": e["fstype"] in LINKS_FS, "used": self._used(e)})
         return out
+
+    def _used(self, e: dict) -> Optional[int]:
+        """Space used on a backup disk; known while it is mounted (the demo makes it up)."""
+        if self.demo:
+            return int(e["size"] * 0.42)
+        if not e.get("mountpoint"):
+            return None
+        try:
+            return shutil.disk_usage(e["mountpoint"]).used
+        except OSError:
+            return None
 
     def blank_disks(self) -> List[dict]:
         """Disks Talon can prepare for backups (erase and format as ext4): empty ones, ones
@@ -244,7 +255,9 @@ class Backup:
             d = disks.get(t["disk_uuid"])
             tasks.append({**t, "sources": self._sources(t), "connected": bool(d), "disk": d,
                           "progress": self.progress.get(t["id"], {"state": "idle"}),
-                          "snapshots": self._snapshots(t, d) if d else norm_versions(t.get("snapshots_seen"))})
+                          "snapshots": self._snapshots(t, d) if d else norm_versions(t.get("snapshots_seen")),
+                          # how full the disk is: now while it is mounted, else as after the last run
+                          "usage": {"used": d["used"], "total": d["size"]} if d and d.get("used") is not None else t.get("usage")})
         return {"tasks": tasks, "disks": list(disks.values()), "prepare": self.blank_disks(),
                 "sources": self.sources(),
                 "backup_dir": os.path.relpath(self._base("/"), "/")}
@@ -547,7 +560,17 @@ class Backup:
                 shutil.rmtree(os.path.join(base, old), ignore_errors=True)
         run(["sync"], check=False, timeout=600)
         snaps = list_versions(base)
-        self.state.update(lambda d: d["usb_backup"][tid].__setitem__("snapshots_seen", snaps))
+        try:
+            du = shutil.disk_usage(root)
+            usage = {"used": du.used, "total": du.total}
+        except OSError:
+            usage = None
+
+        def keep(d):
+            d["usb_backup"][tid]["snapshots_seen"] = snaps
+            if usage:
+                d["usb_backup"][tid]["usage"] = usage
+        self.state.update(keep)
 
     def _copy(self, task: dict, items: List[dict], dest: str, prev: Optional[str], versions: bool) -> None:
         """rsync each folder into the version, logging every file copied or deleted."""

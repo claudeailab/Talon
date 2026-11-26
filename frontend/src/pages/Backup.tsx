@@ -2,12 +2,12 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Check, ChevronDown, DatabaseBackup, FileText, HardDrive, Minus, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Square, Trash2, Usb } from "lucide-react";
 import { api } from "../lib/api";
-import { ago, bytes, cx, dateTime, duration, rate } from "../lib/format";
+import { ago, bytes, cx, dateTime, duration, pct, rate } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import { Detail, Details, ITEM_MENU, ITEM_ROW, ItemTitle } from "../components/storage";
 import { LogList } from "../components/log";
 import { navigate } from "../lib/router";
-import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Select, Switch } from "../components/ui";
+import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Select, Switch, usageTone } from "../components/ui";
 
 type Disk = { uuid: string; id: string; dev: string; name: string; media: string; fstype: string; fs_label: string; size: number; kind: string; versions: boolean };
 type Task = {
@@ -27,6 +27,8 @@ type Task = {
   disk: Disk | null;
   /** newest first; "at" is null for the single copy on FAT32 / exFAT (Current) */
   snapshots: { name: string; at: number | null }[];
+  /** how full the backup disk is: now while connected, else as after the last run */
+  usage: { used: number; total: number } | null;
   progress: { state: "idle" | "running" | "success" | "error" | "stopped"; share?: string; index?: number; total?: number; percent?: number; speed?: number | null };
 };
 type Blank = { disk: string; name: string; media: string; size: number; kind: string; state: "Empty" | "Has data" | "Old RAID" };
@@ -114,6 +116,19 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
         </ItemTitle>
 
         <div className="min-w-0 space-y-3">
+          {t.usage && t.usage.total > 0 && (
+            <div>
+              <div className="mb-1.5 flex items-baseline justify-between gap-3 text-[13px]">
+                <span>
+                  <span className="text-zinc-500">Backup disk </span>
+                  <span className="tabular font-semibold">{bytes(t.usage.used)}</span>
+                  <span className="text-zinc-500"> of {bytes(t.usage.total)} used</span>
+                </span>
+                <span className="tabular text-zinc-500">{pct(t.usage.used, t.usage.total).toFixed(1)}%</span>
+              </div>
+              <Progress value={pct(t.usage.used, t.usage.total)} tone={usageTone(pct(t.usage.used, t.usage.total))} className="h-1.5" />
+            </div>
+          )}
           {running ? (
             <RunProgress p={t.progress} />
           ) : t.last ? (

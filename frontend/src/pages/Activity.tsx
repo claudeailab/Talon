@@ -4,7 +4,7 @@ import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Info, Search, X
 import { api } from "../lib/api";
 import { ago, cx, dateTime } from "../lib/format";
 import { JobDialog } from "../components/jobs";
-import { Button, Card, CardHeader, Empty, Input, PageHeader, PageLoader, Select } from "../components/ui";
+import { Button, Card, Empty, Input, PageHeader, PageLoader, Select } from "../components/ui";
 
 type Entry = {
   kind: "talon" | "system";
@@ -65,13 +65,12 @@ export default function ActivityPage() {
 
   return (
     <>
-      <PageHeader title="Activity" description="Everything that happens in Talon" />
+      <PageHeader
+        title="Activity"
+        description={d.total != null ? `${d.total.toLocaleString()} event${d.total === 1 ? "" : "s"}${filtered ? " found" : ""}, newest first` : "Talon and the system, newest first"}
+      />
       <Card>
-        <CardHeader
-          title="Activity Log"
-          subtitle={d.total != null ? `${d.total} event${d.total === 1 ? "" : "s"}${filtered ? " found" : ""}` : "Talon and the system, newest first"}
-        />
-        <div className="grid gap-2 px-5 pb-3 sm:grid-cols-[1.2fr_1fr_1.4fr]">
+        <div className="grid gap-2 border-b border-zinc-100 p-4 sm:grid-cols-[1.2fr_1fr_1.4fr] dark:border-white/5">
           <Select
             value={show}
             onChange={(e) => {
@@ -111,49 +110,50 @@ export default function ActivityPage() {
         {d.items.length === 0 ? (
           <Empty icon={<Info className="size-6" />} title={filtered ? "Nothing found" : "Nothing yet"} text={filtered ? "Try another choice or search." : undefined} />
         ) : (
-          <ul className="divide-y divide-zinc-100 px-5 pb-2 dark:divide-white/5">
+          <ul className="divide-y divide-zinc-100 dark:divide-white/5">
             {d.items.map((e, i) => {
               const k = key(e, i);
+              const who =
+                e.kind === "talon"
+                  ? `${e.user} · ${catLabel(e.category)}`
+                  : `System · ${srcLabel(e.source) || e.program}${srcLabel(e.source) && e.program && srcLabel(e.source).toLowerCase() !== e.program ? ` (${e.program})` : ""}`;
               return (
-                <li key={k} className="flex cursor-pointer items-start gap-3 py-3" onClick={() => setOpen(open === k ? null : k)} aria-expanded={open === k}>
+                <li
+                  key={k}
+                  className="grid cursor-pointer grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 px-4 py-2.5 hover:bg-zinc-50 sm:grid-cols-[1rem_minmax(0,1fr)_13rem_6.5rem] sm:items-center dark:hover:bg-white/[0.02]"
+                  onClick={() => setOpen(open === k ? null : k)}
+                  aria-expanded={open === k}
+                >
                   {e.level === "error" ? (
-                    <XCircle className="mt-0.5 size-4 shrink-0 text-rose-500" />
+                    <XCircle className="mt-0.5 size-4 text-rose-500 sm:mt-0" />
                   ) : e.level === "warning" ? (
-                    <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-500" />
+                    <AlertTriangle className="mt-0.5 size-4 text-amber-500 sm:mt-0" />
                   ) : (
-                    <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-500" />
+                    <CheckCircle2 className="mt-0.5 size-4 text-emerald-500 sm:mt-0" />
                   )}
-                  <div className="min-w-0 flex-1">
-                    <div className={cx("text-[13px]", open === k ? "break-words whitespace-normal" : "truncate")} title={e.message}>
-                      {e.message}
-                    </div>
-                    <div className="text-xs text-zinc-500">
-                      {e.kind === "talon" ? (
-                        <>
-                          {e.user} · {catLabel(e.category)}
-                        </>
-                      ) : (
-                        <>
-                          System · {srcLabel(e.source) || e.program}
-                          {srcLabel(e.source) && e.program && srcLabel(e.source).toLowerCase() !== e.program ? ` (${e.program})` : ""}
-                        </>
-                      )}{" "}
-                      · <span title={dateTime(e.ts)}>{ago(e.ts)}</span>
-                      {e.job && (
-                        <>
-                          {" · "}
-                          <button
-                            className="font-medium text-brand-600 hover:underline dark:text-brand-400"
-                            onClick={(ev) => {
-                              ev.stopPropagation();
-                              setJob(e.job!);
-                            }}
-                          >
-                            Details
-                          </button>
-                        </>
-                      )}
-                    </div>
+                  <div className={cx("min-w-0 text-[13px]", open === k ? "break-words whitespace-normal" : "truncate")} title={e.message}>
+                    {e.message}
+                  </div>
+                  <div className="col-start-2 truncate text-xs text-zinc-500 sm:col-start-auto" title={who}>
+                    {who}
+                    <span className="sm:hidden"> · {ago(e.ts)}</span>
+                    {e.job && (
+                      <>
+                        {" · "}
+                        <button
+                          className="font-medium text-brand-600 hover:underline dark:text-brand-400"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            setJob(e.job!);
+                          }}
+                        >
+                          Details
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  <div className="tabular hidden text-right text-xs text-zinc-500 sm:block" title={dateTime(e.ts)}>
+                    {ago(e.ts)}
                   </div>
                 </li>
               );

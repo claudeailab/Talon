@@ -21,6 +21,7 @@ def test_usb_backup_task(client):
     t = client.post("/api/backup", json=body).json()
     done = _wait(client, t["id"])
     assert done["progress"]["state"] == "success" and done["last"]["ok"] and len(done["snapshots"]) == 6
+    assert 0 < done["usage"]["used"] < done["usage"]["total"]                  # how full the backup disk is
     assert client.put(f"/api/backup/{t['id']}", json={"when": "daily", "time": "03:30"}).json()["when"] == "daily"
     acts = [a["message"] for a in client.get("/api/activity", params={"category": "backup"}).json()["items"]]
     assert any("completed" in m for m in acts)

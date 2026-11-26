@@ -39,64 +39,69 @@ export default function ServicesPage() {
     ["Enabled", data.filter((x) => x.enabled)],
     ["Disabled", data.filter((x) => !x.enabled)],
   ];
-  const card = (s: Service) => (
-          <Card key={s.id} className="flex flex-col p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-600 dark:bg-white/5 dark:text-zinc-300">{ICONS[s.id]}</div>
-                <div className="min-w-0">
-                  <div className="[overflow-wrap:anywhere] font-semibold">{s.label}</div>
-                  <div className="flex items-center gap-1.5 text-xs whitespace-nowrap text-zinc-500">
-                    <StatusDot tone={s.active ? "green" : "zinc"} pulse={s.active} />
-                    {!s.installed ? "Not installed" : s.active ? "Running" : "Stopped"}
-                  </div>
-                </div>
-              </div>
-              <Switch
-                checked={s.app ? s.enabled : s.enabled && s.active}
-                disabled={!s.installed || act.isPending}
-                label={`Enable ${s.label}`}
-                onChange={(v) => act.mutate({ id: s.id, action: v ? "enable" : "disable" })}
-              />
-            </div>
-            <p className="mt-3 text-[13px] text-zinc-500 dark:text-zinc-400">{s.description}</p>
-            {s.id === "webdav" && s.enabled && (
-              <p className="mt-1 font-mono text-[12.5px] break-all text-zinc-700 dark:text-zinc-300">{davUrl}</p>
-            )}
-            <div className="mt-4 flex items-center justify-between">
-              {s.app ? (
-                s.enabled ? <Badge tone="green">Enabled</Badge> : <Badge>Disabled</Badge>
-              ) : s.enabled ? (
-                <Badge tone="green">Starts at boot</Badge>
-              ) : (
-                <Badge>Disabled at boot</Badge>
-              )}
-              {s.id === "webdav" ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  icon={<Copy className="size-3.5" />}
-                  disabled={!s.enabled}
-                  onClick={() => navigator.clipboard?.writeText(davUrl).then(() => toast("success", "Address copied"), () => toast("error", "Copy failed"))}
-                >
-                  Copy address
-                </Button>
-              ) : s.id === "sdcard" ? (
-                <Button size="sm" variant="ghost" icon={<BarChart3 className="size-3.5" />} onClick={() => setStats(true)}>
-                  Statistics
-                </Button>
-              ) : s.app ? (
-                <Button size="sm" variant="ghost" icon={<Settings2 className="size-3.5" />} disabled={!s.enabled} onClick={() => navigate(`/${s.id}`)}>
-                  Configure
-                </Button>
-              ) : (
-                <Button size="sm" variant="ghost" icon={<RotateCw className="size-3.5" />} disabled={!s.installed || !s.active} onClick={() => act.mutate({ id: s.id, action: "restart" })}>
-                  Restart
-                </Button>
-              )}
-            </div>
-          </Card>
-);
+  // one row per service; the same columns in both lists, so they line up
+  const ROW =
+    "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-2 px-4 py-3 sm:px-5 lg:grid-cols-[14rem_minmax(0,1fr)_8.5rem_9rem_2.75rem]";
+  const row = (s: Service) => (
+    <div key={s.id} className={ROW}>
+      <div className="col-start-1 row-start-1 flex min-w-0 items-center gap-3 lg:col-start-auto lg:row-start-auto">
+        <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-zinc-100 text-zinc-600 dark:bg-white/5 dark:text-zinc-300 [&>svg]:size-[18px]">{ICONS[s.id]}</div>
+        <div className="min-w-0">
+          <div className="text-[13.5px] font-semibold [overflow-wrap:anywhere]">{s.label}</div>
+          <div className="flex items-center gap-1.5 text-xs whitespace-nowrap text-zinc-500">
+            <StatusDot tone={s.active ? "green" : "zinc"} pulse={s.active} />
+            {!s.installed ? "Not installed" : s.active ? "Running" : "Stopped"}
+          </div>
+        </div>
+      </div>
+      <div className="col-span-2 row-start-2 min-w-0 text-[13px] text-zinc-500 lg:col-span-1 lg:row-start-auto dark:text-zinc-400">
+        {s.description}
+        {s.id === "webdav" && s.enabled && <span className="ml-1.5 font-mono text-[12px] break-all text-zinc-700 dark:text-zinc-300">{davUrl}</span>}
+      </div>
+      <div className="row-start-3 lg:row-start-auto">
+        {s.app ? (
+          s.enabled ? <Badge tone="green">Enabled</Badge> : <Badge>Disabled</Badge>
+        ) : s.enabled ? (
+          <Badge tone="green">Starts at boot</Badge>
+        ) : (
+          <Badge>Disabled at boot</Badge>
+        )}
+      </div>
+      <div className="row-start-3 justify-self-end lg:row-start-auto lg:justify-self-start">
+        {s.id === "webdav" ? (
+          <Button
+            size="sm"
+            variant="ghost"
+            icon={<Copy className="size-3.5" />}
+            disabled={!s.enabled}
+            onClick={() => navigator.clipboard?.writeText(davUrl).then(() => toast("success", "Address copied"), () => toast("error", "Copy failed"))}
+          >
+            Copy address
+          </Button>
+        ) : s.id === "sdcard" ? (
+          <Button size="sm" variant="ghost" icon={<BarChart3 className="size-3.5" />} onClick={() => setStats(true)}>
+            Statistics
+          </Button>
+        ) : s.app ? (
+          <Button size="sm" variant="ghost" icon={<Settings2 className="size-3.5" />} disabled={!s.enabled} onClick={() => navigate(`/${s.id}`)}>
+            Configure
+          </Button>
+        ) : (
+          <Button size="sm" variant="ghost" icon={<RotateCw className="size-3.5" />} disabled={!s.installed || !s.active} onClick={() => act.mutate({ id: s.id, action: "restart" })}>
+            Restart
+          </Button>
+        )}
+      </div>
+      <div className="col-start-2 row-start-1 justify-self-end lg:col-start-auto lg:row-start-auto">
+        <Switch
+          checked={s.app ? s.enabled : s.enabled && s.active}
+          disabled={!s.installed || act.isPending}
+          label={`Enable ${s.label}`}
+          onChange={(v) => act.mutate({ id: s.id, action: v ? "enable" : "disable" })}
+        />
+      </div>
+    </div>
+  );
   return (
     <>
       <PageHeader title="Services" description="System services" />
@@ -105,11 +110,11 @@ export default function ServicesPage() {
       )}
       {groups.map(([title, list]) =>
         list.length ? (
-          <section key={title} className="mb-6">
-            <h2 className="mb-2.5 text-xs font-semibold tracking-wide text-zinc-500 uppercase">
+          <section key={title} className="mb-5">
+            <h2 className="mb-2 text-xs font-semibold tracking-wide text-zinc-500 uppercase">
               {title} · {list.length}
             </h2>
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{list.map(card)}</div>
+            <Card className="divide-y divide-zinc-100 overflow-hidden dark:divide-white/5">{list.map(row)}</Card>
           </section>
         ) : null,
       )}

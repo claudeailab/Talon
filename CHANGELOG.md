@@ -1,3 +1,8 @@
+## 1.0.147
+- Backup: each card shows how full the backup disk is
+- Services: one compact list with aligned columns instead of large cards
+- Activity: one line per event, twice as many on screen
+
 ## 1.0.146
 - RAID, Volumes and Backup: each card is one row; disks, shared folders and backup contents sit under the bar, no empty gaps
 - On laptops the name runs across the top, with the bar and its facts side by side below
