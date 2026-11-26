@@ -110,11 +110,11 @@ def fetch_changelog(repo: str) -> list:
 
 
 def local_changelog() -> list:
+    """The CHANGELOG.md installed with Talon, without dates (the first place that has one)."""
     for p in LOCAL_CHANGELOG:
-        try:
-            return [{**v, "date": None} for v in parse_changelog(read_file(p))]
-        except OSError:
-            continue
+        versions = parse_changelog(read_file(p))          # "" when the file is not there
+        if versions:
+            return [{**v, "date": None} for v in versions]
     return []
 
 
