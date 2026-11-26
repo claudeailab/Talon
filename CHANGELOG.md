@@ -1,3 +1,7 @@
+## 1.0.159
+- Settings → Network: after an address change the page opens the new address by itself, instead of waiting at "Applying the new settings…"
+- It says what happens and when, with Open now
+
 ## 1.0.158
 - Settings → Network: HTTPS has its own card at the top; the Save button belongs only to the network address below
 

@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Loader2 } from "lucide-react";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
 import { useAction } from "../lib/hooks";
@@ -293,20 +293,60 @@ function WebCard() {
 }
 
 /** Shown after applying: waits until the NAS is reached again, or the change is undone. */
+/**
+ * After a network change: Talon keeps the change once it is reached at its new address,
+ * and goes back to the previous settings after 3 minutes if it is not. This page asks the
+ * old address how it goes; when Talon has moved, that address stops answering, so the page
+ * goes to the new address by itself: as soon as it answers (plain http), or a few seconds
+ * after the old one went quiet (https: the browser cannot test an address whose certificate
+ * it has not accepted yet, and shows its warning there first).
+ */
 function Moving({ target, onDone }: { target: { url: string | null; mode: "dhcp" | "static" }; onDone: () => void }) {
   const toast = useToast();
   const qc = useQueryClient();
   const [now, setNow] = useState(Date.now() / 1000);
+  const [gone, setGone] = useState<number | null>(null);          // when the old address stopped answering
   const q = useQuery({
     queryKey: ["network-pending"],
     queryFn: () => api.get<NetInfo>("/network"),
     refetchInterval: 2000,
     retry: false,
   });
+  // the new address is somewhere else (not the same address made static)
+  const elsewhere = !!target.url && new URL(target.url).host !== location.host;
+  const go = () => {
+    if (target.url) location.href = target.url;
+  };
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now() / 1000), 1000);
     return () => clearInterval(t);
   }, []);
+  useEffect(() => {
+    if (q.isError && gone === null) setGone(Date.now() / 1000);
+  }, [q.isError, gone]);
+  // knock on the new address; open it as soon as it answers
+  useEffect(() => {
+    if (!elsewhere) return;
+    let stop = false;
+    const probe = async () => {
+      try {
+        await fetch(new URL("/api/health", target.url!), { mode: "no-cors", cache: "no-store" });
+        if (!stop) go();
+      } catch {
+        /* not there yet, or a certificate the browser has not accepted */
+      }
+    };
+    const t = setInterval(probe, 2000);
+    return () => {
+      stop = true;
+      clearInterval(t);
+    };
+  }, [elsewhere]); // eslint-disable-line react-hooks/exhaustive-deps
+  const WAIT = 6;
+  const opening = elsewhere && gone !== null ? Math.max(0, Math.ceil(gone + WAIT - now)) : null;
+  useEffect(() => {
+    if (opening === 0) go();
+  }, [opening]); // eslint-disable-line react-hooks/exhaustive-deps
   const pending = q.data?.pending;
   useEffect(() => {
     if (q.data && !q.data.pending && q.dataUpdatedAt > 0) {
@@ -316,8 +356,26 @@ function Moving({ target, onDone }: { target: { url: string | null; mode: "dhcp"
     }
   }, [q.data, q.dataUpdatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
   const left = pending?.applied ? Math.max(0, Math.round(pending.deadline - now)) : null;
+  const moved = gone !== null;
   return (
-    <Modal open onClose={onDone} title="Network settings applied" description="Waiting for Talon to be reached at its new address" footer={<Button onClick={onDone}>Close</Button>}>
+    <Modal
+      open
+      onClose={onDone}
+      title={moved ? "Talon has moved" : "Applying the network settings"}
+      description={moved ? "It now answers at its new address" : "This takes a few seconds"}
+      footer={
+        <>
+          <Button variant="ghost" onClick={onDone}>
+            Close
+          </Button>
+          {target.url && elsewhere && (
+            <Button variant="primary" icon={<ExternalLink className="size-4" />} onClick={go}>
+              Open now
+            </Button>
+          )}
+        </>
+      }
+    >
       <div className="space-y-4 text-sm">
         {pending?.error ? (
           <Callout tone="danger" title="The change failed; nothing was changed">
@@ -328,7 +386,7 @@ function Moving({ target, onDone }: { target: { url: string | null; mode: "dhcp"
             {target.url ? (
               <>
                 <p className="text-zinc-600 dark:text-zinc-400">
-                  {target.mode === "static" ? "Open Talon at its new address:" : "Open Talon by its name; your router has given it a new address:"}
+                  {target.mode === "static" ? "The new address:" : "Talon by its name; your router has given it a new address:"}
                 </p>
                 <a
                   href={target.url}
@@ -341,10 +399,23 @@ function Moving({ target, onDone }: { target: { url: string | null; mode: "dhcp"
             ) : (
               <p className="text-zinc-600 dark:text-zinc-400">Your router has given Talon a new address. Look it up in your router and open Talon there.</p>
             )}
-            <p className="text-[13px] text-zinc-500">
-              {left === null
-                ? "Applying the new settings…"
-                : `Previous settings return in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")} if Talon is not opened there.`}
+            <div className="flex items-center gap-2.5 text-[13px] text-zinc-600 dark:text-zinc-300">
+              <Loader2 className="size-4 shrink-0 animate-spin text-brand-500" />
+              {opening !== null
+                ? opening > 0
+                  ? `Opening the new address in ${opening} s…`
+                  : "Opening the new address…"
+                : moved
+                  ? "Open the new address above to keep the change."
+                  : elsewhere
+                    ? "Switching to the new address; this page follows by itself."
+                    : "Applying the new settings…"}
+            </div>
+            <p className="text-xs text-zinc-500">
+              {target.url?.startsWith("https:") && elsewhere && "If the browser warns about the connection there, continue as on the first visit (Talon uses its own certificate). "}
+              {left !== null
+                ? `If Talon is not opened there within ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}, the previous settings come back by themselves.`
+                : "If Talon is not opened there within 3 minutes, the previous settings come back by themselves."}
             </p>
           </>
         )}

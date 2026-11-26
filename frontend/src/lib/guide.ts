@@ -973,7 +973,7 @@ export const GUIDE: Topic[] = [
               "Choose **Static**. The fields start with the current values.",
               "Enter the **Address**, **Subnet mask** (usually 255.255.255.0), **Gateway** (usually your router) and a **DNS server** (your router or, for example, 1.1.1.1). A **Second DNS server** is optional.",
               "Click **Save** in the bar at the bottom of the card, then **Apply**.",
-              "Open Talon at the new address shown, for example https://192.168.1.60/.",
+              "The page opens the new address by itself a few seconds after the NAS moved (or click **Open now**). With HTTPS on, the browser warns about the connection there once: continue as on the first visit. Opening Talon there keeps the change.",
             ],
           },
           { img: "settings-network", alt: "Network settings" },
