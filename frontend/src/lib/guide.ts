@@ -203,6 +203,7 @@ export const GUIDE: Topic[] = [
         title: "Look after an array",
         blocks: [
           { img: "raid", alt: "RAID page" },
+          { p: "Each array shows its RAID level, its volumes and the space still free for more, its capacity, how many disk failures it survives and its disks, each with a dot: green when it works, violet while it rebuilds, red when it failed. A rebuild or data scrub shows a second bar with its progress and speed." },
           { p: "Open the **⋯** menu of an array for these actions:" },
           {
             list: [
@@ -283,7 +284,7 @@ export const GUIDE: Topic[] = [
           { img: "volumes", alt: "Volumes page" },
           {
             list: [
-              "Each volume shows its used and free space and whether it survives disk failures.",
+              "Each volume shows its used and free space as a bar, how many disk failures it survives, its disks and its shared folders.",
               "**⋯ → Browse files** opens the volume on the [Browser](/browser) page.",
               "**Change size** grows or shrinks a volume that shares a RAID array (see above).",
               "**Expand filesystem** appears on a volume that takes a whole RAID array after the array has grown.",
@@ -625,6 +626,7 @@ export const GUIDE: Topic[] = [
         title: "Versions and restoring",
         blocks: [
           { p: "On disks formatted as ext4, XFS, Btrfs or NTFS, every backup is a dated version, a folder named after the date and time in the date format of [Settings](/settings), for example 24-11-2026_1240; files that did not change take no extra space. A backup that is stopped or fails leaves no half version behind. Versions older than the number of days you chose are removed, and the newest is always kept. FAT32 and exFAT cannot do this: there the backup is one copy, kept up to date." },
+          { p: "Each backup shows its disk and schedule, how full the backup disk is (the bar turns amber, then red, as it fills up; for a disk that is not connected, as after the last backup), when it last ran and how long it took, or why it failed, what it copies and how many versions it keeps. While it runs, a second bar shows the folder being copied, its progress and speed. **Back up now** and **Restore** are next to it." },
           { p: "**Restore** lists the versions. Choosing one opens it in [Browser](/browser), where you can download a file or move it back to a volume." },
           { p: "**⋯ → Edit** changes the folders or the schedule; **Delete** removes the backup task but keeps the backups on the disk." },
           { p: "**⋯ → View log** shows the progress of a running backup and every file it copies or deletes, keeping the newest line in view; scroll up to read earlier lines. After a run it shows that run's log, with the error if it failed." },
@@ -885,7 +887,7 @@ export const GUIDE: Topic[] = [
         title: "Activity log",
         blocks: [
           { img: "activity", alt: "Activity" },
-          { p: "The **Activity Log** lists everything that happens in Talon: every change made in the web interface, sign-ins, OneDrive and scheduled task runs with their results, alerts and emails, updates and restarts, with who did it and when. **Details** next to a background task, such as creating a RAID array or wiping a disk, shows each step it ran, also after a restart." },
+          { p: "The [Activity](/activity) page lists everything that happens in Talon, one line per event: every change made in the web interface, sign-ins, OneDrive and scheduled task runs with their results, alerts and emails, updates and restarts, with who did it and when. The number of events is shown next to the page title. **Details** next to a background task, such as creating a RAID array or wiping a disk, shows each step it ran, also after a restart." },
           { p: "It also shows the **system logs**: what the operating system and its services wrote to the system journal, such as Samba, NFS, SSH, disks (S.M.A.R.T. and RAID), the kernel and Talon's own service. **Everything** shows both, newest first." },
           { p: "Choose what to show in the first list: **Everything**, **All Talon activity** or one kind of operation (for example OneDrive or Scheduled), or **All system logs** or one service (for example Samba when a computer cannot connect to a shared folder). Show **Warnings and errors** or **Errors only**, and **Search** for words. Tap an entry to read it in full; **Newer** and **Older** page through the list, and **Per page** sets how many entries a page shows (10 by default). The newest 20,000 Talon entries are kept." },
         ],
@@ -1017,10 +1019,10 @@ export const GUIDE: Topic[] = [
               "**OneDrive**: backup and sync with Microsoft OneDrive. See [OneDrive](" + t("onedrive") + ").",
               "**WebDAV**: shared folders over HTTPS for apps and remote access.",
               "**Antivirus**: virus scans of volumes with ClamAV. See [Antivirus](" + t("antivirus") + ").",
-              "**SD-card protection**: keeps the system logs in memory and writes them to the disk once a day and when the NAS shuts down or restarts, so an SD card or USB flash drive lasts much longer. Recommended when Talon runs from one; it applies after the next restart. After a power cut, up to a day of system logs can be lost; your files are not affected. **Statistics** on its card shows how much is written to the disk a day and how much of it are system logs, so you can see what it would save; once it runs, it shows what it saved.",
+              "**SD-card protection**: keeps the system logs in memory and writes them to the disk once a day and when the NAS shuts down or restarts, so an SD card or USB flash drive lasts much longer. Recommended when Talon runs from one; it applies after the next restart. After a power cut, up to a day of system logs can be lost; your files are not affected. **Statistics** on its row shows how much is written to the disk a day and how much of it are system logs, so you can see what it would save; once it runs, it shows what it saved.",
             ],
           },
-          { p: "The page lists the **Enabled** services first, then the **Disabled** ones. Turn a service on or off with its switch; it then also starts, or no longer starts, at boot. **Restart** restarts a running service." },
+          { p: "The page lists the **Enabled** services first, then the **Disabled** ones, one row each: its status, what it does, whether it starts at boot, an action and a switch. Turn a service on or off with its switch; it then also starts, or no longer starts, at boot. **Restart** restarts a running service." },
           { p: "After installing Talon, **NFS**, **Bonjour (mDNS)**, **OneDrive**, **WebDAV**, **Antivirus** and **SD-card protection** are off: turn on the ones you need." },
         ],
       },

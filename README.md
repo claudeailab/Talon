@@ -57,7 +57,7 @@ https://<nas-ip>/
 - **Disks:** S.M.A.R.T. health, temperatures, self-tests and wipe
 - **RAID:** hot spares, expansion, disk replacement and data scrub
 - **Volumes:** ext4 or XFS on a single disk, or several on one RAID array, each with its own size
-- **Backup:** to a USB or internal disk when plugged in or daily, with earlier versions
+- **Backup:** to a USB or internal disk when plugged in or daily, with earlier versions and a live log
 - **Browser:** browse volumes, other disks and OneDrive in the web interface
 - **Recycle bin:** restore deleted files and earlier versions for 30 days
 - **OneDrive:** backup or two-way sync, verified after each run
