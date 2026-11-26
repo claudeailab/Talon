@@ -1,3 +1,7 @@
+## 1.0.152
+- Updates: a new Changelog tab lists every version and its changes by day, with the time it was released
+- "Since" your version shows only what newer versions bring
+
 ## 1.0.151
 - Restarting the NAS shows the same halo as updates: the logo in a ring that fills up, then turns green when the NAS is back
 - "Reconnecting to Talon" uses the same look

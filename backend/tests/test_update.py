@@ -92,3 +92,41 @@ def test_update_auto_install_and_os_interval(client):
     assert os_["auto"]["interval_hours"] == 24
     assert client.put("/api/os-update/auto", json={"interval_hours": 168}).json()["auto"]["interval_hours"] == 168
     assert client.put("/api/os-update/auto", json={"interval_hours": 5}).status_code == 400
+
+
+def test_parse_changelog():
+    text = "# notes\n\n## 1.0.3\n- Three\n- Three b\n\n## 1.0.2\n\n## v1.0.1\n- One\nnot a change\n"
+    assert update.parse_changelog(text) == [{"version": "1.0.3", "items": ["Three", "Three b"]},
+                                            {"version": "1.0.1", "items": ["One"]}]
+
+
+def test_changelog_from_github_with_dates(tmp_path, monkeypatch):
+    from talon.config import Config
+    from talon.state import State
+    cfg = Config(state_file=str(tmp_path / "s.json"), update_status_file=str(tmp_path / "u.json"))
+    u = update.Updater(cfg, State(cfg.state_file))
+
+    def fake_get(url, timeout=15):
+        if url.endswith("CHANGELOG.md"):
+            return b"## 9.0.1\n- Newer\n\n## 9.0.0\n- Older\n"
+        return json.dumps([{"tag_name": "v9.0.1", "published_at": "2026-11-26T15:04:36Z"},
+                           {"tag_name": "v9.0.0", "published_at": "2026-11-23T12:00:00Z"}]).encode()
+    monkeypatch.setattr(update, "_get", fake_get)
+    cl = u.changelog()
+    assert cl["error"] is None and cl["current"] == u.current
+    assert [v["version"] for v in cl["versions"]] == ["9.0.1", "9.0.0"]
+    assert cl["versions"][0]["date"] == 1795705476.0                       # 2026-11-26 15:04:36 UTC
+
+    # offline: the copy installed with Talon, without dates, and the reason
+    u._changelog = {}
+    monkeypatch.setattr(update, "fetch_changelog", lambda repo: (_ for _ in ()).throw(update.UserError("Could not reach GitHub: down")))
+    cl = u.changelog()
+    assert cl["error"].startswith("Could not reach GitHub") and cl["versions"]
+    assert cl["versions"][0]["date"] is None and cl["versions"][0]["items"]
+
+
+def test_changelog_api(client):
+    cl = client.get("/api/update/changelog").json()
+    assert cl["versions"] and all(v["items"] for v in cl["versions"])
+    assert any(v["version"] == cl["current"] for v in cl["versions"])            # the installed one is listed
+    assert all(v["date"] for v in cl["versions"])                                # the demo makes up dates

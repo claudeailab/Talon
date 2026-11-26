@@ -172,6 +172,7 @@ chmod 700 "$CONF_DIR" "$STATE_DIR"
 rm -rf "$PREFIX/app.new"
 mkdir -p "$PREFIX/app.new"
 cp -a "$SRC/backend/talon" "$SRC/backend/requirements.txt" "$PREFIX/app.new/"
+cp "$SRC/CHANGELOG.md" "$PREFIX/app.new/" 2>/dev/null || true   # the Changelog tab, offline
 rm -rf "$PREFIX/app"
 mv "$PREFIX/app.new" "$PREFIX/app"
 cp "$SRC/uninstall.sh" "$PREFIX/uninstall.sh" 2>/dev/null && chmod 755 "$PREFIX/uninstall.sh" || true

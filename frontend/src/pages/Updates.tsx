@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, Download, ExternalLink, Package, RefreshCw, RotateCcw, ShieldAlert } from "lucide-react";
 import { api } from "../lib/api";
-import { ago, cx, date } from "../lib/format";
+import { ago, clock, cx, date } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import { useSearch } from "../lib/router";
 import { restartNas } from "../components/restart";
@@ -25,11 +25,12 @@ type OsInfo = {
   last_install: { at: number; ok: boolean; count: number; error?: string } | null;
 };
 
-type TabId = "settings" | "talon" | "system";
+type TabId = "settings" | "talon" | "system" | "changelog";
 const TABS: { value: TabId; label: string }[] = [
   { value: "settings", label: "Settings" },
   { value: "talon", label: "Talon" },
   { value: "system", label: "System" },
+  { value: "changelog", label: "Changelog" },
 ];
 
 const CHECK_EVERY: [number, string][] = [
@@ -52,7 +53,7 @@ const useOs = () =>
 export default function UpdatesPage() {
   const tabOf = (search: string): TabId => {
     const t = new URLSearchParams(search).get("tab");
-    return t === "talon" || t === "system" ? t : "settings";
+    return t === "talon" || t === "system" || t === "changelog" ? t : "settings";
   };
   const [tab, setTab] = useState<TabId>(() => tabOf(location.search));
   // links from the bell or the menu (?tab=talon) while the page is open
@@ -71,6 +72,7 @@ export default function UpdatesPage() {
       {tab === "settings" && <SettingsTab open={change} />}
       {tab === "talon" && <TalonTab />}
       {tab === "system" && <SystemTab />}
+      {tab === "changelog" && <ChangelogTab />}
     </>
   );
 }
@@ -579,5 +581,102 @@ function PkgList({ pkgs }: { pkgs: Pkg[] }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/* ---------------------------------------------------------------- Changelog */
+
+type Release = { version: string; date: number | null; items: string[] };
+type Changelog = { current: string; versions: Release[]; error: string | null };
+
+/** 1.0.12 → [1, 0, 12]; newer(a, b): a is a later version than b */
+const parts = (v: string) => v.split(".").map((x) => parseInt(x, 10) || 0);
+const newer = (a: string, b: string) => {
+  const x = parts(a);
+  const y = parts(b);
+  for (let i = 0; i < Math.max(x.length, y.length); i++) if ((x[i] ?? 0) !== (y[i] ?? 0)) return (x[i] ?? 0) > (y[i] ?? 0);
+  return false;
+};
+
+/** "Today", "Yesterday" or the date, for a day heading */
+function dayLabel(ts: number): { name: string; date: string } {
+  const d = new Date(ts * 1000);
+  const t = new Date();
+  const days = Math.round((new Date(t.getFullYear(), t.getMonth(), t.getDate()).getTime() - new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) / 86400000);
+  const name = days === 0 ? "Today" : days === 1 ? "Yesterday" : d.toLocaleDateString(undefined, { weekday: "long" });
+  return { name: days < 7 ? name : "", date: date(ts) };
+}
+
+/** Every Talon version and what it changed, by day, newest first; or only the versions after the installed one. */
+function ChangelogTab() {
+  const q = useQuery({ queryKey: ["update-changelog"], queryFn: () => api.get<Changelog>("/update/changelog"), staleTime: 300_000 });
+  const [since, setSince] = useState<"all" | "since">("all");
+  if (!q.data) return <PageLoader />;
+  const { current, versions, error } = q.data;
+  const list = since === "since" ? versions.filter((v) => newer(v.version, current)) : versions;
+  // consecutive versions released on the same day share a heading; undated ones one at the end
+  const groups: { key: string; head: { name: string; date: string } | null; items: Release[] }[] = [];
+  for (const v of list) {
+    const head = v.date ? dayLabel(v.date) : null;
+    const key = head ? head.date : "undated";
+    if (groups.at(-1)?.key === key) groups.at(-1)!.items.push(v);
+    else groups.push({ key, head, items: [v] });
+  }
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Segmented
+          value={since}
+          onChange={setSince}
+          options={[
+            { value: "all", label: "All versions" },
+            { value: "since", label: `Since ${current}` },
+          ]}
+        />
+        {error && <span className="text-xs text-zinc-500">Dates appear when Talon can reach GitHub.</span>}
+      </div>
+      {list.length === 0 ? (
+        <RowCard>
+          <div className="px-5 py-8 text-center text-[13.5px] text-zinc-500">
+            {since === "since" ? `Nothing newer than ${current}: Talon is up to date.` : "The changelog is not available."}
+          </div>
+        </RowCard>
+      ) : (
+        groups.map((g) => (
+          <section key={g.key}>
+            <h3 className="mb-2 ml-0.5 text-xs font-semibold tracking-wider text-zinc-500 uppercase">
+              {g.head ? (
+                <>
+                  {g.head.name || g.head.date}
+                  {g.head.name && <span className="ml-1.5 font-medium tracking-normal text-zinc-400 normal-case">{g.head.date}</span>}
+                </>
+              ) : (
+                "Date not known"
+              )}
+            </h3>
+            <RowCard>
+              <div className="divide-y divide-zinc-100 dark:divide-white/5">
+                {g.items.map((v) => (
+                  <div key={v.version} className="px-5 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="rounded-full bg-zinc-100 px-2 py-0.5 font-mono text-xs font-semibold text-zinc-700 dark:bg-white/10 dark:text-zinc-200">{v.version}</span>
+                      {v.version === current ? <Badge tone="green">Installed</Badge> : newer(v.version, current) ? <Badge tone="blue">New</Badge> : null}
+                      {v.date && <span className="tabular ml-auto text-xs text-zinc-400">{clock(v.date)}</span>}
+                    </div>
+                    <ul className="mt-1.5 space-y-0.5">
+                      {v.items.map((it, i) => (
+                        <li key={i} className="relative pl-3.5 text-[13.5px] leading-relaxed text-zinc-700 before:absolute before:top-[9px] before:left-0.5 before:size-[5px] before:rounded-full before:bg-brand-300 dark:text-zinc-300 dark:before:bg-brand-400/60">
+                          {it}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </RowCard>
+          </section>
+        ))
+      )}
+    </div>
   );
 }

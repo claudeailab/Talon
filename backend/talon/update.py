@@ -4,6 +4,7 @@ The actual installation is done by ``talon.updater`` running in its own
 transient systemd unit, so it survives the restart of the web service."""
 from __future__ import annotations
 
+import calendar
 import json
 import os
 import re
@@ -54,6 +55,69 @@ def fetch_latest_release(repo: str, timeout: float = 15) -> dict:
             "published_at": data.get("published_at")}
 
 
+# ---------------------------------------------------------------- changelog
+CHANGELOG_TTL = 3600
+_PKG = os.path.dirname(os.path.abspath(__file__))
+# the installer copies CHANGELOG.md next to the package; in a checkout it is two levels up
+LOCAL_CHANGELOG = (os.path.join(os.path.dirname(_PKG), "CHANGELOG.md"),
+                   os.path.join(os.path.dirname(os.path.dirname(_PKG)), "CHANGELOG.md"))
+
+
+def parse_changelog(text: str) -> list:
+    """CHANGELOG.md ("## 1.0.5" then "- change" lines) as [{"version", "items"}], newest first."""
+    out: list = []
+    for line in text.splitlines():
+        m = re.match(r"^##\s+v?(\d+\.\d+\.\d+)\s*$", line)
+        if m:
+            out.append({"version": m.group(1), "items": []})
+        elif out and line.startswith("- "):
+            out[-1]["items"].append(line[2:].strip())
+    return [v for v in out if v["items"]]
+
+
+def _iso_ts(s) -> Optional[float]:
+    try:
+        return float(calendar.timegm(time.strptime(s, "%Y-%m-%dT%H:%M:%SZ"))) if s else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _get(url: str, timeout: float = 15):
+    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json", "User-Agent": USER_AGENT})
+    with urllib.request.urlopen(req, timeout=timeout, context=ssl.create_default_context()) as r:
+        return r.read()
+
+
+def fetch_changelog(repo: str) -> list:
+    """The changelog from GitHub (it includes versions newer than the installed one) with
+    each version's release date from the list of releases."""
+    if not re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", repo):
+        raise UserError("Invalid update repository")
+    try:
+        versions = parse_changelog(_get(f"https://raw.githubusercontent.com/{repo}/main/CHANGELOG.md").decode("utf-8", "replace"))
+        dates = {}
+        for page in range(1, 6):                   # 100 releases a page, newest first
+            rels = json.loads(_get(f"https://api.github.com/repos/{repo}/releases?per_page=100&page={page}"))
+            for r in rels:
+                dates[(r.get("tag_name") or "").lstrip("v")] = _iso_ts(r.get("published_at"))
+            if len(rels) < 100:
+                break
+    except urllib.error.HTTPError as e:
+        raise UserError(f"Update server returned HTTP {e.code}") from e
+    except (urllib.error.URLError, OSError, ValueError) as e:
+        raise UserError(f"Could not reach GitHub: {getattr(e, 'reason', e)}") from e
+    return [{**v, "date": dates.get(v["version"])} for v in versions]
+
+
+def local_changelog() -> list:
+    for p in LOCAL_CHANGELOG:
+        try:
+            return [{**v, "date": None} for v in parse_changelog(read_file(p))]
+        except OSError:
+            continue
+    return []
+
+
 class Updater:
     """Checks for releases and starts / reports updates."""
 
@@ -62,6 +126,7 @@ class Updater:
         self.state = state
         self.current = __version__
         self._lock = threading.Lock()
+        self._changelog: dict = {}
 
     # ------------------------------------------------------------ checking
     def check(self, force: bool = False) -> dict:
@@ -81,6 +146,23 @@ class Updater:
                 result = {**cached, "error": str(e), "checked_at": time.time()}
         self.state.update(lambda d: d.__setitem__("update_check", result))
         return result
+
+    def changelog(self) -> dict:
+        """Every version with its changes and release date, newest first. From GitHub,
+        kept for an hour; offline, the copy installed with Talon (without dates)."""
+        c = self._changelog
+        if c.get("versions") and time.time() - c.get("at", 0) < CHANGELOG_TTL:
+            return {"current": self.current, "versions": c["versions"], "error": None}
+        try:
+            versions = self._fetch_changelog()
+            self._changelog = {"versions": versions, "at": time.time()}
+            return {"current": self.current, "versions": versions, "error": None}
+        except UserError as e:
+            versions = c.get("versions") or local_changelog()
+            return {"current": self.current, "versions": versions, "error": str(e)}
+
+    def _fetch_changelog(self) -> list:
+        return fetch_changelog(self.cfg.repo)
 
     def interval(self) -> int:
         """Hours between automatic checks (0: never)."""
@@ -189,6 +271,15 @@ class DemoUpdater(Updater):
         super().__init__(cfg, state)
         self._status = {"state": "idle"}
         self.restarting_until = 0.0
+
+    def _fetch_changelog(self) -> list:
+        """The installed changelog, a release every three hours back from now, and the
+        demo's pretend new version on top."""
+        now = time.time()
+        local = [{**v, "date": now - (i + 1) * 3 * 3600} for i, v in enumerate(local_changelog())]
+        nxt = self.check().get("latest")
+        new = [{"version": nxt, "items": ["A pretend new version, to try updates in the demo"], "date": now - 600}] if nxt and is_newer(nxt, self.current) else []
+        return new + local
 
     def check(self, force: bool = False) -> dict:
         nxt = "1.1.0" if self.current == __version__ else self.current

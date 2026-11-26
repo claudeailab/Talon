@@ -362,6 +362,10 @@ def create_app(cfg, platform) -> FastAPI:
     def update_info(_u: str = Depends(current_user)):
         return updater.info()
 
+    @app.get("/api/update/changelog")
+    def update_changelog(_u: str = Depends(current_user)):
+        return updater.changelog()
+
     @app.post("/api/update/check")
     def update_check(_u: str = Depends(current_user)):
         updater.check(force=True)
