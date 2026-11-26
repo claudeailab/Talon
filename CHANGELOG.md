@@ -1,3 +1,8 @@
+## 1.0.160
+- Settings save by themselves everywhere: a choice right away, a text field when you leave it or press Enter; no Save buttons on any settings page
+- Only moving the NAS to another network address has a button (Apply); dialogs keep Create and Save
+- Settings fields and lists have one width and line up across pages; Thresholds use the same rows as the other settings
+
 ## 1.0.159
 - Settings → Network: after an address change the page opens the new address by itself, instead of waiting at "Applying the new settings…"
 - It says what happens and when, with Open now

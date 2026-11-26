@@ -120,7 +120,7 @@ export default function NetworkTab() {
   const sameAddress = f.mode === "static" && f.address.trim() === iface.address;
 
   const field = (k: "address" | "subnet" | "gateway" | "dns1" | "dns2", placeholder: string) => (
-    <div className="w-full sm:w-56">
+    <div className="w-full sm:w-72">
       <Input value={f[k]} onChange={(e) => set(k, e.target.value)} placeholder={placeholder} inputMode="decimal" className="tabular" aria-label={k} />
       {errors[k] && <div className="mt-1 text-xs text-rose-600 dark:text-rose-400">{errors[k]}</div>}
     </div>
@@ -147,7 +147,7 @@ export default function NetworkTab() {
       )}
       {q.data.interfaces.length > 1 && (
         <Row label="Interface">
-          <Select value={iface.name} onChange={(e) => setName(e.target.value)} className="w-full sm:w-56" aria-label="Interface">
+          <Select value={iface.name} onChange={(e) => setName(e.target.value)} className="w-full sm:w-72" aria-label="Interface">
             {q.data.interfaces.map((i) => (
               <option key={i.name} value={i.name}>
                 {i.name}
@@ -189,7 +189,15 @@ export default function NetworkTab() {
           <Row label="Second DNS server" hint="Optional">{field("dns2", "1.1.1.1")}</Row>
         </>
       )}
-      <SaveBar show={changed} onDiscard={() => setF(start)} disabled={!valid || locked} onSave={() => setConfirm(true)} />
+      {/* the one setting with a button: it moves the NAS, so it is applied on purpose, with a way back */}
+      <SaveBar
+        show={changed}
+        note="Applied together: Talon moves to the new address and comes back if it is not reached there in 3 minutes"
+        saveText="Apply"
+        onDiscard={() => setF(start)}
+        disabled={!valid || locked}
+        onSave={() => setConfirm(true)}
+      />
       <ConfirmDialog
         open={confirm}
         onClose={() => setConfirm(false)}

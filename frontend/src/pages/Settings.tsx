@@ -5,8 +5,9 @@ import { api } from "../lib/api";
 import { DATE_FORMATS } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Settings } from "../lib/types";
-import { Input, PageHeader, PageLoader, Select, Switch, Tabs } from "../components/ui";
-import { Row, RowCard, SaveBar, Section } from "../components/rows";
+import { PageHeader, PageLoader, Select, Switch, Tabs } from "../components/ui";
+import { Row, RowCard, Section } from "../components/rows";
+import { AutoField } from "../components/autosave";
 import { useSearch } from "../lib/router";
 import EntraTab from "./SettingsEntra";
 import NetworkTab from "./SettingsNetwork";
@@ -44,70 +45,72 @@ export default function SettingsPage() {
   );
 }
 
+/** Settings → General: every setting saves as soon as it changes (a text field when you leave it). */
 function GeneralTab() {
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.get<Settings>("/settings") });
   const tz = useQuery({ queryKey: ["timezones"], queryFn: () => api.get<string[]>("/settings/timezones"), staleTime: Infinity });
-  const [form, setForm] = useState<Settings | null>(null);
-  useEffect(() => {
-    if (settings.data) setForm(settings.data);
-  }, [settings.data]);
   const save = useAction((body: Partial<Settings>) => api.put<Settings>("/settings", body), {
-    success: "Settings saved",
+    success: "Saved",
     invalidate: ["settings", "system", "dashboard"],
   });
-  if (!form || !settings.data) return <PageLoader />;
-  const set = <K extends keyof Settings>(k: K, v: Settings[K]) => setForm({ ...form, [k]: v });
-  const FIELDS = ["hostname", "timezone", "workgroup", "smb_min_protocol", "smb_macos_compat", "date_format", "time_format"] as const;
-  const changes = FIELDS.filter((k) => form[k] !== settings.data![k]).length;
-  const W = "w-full sm:w-64";
+  const d = settings.data;
+  if (!d) return <PageLoader />;
+  const put = <K extends keyof Settings>(k: K, v: Settings[K]) => save.mutateAsync({ [k]: v } as Partial<Settings>);
+  const W = "w-full sm:w-72";
   return (
     <RowCard>
       <Section title="This NAS" />
-      <Row label="Name" hint={`Reachable as ${form.hostname}.local when Bonjour is on under Services`}>
-        <Input value={form.hostname} onChange={(e) => set("hostname", e.target.value)} className={W} aria-label="Name" />
+      <Row label="Name" hint={`Reachable as ${d.hostname}.local when Bonjour is on under Services`}>
+        <AutoField
+          value={d.hostname}
+          onSave={(v) => put("hostname", v)}
+          filter={(v) => v.replace(/\s/g, "")}
+          validate={(v) => (/^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(v) ? null : "Letters, digits and - (not at the start or end)")}
+          aria-label="Name"
+        />
       </Row>
       <Section title="Date and time" />
       <Row label="Time zone">
-        <Select value={form.timezone} onChange={(e) => set("timezone", e.target.value)} className={W} aria-label="Time zone">
-          {(tz.data ?? [form.timezone]).map((t) => (
+        <Select value={d.timezone} onChange={(e) => put("timezone", e.target.value)} className={W} aria-label="Time zone">
+          {(tz.data ?? [d.timezone]).map((t) => (
             <option key={t}>{t}</option>
           ))}
         </Select>
       </Row>
       <Row label="Format">
-        <Select value={form.date_format} onChange={(e) => set("date_format", e.target.value)} className="w-full sm:w-40" aria-label="Date format">
+        <Select value={d.date_format} onChange={(e) => put("date_format", e.target.value)} className="w-full sm:w-44" aria-label="Date format">
           {DATE_FORMATS.map((f) => (
             <option key={f} value={f}>
               {example(f)}
             </option>
           ))}
         </Select>
-        <Select value={form.time_format} onChange={(e) => set("time_format", e.target.value)} className="w-full sm:w-28" aria-label="Time format">
+        <Select value={d.time_format} onChange={(e) => put("time_format", e.target.value)} className="w-full sm:w-26" aria-label="Time format">
           <option value="24h">17:45</option>
           <option value="12h">5:45 PM</option>
         </Select>
       </Row>
       <Section title="Windows and macOS sharing" />
       <Row label="Workgroup">
-        <Input value={form.workgroup} onChange={(e) => set("workgroup", e.target.value.toUpperCase())} maxLength={15} className={W} aria-label="Workgroup" />
+        <AutoField
+          value={d.workgroup}
+          onSave={(v) => put("workgroup", v)}
+          filter={(v) => v.toUpperCase().replace(/\s/g, "")}
+          validate={(v) => (/^[A-Z0-9_-]{1,15}$/.test(v) ? null : "Up to 15 letters, digits, - and _")}
+          maxLength={15}
+          aria-label="Workgroup"
+        />
       </Row>
       <Row label="Minimum SMB version" hint="SMB2_10 or newer is recommended">
-        <Select value={form.smb_min_protocol} onChange={(e) => set("smb_min_protocol", e.target.value)} className={W} aria-label="Minimum SMB version">
-          {form.smb_protocols.map((p) => (
+        <Select value={d.smb_min_protocol} onChange={(e) => put("smb_min_protocol", e.target.value)} className={W} aria-label="Minimum SMB version">
+          {d.smb_protocols.map((p) => (
             <option key={p}>{p}</option>
           ))}
         </Select>
       </Row>
       <Row inline label="macOS compatibility" hint="Faster Finder browsing and correct metadata">
-        <Switch checked={form.smb_macos_compat} onChange={(v) => set("smb_macos_compat", v)} label="macOS compatibility" />
+        <Switch checked={d.smb_macos_compat} onChange={(v) => put("smb_macos_compat", v)} label="macOS compatibility" />
       </Row>
-      <SaveBar
-        show={changes > 0}
-        note={`${changes} change${changes > 1 ? "s" : ""}`}
-        onDiscard={() => setForm(settings.data!)}
-        loading={save.isPending}
-        onSave={() => save.mutate(Object.fromEntries(FIELDS.map((k) => [k, form[k]])) as Partial<Settings>)}
-      />
     </RowCard>
   );
 }

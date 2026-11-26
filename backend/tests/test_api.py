@@ -422,3 +422,13 @@ def test_several_volumes_on_one_raid(client):
     for n in ("rest", "photos"):
         assert wait_job(client, client.delete(f"/api/volumes/{n}").json())["status"] == "success"
     assert next(a for a in client.get("/api/raid").json() if a["name"] == "tank")["free"] == tank["free"]
+
+
+def test_smtp_fields_save_one_at_a_time(client):
+    # each field saves by itself: the server may come before the sender
+    base = {"host": "", "port": 587, "security": "starttls", "username": "", "password": "", "sender": ""}
+    r = client.put("/api/settings/smtp", json={**base, "host": "smtp.example.com"})
+    assert r.status_code == 200 and r.json()["host"] == "smtp.example.com" and not r.json()["configured"]
+    r = client.put("/api/settings/smtp", json={**base, "host": "smtp.example.com", "sender": "nas@example.com"})
+    assert r.json()["configured"]
+    assert client.put("/api/settings/smtp", json={**base, "host": "smtp.example.com", "sender": "not an address"}).status_code == 400

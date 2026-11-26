@@ -75,6 +75,9 @@
      },
      {
       "p": "On a phone, open the menu with the button at the top left or by swiping right, and close it by swiping left. It closes by itself when you open a page."
+     },
+     {
+      "tip": "Settings save by themselves, everywhere in Talon: a switch or a choice as soon as you change it, a text field when you leave it or press Enter (Escape puts the saved value back). **Saved** confirms it; a value that is not valid is shown in red and not saved. Only dialogs have a button (**Create**, **Save**), and so does moving the NAS to another network address (**Apply**)."
      }
     ]
    }
@@ -939,7 +942,7 @@
        "**Copy the two IDs**: from the **Overview** page, copy the **Application (client) ID** and the **Directory (tenant) ID** into Talon.",
        "**Add the permissions**: **API permissions → Add a permission → Microsoft Graph → Delegated permissions**, add **Files.ReadWrite** and **offline_access** (allows OneDrive sync). Then **API permissions → Add a permission → Microsoft Graph → Application permissions**, add **User.Read.All** (allows [Entra ID users](/documentation?topic=users) to access the Talon web interface). Click **Grant admin consent**.",
        "**Create a client secret**: **Certificates & secrets → New client secret**, expiry **24 months**. Copy the secret **Value** (not the Secret ID) into Talon. It is shown once. In Talon, enter its **Expires** date under **Expires on**.",
-       "**Save and test in Talon**: click **Save**, then **Test**."
+       "**Test in Talon**: the fields save by themselves; click **Test**."
       ]
      },
      {
@@ -956,7 +959,7 @@
       "list": [
        "**Redirect URI**: it must match the address you use to open Talon exactly, including https:// and the name or IP address. Using several addresses? Add each one's redirect URI in Entra.",
        "**Client secret**: paste the secret **Value**, not the Secret ID. Expired secrets must be replaced with a new one.",
-       "**Accounts**: shows which accounts can connect OneDrive. If yours cannot, change **Supported account types** in the Entra portal (see step 2), then click **Save** in Talon again."
+       "**Accounts**: shows which accounts can connect OneDrive. If yours cannot, change **Supported account types** in the Entra portal (see step 2), then click **Test** in Talon again."
       ]
      },
      {
@@ -972,8 +975,7 @@
       "steps": [
        "In [Settings → Entra ID](/settings?tab=entra), under **Client secret**, enter the date in **Expires on**. Entra shows it under **Certificates & secrets**.",
        "Under **Reminder**, choose when: 7 to 90 days before.",
-       "Next to it, enter the addresses, separated by commas. Leave it empty to use the recipients from the [Notifications](/notifications) page.",
-       "Click **Save**."
+       "Next to it, enter the addresses, separated by commas. Leave it empty to use the recipients from the [Notifications](/notifications) page. Everything saves by itself."
       ]
      },
      {
@@ -984,7 +986,7 @@
       "p": "Talon sends one email when the reminder period starts and one more if the secret expires. The bell also shows the expiry as an issue. Emails need [SMTP](/documentation?topic=email) to be set up."
      },
      {
-      "p": "After you create a new secret, paste its Value and its new expiry date and click **Save**; the reminders start again for the new date."
+      "p": "After you create a new secret, paste its Value and its new expiry date (they save by themselves); the reminders start again for the new date."
      }
     ]
    },
@@ -1025,7 +1027,7 @@
        "Enter the **SMTP server** and **Port** from your email provider, and the **Connection security**: **STARTTLS** (usually port 587), **SSL/TLS** (usually 465) or **None**.",
        "Enter the **Sender address** the emails come from.",
        "Enter the **User name** and **Password**, or leave them empty if the server needs no sign-in. Many providers require an app password here instead of your normal password.",
-       "Click **Save**, then **Test**. Talon checks the connection, encryption, sign-in and sender address without sending an email."
+       "The fields save by themselves. Click **Test**: Talon checks the connection, encryption, sign-in and sender address without sending an email."
       ]
      },
      {
@@ -1043,7 +1045,7 @@
        "Open the [Notifications](/notifications?tab=notifications) page, tab **Notifications**. The tab appears once email is set up.",
        "Enter one or more addresses under **Send to**, separated by commas.",
        "Under **Send an email when**, choose the events: RAID degraded or failed, disk health warning or failure, disk too hot, volume almost full, background task failed, OneDrive task failed, software update available, operating system security updates, virus found, backup completed or failed, and failed sign-in attempt. All are on by default.",
-       "Click **Save**, then **Send test** to send a test email."
+       "Everything saves by itself; click **Send test** to send a test email."
       ]
      },
      {
@@ -1075,7 +1077,7 @@
       "alt": "Thresholds"
      },
      {
-      "p": "Change the values and click **Save**. **Reset to defaults** restores 55 °C, 65 °C and 75 °C, 90% full, 90% worn, and bad sector warnings on."
+      "p": "Each value saves when you leave its field. **Reset to defaults** restores 55 °C, 65 °C and 75 °C, 90% full, 90% worn, and bad sector warnings on."
      }
     ]
    }
@@ -1274,7 +1276,7 @@
        "Open [Settings → Network](/settings?tab=network). It shows the current address, subnet mask, gateway and DNS servers.",
        "Choose **Static**. The fields start with the current values.",
        "Enter the **Address**, **Subnet mask** (usually 255.255.255.0), **Gateway** (usually your router) and a **DNS server** (your router or, for example, 1.1.1.1). A **Second DNS server** is optional.",
-       "Click **Save** in the bar at the bottom of the card, then **Apply**.",
+       "Click **Apply** in the bar at the bottom of the card, and **Apply** again to confirm. This is the only setting with a button: it moves the NAS, so it is applied on purpose, with a way back.",
        "The page opens the new address by itself a few seconds after the NAS moved (or click **Open now**). With HTTPS on, the browser warns about the connection there once: continue as on the first visit. Opening Talon there keeps the change."
       ]
      },
@@ -1286,7 +1288,7 @@
       "warn": "Pick an address outside the range your router hands out, or reserve it in the router, so no other device gets the same address."
      },
      {
-      "p": "To go back, choose **Automatic** and click **Save**. The router may then give the NAS a different address: find it in your router, or open **https://<hostname>.local/** when Bonjour is on."
+      "p": "To go back, choose **Automatic** and click **Apply**. The router may then give the NAS a different address: find it in your router, or open **https://<hostname>.local/** when Bonjour is on."
      },
      {
       "tip": "If Talon is not opened at its new address within 3 minutes, for example because the gateway was wrong, the previous settings come back by themselves."

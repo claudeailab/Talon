@@ -2,7 +2,8 @@ import type { ReactNode } from "react";
 import { cx } from "../lib/format";
 import { Button, Card } from "./ui";
 
-/** Settings layout: one card of rows, with small section headers and a save bar that appears after a change. */
+/** Settings layout: one card of rows with small section headers. Settings save by themselves
+ *  (components/autosave.tsx); only the network address uses the Apply bar below. */
 export function RowCard({ children, className }: { children: ReactNode; className?: string }) {
   return <Card className={cx("overflow-hidden", className)}>{children}</Card>;
 }
@@ -56,6 +57,8 @@ export function RowBlock({ children, className }: { children: ReactNode; classNa
   return <div className={cx("border-t border-zinc-100 px-5 py-3 first:border-t-0 dark:border-white/5", className)}>{children}</div>;
 }
 
+/** A bar with Discard and Apply for settings that must be applied together, on purpose
+ *  (the network address). Everything else saves by itself. */
 export function SaveBar({
   show,
   onSave,

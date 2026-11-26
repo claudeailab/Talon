@@ -7,7 +7,7 @@ import { useAction } from "../lib/hooks";
 import { useSearch } from "../lib/router";
 import { restartNas } from "../components/restart";
 import type { UpdateInfo } from "../lib/types";
-import { Badge, Button, Callout, ConfirmDialog, Input, PageHeader, PageLoader, Progress, Segmented, Select, Switch, Tabs } from "../components/ui";
+import { Badge, Button, Callout, ConfirmDialog, PageHeader, PageLoader, Progress, Segmented, Select, Switch, Tabs, TimeInput } from "../components/ui";
 import { Row, RowBlock, RowCard, Section } from "../components/rows";
 
 type Pkg = { name: string; old: string; new: string; security: boolean; restart: boolean };
@@ -135,7 +135,7 @@ function StatusRow({ name, detail, ok, text, onClick }: { name: string; detail: 
 
 function CheckEvery({ value, onChange }: { value: number; onChange: (h: number) => void }) {
   return (
-    <Select value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full sm:w-56" aria-label="How often to check">
+    <Select value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full sm:w-72" aria-label="How often to check">
       {CHECK_EVERY.map(([h, label]) => (
         <option key={h} value={h}>
           {label}
@@ -172,9 +172,6 @@ function TalonSettings({ t }: { t: UpdateInfo }) {
 
 function SystemSettings({ o }: { o: OsInfo }) {
   const auto = useAction((body: Partial<OsInfo["auto"]>) => api.put<OsInfo>("/os-update/auto", body), { invalidate: ["os-update"], success: "Saved" });
-  const [time, setTime] = useState(o.auto.restart_time);
-  useEffect(() => setTime(o.auto.restart_time), [o.auto.restart_time]);
-  const timeOk = /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
   return (
     <RowCard>
       <Section title="System" />
@@ -206,22 +203,12 @@ function SystemSettings({ o }: { o: OsInfo }) {
         hint={o.auto.restart ? "At the time set here, only if an update needs it" : "Only if an update needs it; shared folders are unavailable for a minute or two"}
       >
         {o.auto.restart && (
-          <>
-            <div className="w-20">
-              <Input value={time} onChange={(e) => setTime(e.target.value)} aria-label="Restart time" placeholder="04:00" />
-            </div>
-            {time !== o.auto.restart_time && (
-              <Button size="sm" disabled={!timeOk} onClick={() => auto.mutate({ restart_time: time })}>
-                Save
-              </Button>
-            )}
-          </>
+          <div className="w-20">
+            <TimeInput value={o.auto.restart_time} onChange={(t) => auto.mutate({ restart_time: t })} />
+          </div>
         )}
         <Switch checked={o.auto.restart} disabled={o.auto.mode === "off"} onChange={(v) => auto.mutate({ restart: v })} label="Restart when needed" />
       </Row>
-      {o.auto.restart && !timeOk && (
-        <RowBlock className="py-2 text-xs text-rose-600 dark:text-rose-400">Enter the time as hh:mm, 24-hour</RowBlock>
-      )}
     </RowCard>
   );
 }

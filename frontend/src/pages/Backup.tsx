@@ -7,7 +7,7 @@ import { useAction } from "../lib/hooks";
 import { Detail, Details, ITEM_CARD, ITEM_LIST, ITEM_MENU, ITEM_WRAP, ITEM_ROW, ItemTitle } from "../components/storage";
 import { LogList } from "../components/log";
 import { navigate } from "../lib/router";
-import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Select, Switch, usageTone } from "../components/ui";
+import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Select, Switch, TimeInput, usageTone } from "../components/ui";
 
 type Disk = { uuid: string; id: string; dev: string; name: string; media: string; fstype: string; fs_label: string; size: number; kind: string; versions: boolean };
 type Task = {
@@ -409,8 +409,9 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
           {when !== "plug" && (
             <div className="flex items-center gap-2">
               <span className="text-[13px] text-zinc-500">at</span>
-              <Input value={time} onChange={(e) => setTime(e.target.value)} className="w-24" aria-label="Time" />
-              {!timeOk && <span className="text-xs text-rose-600">Use hh:mm, 24-hour</span>}
+              <div className="w-24">
+                <TimeInput value={time} onChange={setTime} />
+              </div>
             </div>
           )}
           <div className="flex items-start justify-between gap-4 rounded-xl bg-zinc-50 p-3 dark:bg-white/[0.03]">

@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { MoreHorizontal, Play, RotateCcw, ShieldAlert, ShieldCheck, Square, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, bytes, cx, dateTime, duration } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Volume } from "../lib/types";
-import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, IconButton, Input, Menu, MenuItem, PageHeader, PageLoader, Progress, Segmented, Select } from "../components/ui";
+import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, IconButton, Menu, MenuItem, PageHeader, PageLoader, Progress, Segmented, Select, TimeInput } from "../components/ui";
 
 type QItem = { id: string; path: string; virus: string; found: number; size: number };
 type AvInfo = {
@@ -126,8 +126,6 @@ function ProgressBox({ title, text, percent, note, action }: { title: string; te
 /** Volumes, Scan now and the schedule; changes to the schedule save by themselves. */
 function Scanner({ d, volumes }: { d: AvInfo; volumes: Volume[] }) {
   const [sel, setSel] = useState<string[]>(d.settings.volumes);
-  const [time, setTime] = useState(d.settings.time);
-  useEffect(() => setTime(d.settings.time), [d.settings.time]);
   const save = useAction((body: Partial<AvInfo["settings"]>) => api.put<AvInfo>("/antivirus/settings", { ...d.settings, ...body }), {
     invalidate: ["antivirus"],
     success: "Saved",
@@ -140,7 +138,6 @@ function Scanner({ d, volumes }: { d: AvInfo; volumes: Volume[] }) {
   };
   const p = d.progress;
   const last = d.last_scan;
-  const timeOk = /^([01]\d|2[0-3]):[0-5]\d$/.test(time);
   return (
     <div className="space-y-4">
       {p.state === "running" ? (
@@ -213,9 +210,8 @@ function Scanner({ d, volumes }: { d: AvInfo; volumes: Volume[] }) {
             )}
             <span className="text-[13px] text-zinc-500">at</span>
             <div className="w-20 shrink-0">
-              <Input value={time} onChange={(e) => setTime(e.target.value)} onBlur={() => timeOk && time !== d.settings.time && save.mutate({ time })} aria-label="Time" />
+              <TimeInput value={d.settings.time} onChange={(t) => save.mutate({ time: t })} />
             </div>
-            {!timeOk && <span className="text-xs text-rose-600">Use hh:mm</span>}
           </div>
         )}
       </div>

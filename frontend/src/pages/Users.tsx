@@ -638,7 +638,7 @@ function EntraSetupNeeded() {
       <p className="mt-1 text-sm text-zinc-500">To choose people from your organization's directory:</p>
       <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm">
         <li>
-          In <b>Settings → Entra ID</b>, enter the <b>Directory (tenant) ID</b> from the app's Overview page in the Entra portal, then click <b>Save</b>.
+          In <b>Settings → Entra ID</b>, enter the <b>Directory (tenant) ID</b> from the app's Overview page in the Entra portal; it saves by itself.
         </li>
         <li>
           In the Entra portal, open the app's <b>API permissions → Add a permission → Microsoft Graph → Application permissions</b>, add <b>User.Read.All</b>{" "}

@@ -43,7 +43,9 @@ def smtp_validate(data: dict, old: dict) -> dict:
     if security not in SECURITY:
         raise UserError("Invalid connection security")
     sender = str(data.get("sender", "")).strip()
-    if host and not EMAIL_RE.match(sender):
+    # each field saves by itself, so the server may come before the sender; email is
+    # "configured" (and used) only once both are there
+    if sender and not EMAIL_RE.match(sender):
         raise UserError("Enter a valid sender address")
     if host and not re.match(r"^[A-Za-z0-9.\-]+$", host):
         raise UserError("Invalid SMTP server name")
