@@ -106,7 +106,8 @@ def fetch_changelog(repo: str) -> list:
         raise UserError(f"Update server returned HTTP {e.code}") from e
     except (urllib.error.URLError, OSError, ValueError) as e:
         raise UserError(f"Could not reach GitHub: {getattr(e, 'reason', e)}") from e
-    return [{**v, "date": dates.get(v["version"])} for v in versions]
+    # a version whose release failed (its tests did not pass) was never published: left out
+    return [{**v, "date": dates[v["version"]]} for v in versions if dates.get(v["version"])]
 
 
 def local_changelog() -> list:

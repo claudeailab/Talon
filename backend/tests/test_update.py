@@ -108,7 +108,7 @@ def test_changelog_from_github_with_dates(tmp_path, monkeypatch):
 
     def fake_get(url, timeout=15):
         if url.endswith("CHANGELOG.md"):
-            return b"## 9.0.1\n- Newer\n\n## 9.0.0\n- Older\n"
+            return b"## 9.0.2\n- Never released\n\n## 9.0.1\n- Newer\n\n## 9.0.0\n- Older\n"
         return json.dumps([{"tag_name": "v9.0.1", "published_at": "2026-11-26T15:04:36Z"},
                            {"tag_name": "v9.0.0", "published_at": "2026-11-23T12:00:00Z"}]).encode()
     monkeypatch.setattr(update, "_get", fake_get)
