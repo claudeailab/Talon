@@ -7,8 +7,8 @@ import { useAction } from "../lib/hooks";
 import { Link } from "../lib/router";
 import type { Disk, Job, Member, RaidArray, RaidOption } from "../lib/types";
 import { JobDialog } from "../components/jobs";
-import { DiskRow, Dots, MemberList, NAME_HINT, NAME_RE, Stat, StatusBadge, Stepper, SyncProgress, statusTone } from "../components/storage";
-import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Segmented } from "../components/ui";
+import { DiskRow, Dots, FootItem, ITEM_FOOT, ITEM_MENU, ITEM_ROW, ItemTitle, MemberChips, NAME_HINT, NAME_RE, Stat, StatusBadge, Stepper, SyncProgress, statusTone } from "../components/storage";
+import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Segmented } from "../components/ui";
 
 export default function RaidPage() {
   const arrays = useQuery({ queryKey: ["raid"], queryFn: () => api.get<RaidArray[]>("/raid"), refetchInterval: 4000 });
@@ -40,7 +40,7 @@ export default function RaidPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-5">
+        <div className="grid gap-4">
           {arrays.data.map((a) => (
             <RaidCard key={a.name} a={a} disks={disks.data} onJob={setJob} />
           ))}
@@ -88,21 +88,68 @@ function RaidCard({ a, disks, onJob }: { a: RaidArray; disks: Disk[]; onJob: (id
     },
   });
 
+  const disksIn = a.members.filter((m) => m.state !== "spare").length;
+  const spares = a.members.length - disksIn;
+  const used = Math.max(0, a.size - a.free);
+  const link = "font-medium text-brand-600 hover:underline dark:text-brand-400";
   return (
-    <Card className="overflow-hidden">
-      <div className="flex items-start justify-between gap-4 p-5">
-        <div className="flex min-w-0 items-center gap-3.5">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-violet-500 text-white shadow-md shadow-brand-500/20">
-            <Layers className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-lg font-semibold tracking-tight">{a.name}</h3>
-              <StatusBadge status={a.status} />
+    <Card className="relative overflow-hidden">
+      <div className="relative">
+      <div className={ITEM_ROW}>
+        <ItemTitle icon={<Layers />} name={a.name} badge={<StatusBadge status={a.status} />}>
+          <span className="font-medium text-zinc-700 dark:text-zinc-300">{levelLabel[a.level] ?? a.level}</span>
+          <span aria-hidden>·</span>
+          <span>
+            {disksIn} disk{disksIn === 1 ? "" : "s"}
+            {spares > 0 && ` + ${spares} spare${spares === 1 ? "" : "s"}`}
+          </span>
+        </ItemTitle>
+
+        <div className="min-w-0 space-y-3">
+          <div>
+            <div className="mb-1.5 flex items-baseline justify-between gap-3 text-[13px]">
+              <span className="min-w-0">
+                {a.volumes.length ? (
+                  <>
+                    <span className="text-zinc-500">{a.volumes.length > 1 ? "Volumes " : "Volume "}</span>
+                    {a.volumes.map((v, i) => (
+                      <span key={v}>
+                        {i > 0 && ", "}
+                        <Link to="/volumes" className={link}>
+                          {v}
+                        </Link>
+                      </span>
+                    ))}
+                  </>
+                ) : (
+                  <span className="text-zinc-500">No volume yet</span>
+                )}
+              </span>
+              <span className="tabular shrink-0 text-zinc-500">
+                {a.free >= 2 ** 30 ? (
+                  <>
+                    {bytes(a.free)} free ·{" "}
+                    <Link to="/volumes?create=1" className={link}>
+                      New volume
+                    </Link>
+                  </>
+                ) : (
+                  "fully used"
+                )}
+              </span>
             </div>
-            <div className="mt-0.5 text-[13px] font-medium text-zinc-700 dark:text-zinc-300">{levelLabel[a.level] ?? a.level}</div>
+            <Progress value={a.size ? (used / a.size) * 100 : 0} className="h-1.5" />
           </div>
+          {a.sync && a.sync.sync_action !== "idle" && <SyncProgress sync={a.sync} />}
         </div>
+
+        <div className="grid w-60 max-w-full grid-cols-2 gap-4">
+          <Stat label="Capacity" value={bytes(a.size)} />
+          <Stat label="Survives" value={a.fault_tolerance ? `${a.fault_tolerance} failure${a.fault_tolerance > 1 ? "s" : ""}` : "No failures"} />
+        </div>
+      </div>
+
+      <div className={ITEM_MENU}>
         <Menu
           trigger={
             <IconButton label="RAID actions">
@@ -130,59 +177,19 @@ function RaidCard({ a, disks, onJob }: { a: RaidArray; disks: Disk[]; onJob: (id
           </MenuItem>
         </Menu>
       </div>
+      </div>
 
       {a.status_detail && statusTone(a.status) !== "info" && (
-        <div className="px-5 pb-3">
+        <div className="px-4 pb-4 sm:px-5">
           <Callout tone={statusTone(a.status)}>{a.status_detail}</Callout>
         </div>
       )}
-      {a.sync && a.sync.sync_action !== "idle" && (
-        <div className="px-5 pb-4">
-          <SyncProgress sync={a.sync} />
-        </div>
-      )}
 
-      <div className="grid grid-cols-3 gap-3 px-5 pb-5">
-        <Stat label="Capacity" value={bytes(a.size)} />
-        <Stat label="Disks" value={a.members.filter((m) => m.state !== "spare").length} />
-        <Stat label="Survives" value={a.fault_tolerance ? `${a.fault_tolerance} failure${a.fault_tolerance > 1 ? "s" : ""}` : "No failures"} />
-      </div>
-
-      <div className="border-t border-zinc-100 bg-zinc-50/50 px-5 py-4 dark:border-white/5 dark:bg-white/[0.015]">
-        <div className="mb-2.5 text-xs font-semibold tracking-wide text-zinc-500 uppercase">Member disks</div>
-        <MemberList members={a.members} onRemove={a.members.length > 1 ? setRemove : undefined} />
-        <div className="mt-3 text-xs text-zinc-500">
-          {a.volumes.length ? (
-            <>
-              {a.volumes.length > 1 ? "Volumes: " : "Volume: "}
-              {a.volumes.map((v, i) => (
-                <span key={v}>
-                  {i > 0 && ", "}
-                  <Link to="/volumes" className="font-medium text-brand-600 hover:underline dark:text-brand-400">
-                    {v}
-                  </Link>
-                </span>
-              ))}
-              {a.free >= 2 ** 30 && (
-                <>
-                  {" · "}
-                  {bytes(a.free)} free for more volumes.{" "}
-                  <Link to="/volumes?create=1" className="font-medium text-brand-600 hover:underline dark:text-brand-400">
-                    Create a volume
-                  </Link>
-                </>
-              )}
-            </>
-          ) : (
-            <>
-              No volume yet.{" "}
-              <Link to="/volumes?create=1" className="font-medium text-brand-600 hover:underline dark:text-brand-400">
-                Create a volume on this RAID
-              </Link>
-            </>
-          )}
-        </div>
-        {a.created && <div className="mt-1 text-xs text-zinc-400">Created {dateTime(a.created)}</div>}
+      <div className={ITEM_FOOT}>
+        <FootItem label="Disks">
+          <MemberChips members={a.members} onRemove={a.members.length > 1 ? setRemove : undefined} />
+        </FootItem>
+        {a.created && <span className="ml-auto text-zinc-400">Created {dateTime(a.created)}</span>}
       </div>
 
       <ConfirmDialog

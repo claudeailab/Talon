@@ -18,7 +18,12 @@ import type { Job, Volume, VolumeSources } from "../lib/types";
 import { JobDialog } from "../components/jobs";
 import {
   DiskRow,
-  MemberList,
+  FootItem,
+  ITEM_FOOT,
+  ITEM_MENU,
+  ITEM_ROW,
+  ItemTitle,
+  MemberChips,
   NAME_HINT,
   NAME_RE,
   Stat,
@@ -102,7 +107,7 @@ export default function VolumesPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-5">
+        <div className="grid gap-4">
           {vols.data.map((v) => (
             <VolumeCard key={v.name} v={v} onJob={setJob} />
           ))}
@@ -142,46 +147,13 @@ function VolumeCard({ v, onJob }: { v: Volume; onJob: (id: string) => void }) {
   const [resize, setResize] = useState(false);
 
   return (
-    <Card className="overflow-hidden">
-      <div className="p-5 pb-4">
-        <div className="flex items-center gap-3.5">
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-violet-500 text-white shadow-md shadow-brand-500/20">
-            <Database className="size-5" />
-          </div>
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-            <h3 className="text-lg font-semibold tracking-tight break-words">{v.name}</h3>
-            <StatusBadge status={v.status} />
-          </div>
-          <Menu
-            trigger={
-              <IconButton label="Volume actions">
-                <MoreHorizontal className="size-5" />
-              </IconButton>
-            }
-          >
-            <MenuItem icon={<FolderTree />} disabled={!v.mounted} onClick={() => navigate(`/browser?volume=${encodeURIComponent(v.name)}`)}>
-              Browse files
-            </MenuItem>
-            {v.resizable && (
-              <MenuItem icon={<Scaling />} disabled={!v.mounted} onClick={() => setResize(true)}>
-                Change size
-              </MenuItem>
-            )}
-            {v.can_expand_fs && (
-              <MenuItem icon={<Expand />} onClick={() => expand.mutate()}>
-                Expand filesystem
-              </MenuItem>
-            )}
-            <MenuItem icon={<Trash2 />} danger onClick={() => setConfirmDelete(true)}>
-              Delete volume
-            </MenuItem>
-          </Menu>
-        </div>
-        {/* full card width, so it usually fits on one line; it wraps between the parts, not inside them */}
-        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] text-zinc-500">
+    <Card className="relative overflow-hidden">
+      <div className="relative">
+      <div className={ITEM_ROW}>
+        <ItemTitle icon={<Database />} name={v.name} badge={<StatusBadge status={v.status} />}>
           {v.array ? (
             <Link to="/raid" className="font-medium whitespace-nowrap text-zinc-700 hover:text-brand-600 dark:text-zinc-300">
-              RAID {v.array} ({levelLabel[v.level] ?? v.level})
+              {levelLabel[v.level] ?? v.level} on {v.array}
             </Link>
           ) : (
             <span className="font-medium whitespace-nowrap text-zinc-700 dark:text-zinc-300">Disk {v.disk ?? "?"}</span>
@@ -189,71 +161,73 @@ function VolumeCard({ v, onJob }: { v: Volume; onJob: (id: string) => void }) {
           <span aria-hidden>·</span>
           <span className="whitespace-nowrap">{v.fs.toUpperCase()}</span>
           <span aria-hidden>·</span>
-          <span className="font-mono text-xs break-words">{v.mountpoint}</span>
+          <span className="font-mono text-xs break-all">{v.mountpoint}</span>
+        </ItemTitle>
+
+        <div className="min-w-0 space-y-3">
+          <div>
+            <div className="mb-1.5 flex items-baseline justify-between gap-3 text-[13px]">
+              <span>
+                <span className="tabular font-semibold">{bytes(v.used)}</span>
+                <span className="text-zinc-500"> of {bytes(v.size)} used</span>
+              </span>
+              <span className="tabular text-zinc-500">{p.toFixed(1)}%</span>
+            </div>
+            <Progress value={p} tone={usageTone(p)} className="h-1.5" />
+          </div>
+          {v.sync && v.sync.sync_action !== "idle" && <SyncProgress sync={v.sync} />}
         </div>
+
+        <div className="grid w-60 max-w-full grid-cols-2 gap-4">
+          <Stat label="Free" value={bytes(v.free)} />
+          <Stat label="Survives" value={v.fault_tolerance ? `${v.fault_tolerance} failure${v.fault_tolerance > 1 ? "s" : ""}` : "No failures"} />
+        </div>
+      </div>
+
+      <div className={ITEM_MENU}>
+        <Menu
+          trigger={
+            <IconButton label="Volume actions">
+              <MoreHorizontal className="size-5" />
+            </IconButton>
+          }
+        >
+          <MenuItem icon={<FolderTree />} disabled={!v.mounted} onClick={() => navigate(`/browser?volume=${encodeURIComponent(v.name)}`)}>
+            Browse files
+          </MenuItem>
+          {v.resizable && (
+            <MenuItem icon={<Scaling />} disabled={!v.mounted} onClick={() => setResize(true)}>
+              Change size
+            </MenuItem>
+          )}
+          {v.can_expand_fs && (
+            <MenuItem icon={<Expand />} onClick={() => expand.mutate()}>
+              Expand filesystem
+            </MenuItem>
+          )}
+          <MenuItem icon={<Trash2 />} danger onClick={() => setConfirmDelete(true)}>
+            Delete volume
+          </MenuItem>
+        </Menu>
+      </div>
       </div>
 
       {v.status_detail && statusTone(v.status) !== "info" && (
-        <div className="px-5 pb-3">
+        <div className="px-4 pb-4 sm:px-5">
           <Callout tone={statusTone(v.status)}>{v.status_detail}</Callout>
         </div>
       )}
-      {v.sync && v.sync.sync_action !== "idle" && (
-        <div className="px-5 pb-4">
-          <SyncProgress sync={v.sync} />
-        </div>
-      )}
 
-      <div className="px-5 pb-5">
-        <div className="mb-2 flex items-baseline justify-between">
-          <div>
-            <span className="tabular text-2xl font-semibold tracking-tight">
-              {bytes(v.used)}
-            </span>
-            <span className="ml-1.5 text-sm text-zinc-500">
-              of {bytes(v.size)} used
-            </span>
-          </div>
-          <span className="tabular text-sm font-medium text-zinc-500">
-            {p.toFixed(1)}%
-          </span>
-        </div>
-        <Progress value={p} tone={usageTone(p)} className="h-2.5" />
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          <Stat label="Free" value={bytes(v.free)} />
-          <Stat
-            label="Disks"
-            value={v.members.filter((m) => m.state !== "spare").length}
-          />
-          <Stat
-            label="Survives"
-            value={
-              v.fault_tolerance
-                ? `${v.fault_tolerance} failure${v.fault_tolerance > 1 ? "s" : ""}`
-                : "No failures"
-            }
-          />
-        </div>
-      </div>
-
-      <div className="border-t border-zinc-100 bg-zinc-50/50 px-5 py-4 dark:border-white/5 dark:bg-white/[0.015]">
-        <div className="mb-2.5 text-xs font-semibold tracking-wide text-zinc-500 uppercase">
-          Disks
-        </div>
-        <MemberList members={v.members} />
-        {v.shares.length > 0 && (
-          <div className="mt-3 text-xs text-zinc-500">
-            Shared folders:{" "}
-            <span className="font-medium text-zinc-700 dark:text-zinc-300">
-              {v.shares.join(", ")}
-            </span>
-          </div>
+      <div className={ITEM_FOOT}>
+        {v.members.length > 0 && (
+          <FootItem label="Disks">
+            <MemberChips members={v.members} />
+          </FootItem>
         )}
-        {v.created && (
-          <div className="mt-1 text-xs text-zinc-400">
-            Created {dateTime(v.created)}
-          </div>
-        )}
+        <FootItem label="Shared folders">
+          {v.shares.length ? <span className="font-medium text-zinc-700 dark:text-zinc-300">{v.shares.join(", ")}</span> : <span>None</span>}
+        </FootItem>
+        {v.created && <span className="ml-auto text-zinc-400">Created {dateTime(v.created)}</span>}
       </div>
 
       {resize && (

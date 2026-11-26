@@ -212,7 +212,7 @@ export const GUIDE: Topic[] = [
               "**Delete RAID**: only possible after its volume is deleted.",
             ],
           },
-          { p: "To take a disk out of an array, point at it under **Member disks** and click its remove button. Talon refuses when the array would not survive it." },
+          { p: "To take a disk out of an array, point at it in the **Disks** row at the bottom of the array and click its remove button. Talon refuses when the array would not survive it." },
           { p: "After **Expand capacity** finishes, use **Expand filesystem** on the [Volumes](/volumes) page so the volume can use the new space." },
         ],
       },

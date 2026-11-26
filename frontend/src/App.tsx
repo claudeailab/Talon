@@ -337,7 +337,7 @@ function Shell({ me }: { me: Me }) {
           <X className="size-5" />
         </IconButton>
       </div>
-      <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-3 [scrollbar-width:none]">
+      <nav className="flex-1 space-y-3 overflow-y-auto px-3 py-2 [scrollbar-width:none]">
         {NAV.map((s) => (
           <div key={s.section}>
             {s.section && <div className="mb-1 px-3 text-[11px] font-semibold tracking-wider text-zinc-400 uppercase dark:text-zinc-500">{s.section}</div>}
@@ -350,7 +350,7 @@ function Shell({ me }: { me: Me }) {
                     to={i.to}
                     onClick={() => setMobileNav(false)}
                     className={cx(
-                      "group flex items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-medium transition",
+                      "group flex items-center gap-3 rounded-xl px-3 py-[5px] text-sm font-medium transition",
                       active
                         ? "bg-white text-zinc-900 shadow-sm ring-1 ring-zinc-200/70 dark:bg-white/[0.07] dark:text-white dark:ring-white/5"
                         : "text-zinc-600 hover:bg-zinc-200/40 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/[0.04] dark:hover:text-zinc-100",

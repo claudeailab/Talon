@@ -2,8 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Check, ChevronDown, DatabaseBackup, FileText, HardDrive, Minus, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Square, Trash2, Usb } from "lucide-react";
 import { api } from "../lib/api";
-import { ago, bytes, cx, dateTime, rate } from "../lib/format";
+import { ago, bytes, cx, dateTime, duration, rate } from "../lib/format";
 import { useAction } from "../lib/hooks";
+import { FootItem, ITEM_FOOT, ITEM_MENU, ITEM_ROW, ItemTitle } from "../components/storage";
 import { LogList } from "../components/log";
 import { navigate } from "../lib/router";
 import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Select, Switch } from "../components/ui";
@@ -75,7 +76,7 @@ export default function BackupPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-5">
+        <div className="grid gap-4">
           {d.tasks.map((t) => (
             <TaskCard key={t.id} t={t} onEdit={() => setWizard(t)} backupDir={d.backup_dir} />
           ))}
@@ -95,22 +96,60 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
   const [log, setLog] = useState(false);
   const running = t.progress.state === "running";
   return (
-    <Card className="flex flex-col">
-      <div className="flex items-start gap-3 p-5 pb-3">
-        <div className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-400">
-          {t.disk && t.disk.kind !== "usb" ? <HardDrive className="size-5" /> : <Usb className="size-5" />}
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-semibold break-words">{t.name}</h3>
-            {t.connected ? <Badge tone="green" dot>Connected</Badge> : <Badge dot>Not connected</Badge>}
-          </div>
-          <p className="text-[13px] break-words text-zinc-500">
+    <Card className="relative overflow-hidden">
+      <div className="relative">
+      <div className={ITEM_ROW}>
+        <ItemTitle
+          tone="amber"
+          icon={t.disk && t.disk.kind !== "usb" ? <HardDrive /> : <Usb />}
+          name={t.name}
+          badge={t.connected ? <Badge tone="green" dot>Connected</Badge> : <Badge dot>Not connected</Badge>}
+        >
+          <span className="break-words">
             {t.disk ? `${t.disk.media}: ` : ""}
             {t.disk_name}
-            {t.disk_size ? ` · ${bytes(t.disk_size)}` : ""} · {describe(t.sources)}
-          </p>
+            {t.disk_size ? ` · ${bytes(t.disk_size)}` : ""}
+          </span>
+        </ItemTitle>
+
+        <div className="min-w-0">
+          {running ? (
+            <RunProgress p={t.progress} />
+          ) : t.last ? (
+            <div className="text-[13px]">
+              <div>
+                <span className="font-medium">Last backup</span>{" "}
+                <span className="text-zinc-500">{ago(t.last.at)}</span>
+                {t.last.ok && <span className="text-zinc-500"> · took {duration(t.last.duration)}</span>}
+              </div>
+              {!t.last.ok && (
+                <div className={cx("mt-0.5 break-words", t.last.stopped ? "text-zinc-500" : "text-rose-600 dark:text-rose-400")}>
+                  {t.last.stopped ? "Stopped before it finished" : `Failed: ${t.last.error}`}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-[13px] text-zinc-500">Not backed up yet</div>
+          )}
         </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {running ? (
+            <Button size="sm" icon={<Square className="size-3.5" />} loading={stop.isPending} onClick={() => stop.mutate()}>
+              Stop
+            </Button>
+          ) : (
+            <Button size="sm" variant="primary" icon={<Play className="size-3.5" />} disabled={!t.connected} loading={run.isPending} onClick={() => run.mutate()}>
+              Back up now
+            </Button>
+          )}
+          <Button size="sm" icon={<RotateCcw className="size-3.5" />} disabled={!t.connected || !t.snapshots.length || running} onClick={() => setRestore(true)}>
+            Restore
+          </Button>
+        </div>
+      </div>
+
+      <div className={ITEM_MENU}>
         <Menu
           trigger={
             <IconButton label={`Actions for ${t.name}`}>
@@ -129,41 +168,22 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
           </MenuItem>
         </Menu>
       </div>
-      <div className="flex-1 space-y-3 px-5 pb-4">
-        {running ? (
-          <RunProgress p={t.progress} />
-        ) : t.last ? (
-          <div className="text-[13px]">
-            <span className="font-medium">Last backup</span>{" "}
-            <span className={cx(t.last.ok ? "text-zinc-500" : "text-rose-600 dark:text-rose-400")}>
-              {ago(t.last.at)}
-              {t.last.ok ? "" : t.last.stopped ? " · stopped" : ` · failed: ${t.last.error}`}
-            </span>
-          </div>
-        ) : (
-          <div className="text-[13px] text-zinc-500">Not backed up yet</div>
-        )}
-        {t.disk && !t.disk.versions && (
-          <p className="text-xs text-amber-600 dark:text-amber-400">
-            {t.disk.fs_label} keeps one copy, without earlier versions.
-          </p>
-        )}
-        {t.versions && t.snapshots.length > 0 && <div className="text-xs text-zinc-500">{t.snapshots.length} version{t.snapshots.length === 1 ? "" : "s"} kept · up to {t.keep_days} days</div>}
       </div>
-      <div className="flex flex-wrap items-center gap-2 border-t border-zinc-100 px-5 py-3 dark:border-white/5">
-        {running ? (
-          <Button size="sm" icon={<Square className="size-3.5" />} loading={stop.isPending} onClick={() => stop.mutate()}>
-            Stop
-          </Button>
-        ) : (
-          <Button size="sm" variant="primary" icon={<Play className="size-3.5" />} disabled={!t.connected} loading={run.isPending} onClick={() => run.mutate()}>
-            Back up now
-          </Button>
-        )}
-        <Button size="sm" icon={<RotateCcw className="size-3.5" />} disabled={!t.connected || !t.snapshots.length || running} onClick={() => setRestore(true)}>
-          Restore
-        </Button>
-        <span className="ml-auto text-xs text-zinc-500">{whenText(t)}</span>
+
+      <div className={ITEM_FOOT}>
+        <FootItem label="What">
+          <span className="font-medium break-words text-zinc-700 dark:text-zinc-300">{describe(t.sources)}</span>
+        </FootItem>
+        <FootItem label="Versions">
+          {t.disk && !t.disk.versions ? (
+            <span className="text-amber-600 dark:text-amber-400">{t.disk.fs_label} keeps one copy</span>
+          ) : (
+            <span>
+              {t.snapshots.length ? `${t.snapshots.length} kept · ` : ""}up to {t.keep_days} days
+            </span>
+          )}
+        </FootItem>
+        <span className="ml-auto">{whenText(t)}</span>
       </div>
       {restore && t.disk && (
         <Modal open onClose={() => setRestore(false)} title="Restore" description="Choose a version; it opens in Files, where you can copy back a file, a folder or everything">
@@ -198,15 +218,19 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
 /** Which folder is being copied, how far the run is and how fast it goes. */
 function RunProgress({ p }: { p: Task["progress"] }) {
   return (
-    <div className="rounded-xl bg-zinc-50 p-3.5 dark:bg-white/[0.03]">
-      <div className="flex items-baseline justify-between gap-3 text-[13px]">
-        <span className="min-w-0 font-medium break-words">
-          Backing up {p.share} · {(p.index ?? 0) + 1} of {p.total}
+    <div>
+      <div className="mb-1.5 flex items-baseline justify-between gap-3 text-[13px]">
+        <span className="min-w-0 break-words">
+          <span className="font-medium">Backing up {p.share}</span>
+          <span className="text-zinc-500">
+            {" "}
+            · {(p.index ?? 0) + 1} of {p.total}
+            {p.speed ? ` · ${rate(p.speed)}` : ""}
+          </span>
         </span>
-        <span className="tabular shrink-0 font-semibold text-zinc-500">{Math.round(p.percent ?? 0)}%</span>
+        <span className="tabular shrink-0 text-zinc-500">{Math.round(p.percent ?? 0)}%</span>
       </div>
-      <Progress value={p.percent ?? 0} className="mt-2 h-2" />
-      {p.speed ? <div className="mt-1 text-xs text-zinc-500">{rate(p.speed)}</div> : null}
+      <Progress value={p.percent ?? 0} className="h-1.5" />
     </div>
   );
 }

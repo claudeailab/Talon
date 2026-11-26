@@ -1,3 +1,7 @@
+## 1.0.145
+- RAID, Volumes and Backup: compact cards with aligned columns, about a third of the height, on wide screens, laptops and phones
+- The menu fits on shorter screens without hiding its last entries
+
 ## 1.0.144
 - Backup: ⋯ → View log shows a running backup's progress and every file it copies, like OneDrive
 - Backup versions are named in the date format of Settings, and a stopped or failed backup no longer leaves a .partial folder
