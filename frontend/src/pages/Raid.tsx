@@ -40,7 +40,7 @@ export default function RaidPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-5 2xl:grid-cols-2">
+        <div className="grid gap-5">
           {arrays.data.map((a) => (
             <RaidCard key={a.name} a={a} disks={disks.data} onJob={setJob} />
           ))}

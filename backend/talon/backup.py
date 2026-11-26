@@ -3,7 +3,11 @@ plugged in or every day.
 
 Each backup task belongs to one disk (recognised by its filesystem UUID, so it does
 not matter which port it is in) and copies the chosen volumes and folders into
-"Talon Backup/<NAS name>/<version>/<volume>/" on it with rsync.
+"Talon Backup/<NAS name>/<version>/<volume>/" on it with rsync. A version is named after
+when it was made, in the date format of Settings (e.g. "24-11-2026_1240"); a hidden
+".talon-version" file in it holds the exact time, as names like 05-06-2026 can be read
+two ways. A run copies into "<version>.partial" and renames it when done; a run that
+stops or fails removes it again.
 
 On disks that support hard links (ext4, XFS, Btrfs, NTFS) every run is a dated
 version: files that did not change are hard links to the previous version, so a
@@ -15,6 +19,8 @@ Restore: open a version in Files (it is a normal folder on the disk) and copy ba
 what you need."""
 from __future__ import annotations
 
+import collections
+import contextlib
 import os
 import re
 import shutil
@@ -25,11 +31,13 @@ import uuid
 from typing import Dict, List, Optional
 
 from .scheduler import parse_progress
-from .util import UserError, run
+from .util import DATE_FORMATS, UserError, date_pattern, run, write_atomic
 
 ROOT_DIR = "Talon Backup"
-STAMP_FMT = "%Y-%m-%d_%H%M"
+STAMP_FMT = "%Y-%m-%d_%H%M"                  # names of versions made before 1.0.144
 STAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}_\d{4}$")
+MARKER = ".talon-version"                    # in each version: when it was made (seconds)
+PARTIAL = ".partial"                         # a version still being copied
 CURRENT = "Current"                          # the single copy on FAT32 / exFAT
 MEDIA = {"usb": "USB disk", "hdd": "SATA hard disk", "ssd": "SATA SSD", "nvme": "NVMe SSD"}   # by disk kind
 LINKS_FS = {"ext2", "ext3", "ext4", "xfs", "btrfs", "ntfs", "ntfs3"}
@@ -38,18 +46,67 @@ WHEN = ("plug", "daily", "both")
 ENV = {"DEBIAN_FRONTEND": "noninteractive"}
 
 
-def snapshot_name(ts: float) -> str:
-    return time.strftime(STAMP_FMT, time.localtime(ts))
+def snapshot_name(ts: float, settings: Optional[dict] = None) -> str:
+    """A version's folder name: the date as in Settings → Date format ("/" becomes "-", as
+    it cannot be in a name) and the time without ":" (Windows cannot show it)."""
+    s = settings or {}
+    lt = time.localtime(ts)
+    date = time.strftime(DATE_FORMATS.get(s.get("date_format", ""), DATE_FORMATS["dd-mm-yyyy"]), lt).replace("/", "-")
+    return f"{date}_{time.strftime('%I%M%p' if s.get('time_format') == '12h' else '%H%M', lt)}"
 
 
-def to_prune(names: List[str], keep_days: int, now: float) -> List[str]:
-    """Versions older than keep_days; the newest version is always kept."""
-    stamps = sorted(n for n in names if STAMP_RE.match(n))
-    if len(stamps) <= 1:
+def version_time(folder: str, name: str) -> Optional[float]:
+    """When a version was made; None for a folder that is not a version."""
+    if name.endswith(PARTIAL) or name == CURRENT:
+        return None
+    if STAMP_RE.match(name):
+        return time.mktime(time.strptime(name, STAMP_FMT))
+    try:
+        with open(os.path.join(folder, MARKER)) as f:
+            return float(f.read().strip())
+    except (OSError, ValueError):
+        return None
+
+
+def list_versions(base: str) -> List[dict]:
+    """The versions in a backup folder, newest first: [{"name", "at"}]; the single copy
+    on FAT32 / exFAT is {"name": "Current", "at": None}."""
+    try:
+        names = os.listdir(base)
+    except OSError:
         return []
+    found = [{"name": n, "at": version_time(os.path.join(base, n), n)} for n in names]
+    out = sorted((v for v in found if v["at"] is not None), key=lambda v: v["at"], reverse=True)
+    return out + ([{"name": CURRENT, "at": None}] if CURRENT in names else [])
+
+
+def norm_versions(items) -> List[dict]:
+    """Versions as {"name", "at"}; the state of older releases kept the names only."""
+    out = []
+    for v in items or []:
+        if isinstance(v, dict):
+            out.append(v)
+        elif v == CURRENT:
+            out.append({"name": v, "at": None})
+        elif STAMP_RE.match(v):
+            out.append({"name": v, "at": time.mktime(time.strptime(v, STAMP_FMT))})
+    return out
+
+
+def to_prune(versions: List[dict], keep_days: int, now: float) -> List[str]:
+    """Versions older than keep_days; the newest version is always kept."""
+    dated = sorted((v for v in versions if v.get("at") is not None), key=lambda v: v["at"])
     cutoff = now - keep_days * 86400
-    old = [n for n in stamps[:-1] if time.mktime(time.strptime(n, STAMP_FMT)) < cutoff]
-    return old
+    return [v["name"] for v in dated[:-1] if v["at"] < cutoff]
+
+
+def _duration(sec: float) -> str:
+    sec = int(sec)
+    if sec < 60:
+        return f"{sec} s"
+    if sec < 3600:
+        return f"{sec // 60} min {sec % 60} s"
+    return f"{sec // 3600} h {sec % 3600 // 60} min"
 
 
 # never copied: recycle bins and previous versions (anywhere), Talon's own folders and lost+found
@@ -70,6 +127,8 @@ class Backup:
         self._lock = threading.Lock()
         self._sizes: Dict[str, dict] = {}            # volume -> {"at": time, "folders": {name: bytes}}
         self._sizing: set = set()
+        self._logs: Dict[str, collections.deque] = {}   # task -> the lines of its last run
+        self.log_dir = os.path.join(os.path.dirname(os.path.abspath(nas.cfg.state_file)), "backup-logs")
 
     # ------------------------------------------------------------ disks
     def _uuid(self, dev: str, fstype: str) -> str:
@@ -185,7 +244,7 @@ class Backup:
             d = disks.get(t["disk_uuid"])
             tasks.append({**t, "sources": self._sources(t), "connected": bool(d), "disk": d,
                           "progress": self.progress.get(t["id"], {"state": "idle"}),
-                          "snapshots": self._snapshots(t, d) if d else t.get("snapshots_seen", [])})
+                          "snapshots": self._snapshots(t, d) if d else norm_versions(t.get("snapshots_seen"))})
         return {"tasks": tasks, "disks": list(disks.values()), "prepare": self.blank_disks(),
                 "sources": self.sources(),
                 "backup_dir": os.path.relpath(self._base("/"), "/")}
@@ -284,6 +343,9 @@ class Backup:
         if self.progress.get(tid, {}).get("state") == "running":
             raise UserError("Stop the backup first")
         self.state.update(lambda d: d["usb_backup"].pop(tid, None))
+        self._logs.pop(tid, None)
+        with contextlib.suppress(OSError):
+            os.remove(self._log_file(tid))
         self.state.log_activity(actor, f"Deleted backup {t['name']} (the backups on the disk are kept)", "info", "backup")
 
     def _get(self, tid: str) -> dict:
@@ -297,19 +359,47 @@ class Backup:
         host = re.sub(r"[^A-Za-z0-9._-]", "_", self.nas.p.system_info().get("hostname", "nas")) or "nas"
         return os.path.join(root, ROOT_DIR, host)
 
-    def _snapshots(self, task: dict, disk: Optional[dict]) -> List[str]:
+    def _snapshots(self, task: dict, disk: Optional[dict]) -> List[dict]:
         if not disk:
             return []
         if self.demo:
-            return list(task.get("demo_snapshots", []))
+            return norm_versions(task.get("demo_snapshots"))
         root = self._mounted_root(disk, mount=False)
         if not root:
-            return task.get("snapshots_seen", [])
+            return norm_versions(task.get("snapshots_seen"))
+        return list_versions(self._base(root))
+
+    # ------------------------------------------------------------ log
+    def _log_file(self, tid: str) -> str:
+        return os.path.join(self.log_dir, f"{tid}.log")
+
+    def _log(self, tid: str, text: str, level: str = "INFO", file: str = "") -> None:
+        """A log line in the same time/level/file/message form as OneDrive's."""
+        q = self._logs.get(tid)
+        if q is not None:
+            q.append("\t".join((time.strftime("%H:%M:%S"), level, file.replace("\t", " "), text.replace("\t", " "))))
+
+    def task_log(self, tid: str) -> List[str]:
+        """The lines of the running or the last run."""
+        self._get(tid)
+        q = self._logs.get(tid)
+        if q is not None:
+            return list(q)
         try:
-            names = os.listdir(self._base(root))
+            with open(self._log_file(tid)) as f:
+                return f.read().splitlines()[-2000:]
         except OSError:
             return []
-        return sorted((n for n in names if STAMP_RE.match(n) or n == CURRENT), reverse=True)
+
+    def _save_log(self, tid: str) -> None:
+        q = self._logs.get(tid)
+        if q is None:
+            return
+        try:
+            os.makedirs(self.log_dir, exist_ok=True)
+            write_atomic(self._log_file(tid), "\n".join(q) + "\n", 0o600)
+        except OSError:
+            pass
 
     def _mounted_root(self, disk: dict, mount: bool = True) -> Optional[str]:
         ext = next((e for e in self.nas.files.externals() if e["dev"] == disk["dev"]), None)
@@ -331,6 +421,9 @@ class Backup:
             self._stop.discard(tid)
             self.progress[tid] = {"state": "running", "share": "", "index": 0, "total": 0, "percent": 0,
                                   "started": time.time(), "speed": None}
+            self._logs[tid] = collections.deque(maxlen=2000)
+        self._log(tid, time.strftime("Backup started " + date_pattern(self.state.get("settings"), True)) +
+                  ("" if actor == "talon" else f" by {actor}"))
         self.state.log_activity(actor, f"Backup {task['name']} started", "info", "backup")
         threading.Thread(target=self._run, args=(task, disk, actor), daemon=True, name=f"backup-{tid}").start()
         return self.info()
@@ -345,16 +438,15 @@ class Backup:
         tid = task["id"]
         p = self.progress[tid]
         err = None
-        stamp = snapshot_name(time.time())
         try:
             items = self._items(task)
             if not items:
                 raise UserError("Nothing to back up: the chosen folders no longer exist")
             p["total"] = len(items)
             if self.demo:
-                self._demo_run(task, items, stamp)
+                self._demo_run(task, items)
             else:
-                self._real_run(task, disk, items, stamp)
+                self._real_run(task, disk, items)
             stopped = tid in self._stop
             p.update(state="stopped" if stopped else "success", percent=100, finished=time.time())
         except Exception as e:   # noqa: BLE001 - reported in the page, the log and by email
@@ -370,18 +462,25 @@ class Backup:
             if t:
                 t["last"] = last
         self.state.update(upd)
+        took = _duration(last["duration"])
         if err:
+            self._log(tid, f"Failed after {took}: {err}", "ERROR")
             self.state.log_activity(actor, f"Backup {task['name']} failed: {err}", "error", "backup")
             self.nas.notifier.send("usb_backup", f"Backup {task['name']} failed", f"Backup {task['name']} failed:\n{err}")
         elif p["state"] == "stopped":
+            self._log(tid, f"Stopped after {took}", "WARNING")
             self.state.log_activity(actor, f"Backup {task['name']} stopped", "warning", "backup")
         else:
             ejected = ""
             if task.get("eject"):
                 ejected = self._eject(disk)
+                if ejected:
+                    self._log(tid, "Ejected the disk; it can be unplugged")
+            self._log(tid, f"Finished in {took}", "SUCCESS")
             self.state.log_activity(actor, f"Backup {task['name']} completed{ejected}", "info", "backup")
             self.nas.notifier.send("usb_backup", f"Backup {task['name']} completed",
                                    f"Backup {task['name']} to {task['disk_name']} completed{ejected}.")
+        self._save_log(tid)
 
     def _eject(self, disk: dict) -> str:
         try:
@@ -396,91 +495,157 @@ class Backup:
             pass
         return ""
 
-    def _real_run(self, task: dict, disk: dict, items: List[dict], stamp: str) -> None:
+    def _real_run(self, task: dict, disk: dict, items: List[dict]) -> None:
         tid = task["id"]
         p = self.progress[tid]
         if not shutil.which("rsync"):
             p["share"] = "Installing rsync"
+            self._log(tid, "Installing rsync")
             run(["apt-get", "install", "-y", "-q", "rsync"], timeout=900, env=ENV)
         root = self._mounted_root(disk)
         if not root:
             raise UserError("The disk is no longer connected")
         base = self._base(root)
         os.makedirs(base, exist_ok=True)
+        for n in os.listdir(base):                             # left by a run that could not finish (power cut)
+            if n.endswith(PARTIAL):
+                self._log(tid, f"Removing {n}, left unfinished by an earlier run")
+                shutil.rmtree(os.path.join(base, n), ignore_errors=True)
         versions = disk["fstype"] in LINKS_FS
+        settings = self.state.get("settings")
         if versions:
-            done = sorted(n for n in os.listdir(base) if STAMP_RE.match(n))
-            prev = os.path.join(base, done[-1]) if done else None
-            if done and done[-1] == stamp:                     # twice in one minute
-                stamp = snapshot_name(time.time() + 60)
-            dest = os.path.join(base, stamp + ".partial")
+            prev = next((v["name"] for v in list_versions(base) if v["at"] is not None), None)
+            at = time.time()
+            stamp = snapshot_name(at, settings)
+            while os.path.exists(os.path.join(base, stamp)):   # twice in one minute
+                at += 60
+                stamp = snapshot_name(at, settings)
+            dest = os.path.join(base, stamp + PARTIAL)
+            os.makedirs(dest, exist_ok=True)
+            with open(os.path.join(dest, MARKER), "w") as f:
+                f.write(f"{at}\n")
+            self._log(tid, f"New version {stamp}" + (f"; files that did not change are linked to {prev}" if prev else ""))
+            prev = os.path.join(base, prev) if prev else None
         else:
-            prev, dest = None, os.path.join(base, CURRENT)
-        os.makedirs(dest, exist_ok=True)
+            stamp, prev, dest = CURRENT, None, os.path.join(base, CURRENT)
+            os.makedirs(dest, exist_ok=True)
+            self._log(tid, f"Updating the copy in {CURRENT} ({disk['fs_label']} keeps no earlier versions)")
+        finished = False
+        try:
+            self._copy(task, items, dest, prev, versions)
+            finished = tid not in self._stop
+        finally:
+            if versions and not finished:                      # stopped or failed: no half version is left
+                shutil.rmtree(dest, ignore_errors=True)
+                self._log(tid, f"Removed the unfinished version {stamp}")
+        if not finished:
+            return
+        if versions:
+            os.rename(dest, os.path.join(base, stamp))
+            for old in to_prune(list_versions(base), task["keep_days"], time.time()):
+                self._log(tid, f"Removing version {old}, older than {task['keep_days']} days")
+                shutil.rmtree(os.path.join(base, old), ignore_errors=True)
+        run(["sync"], check=False, timeout=600)
+        snaps = list_versions(base)
+        self.state.update(lambda d: d["usb_backup"][tid].__setitem__("snapshots_seen", snaps))
+
+    def _copy(self, task: dict, items: List[dict], dest: str, prev: Optional[str], versions: bool) -> None:
+        """rsync each folder into the version, logging every file copied or deleted."""
+        tid = task["id"]
+        p = self.progress[tid]
         n = len(items)
         for i, it in enumerate(items):
             if tid in self._stop:
                 return
             p.update(share=it["label"], index=i, percent=round(i / n * 100, 1))
+            self._log(tid, f"Backing up {it['label']} ({i + 1} of {n})")
             target = os.path.join(dest, it["dest"])
             os.makedirs(target, exist_ok=True)
-            cmd = ["nice", "-n", "10", "rsync", "--info=progress2", "--no-inc-recursive", "--delete", *EXCLUDES]
+            cmd = ["nice", "-n", "10", "rsync", "--info=progress2", "--no-inc-recursive", "--delete",
+                   "--out-format=>> %o %n", *EXCLUDES]
             cmd += ["-aH"] if versions else ["-rt", "--modify-window=2"]
             if prev and os.path.isdir(os.path.join(prev, it["dest"])):
                 cmd.append(f"--link-dest={os.path.join(prev, it['dest'])}")
             cmd += [it["path"].rstrip("/") + "/", target + "/"]
-            proc = self._procs[tid] = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            # one pipe for both: rsync waits when a stderr pipe nobody reads fills up
+            proc = self._procs[tid] = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                                       text=True, errors="replace")
             assert proc.stdout is not None
+            errors: List[str] = []
+            counts = {"copied": 0, "deleted": 0}
             buf = ""
             while True:
                 ch = proc.stdout.read(1)
                 if not ch:
                     break
                 if ch in "\r\n":
-                    pr = parse_progress(buf)
-                    if pr and pr.get("source") == "rsync":
-                        p.update(percent=round((i + pr["percent"] / 100) / n * 100, 1), speed=pr.get("speed"))
+                    self._rsync_line(tid, it, buf, i, n, counts, errors)
                     buf = ""
                 else:
                     buf += ch
+            self._rsync_line(tid, it, buf, i, n, counts, errors)
             rc = proc.wait()
-            errtxt = (proc.stderr.read() if proc.stderr else "").strip()
             if tid in self._stop:
                 return
+            self._log(tid, f"{it['label']}: {counts['copied']:,} files copied, {counts['deleted']:,} deleted")
             if rc not in (0, 24):                              # 24: files vanished while copying
-                if "No space left" in errtxt:
+                if any("No space left" in e for e in errors):
                     raise UserError("The backup disk is full")
-                raise UserError((errtxt.splitlines() or [f"rsync failed (exit code {rc})"])[-1])
-        if versions:
-            final = os.path.join(base, stamp)
-            os.rename(dest, final)
-            for old in to_prune(os.listdir(base), task["keep_days"], time.time()):
-                shutil.rmtree(os.path.join(base, old), ignore_errors=True)
-        run(["sync"], check=False, timeout=600)
-        snaps = sorted((n for n in os.listdir(base) if STAMP_RE.match(n) or n == CURRENT), reverse=True)
-        self.state.update(lambda d: d["usb_backup"][tid].__setitem__("snapshots_seen", snaps))
+                raise UserError(errors[-1] if errors else f"rsync failed (exit code {rc})")
 
-    def _demo_run(self, task: dict, items: List[dict], stamp: str) -> None:
+    def _rsync_line(self, tid: str, it: dict, line: str, i: int, n: int, counts: dict, errors: List[str]) -> None:
+        """One line of rsync's output: a file it copied or deleted, its progress, or a message."""
+        line = line.strip()
+        if not line:
+            return
+        if line.startswith(">> "):                             # --out-format: the operation and the path
+            op, _, name = line[3:].partition(" ")
+            if not name or name.endswith("/"):                 # a folder
+                return
+            gone = op == "del."
+            counts["deleted" if gone else "copied"] += 1
+            self._log(tid, "Deleted" if gone else "Copied", file=f"{it['dest']}/{name}")
+            return
+        pr = parse_progress(line)
+        if pr:
+            if pr.get("source") == "rsync":
+                self.progress[tid].update(percent=round((i + pr["percent"] / 100) / n * 100, 1), speed=pr.get("speed"))
+            return
+        vanished = "vanished" in line
+        if not vanished:
+            errors.append(line)
+        self._log(tid, line, "WARNING" if vanished else "ERROR")
+
+    def _demo_run(self, task: dict, items: List[dict]) -> None:
         tid = task["id"]
         p = self.progress[tid]
         disk = next((d for d in self.disks() if d["uuid"] == task["disk_uuid"]), None)
+        settings = self.state.get("settings")
+        now = time.time()
+        old = norm_versions(task.get("demo_snapshots")) or [
+            {"name": snapshot_name(now - k * 86400, settings), "at": now - k * 86400} for k in range(1, 6)]
+        new = {"name": snapshot_name(now, settings), "at": now}
+        self._log(tid, f"New version {new['name']}; files that did not change are linked to {old[0]['name']}")
         for i, it in enumerate(items):
+            self._log(tid, f"Backing up {it['label']} ({i + 1} of {len(items)})")
             for step in range(10):
                 if tid in self._stop:
+                    self._log(tid, f"Removed the unfinished version {new['name']}")
                     return
                 p.update(share=it["label"], index=i, percent=round((i + step / 10) / len(items) * 100, 1), speed=48 * 1024 ** 2)
+                self._log(tid, "Copied", file=f"{it['dest']}/Example {step + 1}.txt")
                 time.sleep(0.12)
+            self._log(tid, f"{it['label']}: 10 files copied, 0 deleted")
 
-        snaps = sorted(set(task.get("demo_snapshots") or [snapshot_name(time.time() - k * 86400) for k in range(1, 6)]) | {stamp},
-                       reverse=True)
+        snaps = sorted([v for v in old if v["name"] != new["name"]] + [new], key=lambda v: v["at"], reverse=True)
         if disk:                                   # folders in the Files sandbox, so Restore opens something
             base = self._base(self.nas.files._root(disk["id"]))
             for snap in snaps:
                 for it in items:
-                    folder = os.path.join(base, snap, it["dest"])
+                    folder = os.path.join(base, snap["name"], it["dest"])
                     os.makedirs(folder, exist_ok=True)
                     with open(os.path.join(folder, "Example.txt"), "w") as f:
-                        f.write(f"A file from {it['label']}, backed up {snap}\n")
+                        f.write(f"A file from {it['label']}, backed up {snap['name']}\n")
         self.state.update(lambda d: d["usb_backup"][tid].__setitem__("demo_snapshots", snaps))
 
     # ------------------------------------------------------------ plug and schedule

@@ -378,6 +378,10 @@ def create_app(cfg, platform) -> FastAPI:
             nas.backup.run_now(t["id"], user)
         return t
 
+    @app.get("/api/backup/{tid}/log")
+    def backup_log(tid: str, _u: str = Depends(current_user)):
+        return nas.backup.task_log(tid)
+
     @app.put("/api/backup/{tid}")
     def backup_update(tid: str, body: dict = Body(...), user: str = Depends(current_user)):
         return nas.backup.update(tid, body, user)

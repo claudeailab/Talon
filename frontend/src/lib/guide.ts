@@ -624,9 +624,10 @@ export const GUIDE: Topic[] = [
         id: "versions",
         title: "Versions and restoring",
         blocks: [
-          { p: "On disks formatted as ext4, XFS, Btrfs or NTFS, every backup is a dated version; files that did not change take no extra space. Versions older than the number of days you chose are removed, and the newest is always kept. FAT32 and exFAT cannot do this: there the backup is one copy, kept up to date." },
+          { p: "On disks formatted as ext4, XFS, Btrfs or NTFS, every backup is a dated version, a folder named after the date and time in the date format of [Settings](/settings), for example 24-11-2026_1240; files that did not change take no extra space. A backup that is stopped or fails leaves no half version behind. Versions older than the number of days you chose are removed, and the newest is always kept. FAT32 and exFAT cannot do this: there the backup is one copy, kept up to date." },
           { p: "**Restore** lists the versions. Choosing one opens it in [Browser](/browser), where you can download a file or move it back to a volume." },
           { p: "**⋯ → Edit** changes the folders or the schedule; **Delete** removes the backup task but keeps the backups on the disk." },
+          { p: "**⋯ → View log** shows the progress of a running backup and every file it copies or deletes, keeping the newest line in view; scroll up to read earlier lines. After a run it shows that run's log, with the error if it failed." },
         ],
       },
     ],

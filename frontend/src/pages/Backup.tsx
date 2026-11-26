@@ -1,9 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Check, ChevronDown, DatabaseBackup, HardDrive, Minus, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Square, Trash2, Usb } from "lucide-react";
+import { Check, ChevronDown, DatabaseBackup, FileText, HardDrive, Minus, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Square, Trash2, Usb } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, bytes, cx, dateTime, rate } from "../lib/format";
 import { useAction } from "../lib/hooks";
+import { LogList } from "../components/log";
 import { navigate } from "../lib/router";
 import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Select, Switch } from "../components/ui";
 
@@ -23,7 +24,8 @@ type Task = {
   last: { at: number; ok: boolean; error: string | null; stopped: boolean; duration: number } | null;
   connected: boolean;
   disk: Disk | null;
-  snapshots: string[];
+  /** newest first; "at" is null for the single copy on FAT32 / exFAT (Current) */
+  snapshots: { name: string; at: number | null }[];
   progress: { state: "idle" | "running" | "success" | "error" | "stopped"; share?: string; index?: number; total?: number; percent?: number; speed?: number | null };
 };
 type Blank = { disk: string; name: string; media: string; size: number; kind: string; state: "Empty" | "Has data" | "Old RAID" };
@@ -35,8 +37,7 @@ const describe = (src: Source[]) => src.map((x) => (x.folders.length ? `${x.volu
 const KEEP = [7, 14, 30, 90, 365];
 const whenText = (t: Pick<Task, "when" | "time">) =>
   t.when === "plug" ? "Runs when the disk is plugged in" : t.when === "daily" ? `Runs every day at ${t.time}` : `Runs when plugged in and every day at ${t.time}`;
-const snapLabel = (s: string) =>
-  s === "Current" ? "Latest copy" : dateTime(new Date(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10), +s.slice(11, 13), +s.slice(13, 15)).getTime() / 1000);
+const snapLabel = (s: Task["snapshots"][number]) => (s.at == null ? "Latest copy" : dateTime(s.at));
 
 export default function BackupPage() {
   const q = useQuery({
@@ -74,7 +75,7 @@ export default function BackupPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-5">
           {d.tasks.map((t) => (
             <TaskCard key={t.id} t={t} onEdit={() => setWizard(t)} backupDir={d.backup_dir} />
           ))}
@@ -91,8 +92,8 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
   const del = useAction(() => api.del(`/backup/${t.id}`), { invalidate: ["backup"], success: "Backup deleted", onSuccess: () => setConfirm(false) });
   const [confirm, setConfirm] = useState(false);
   const [restore, setRestore] = useState(false);
-  const p = t.progress;
-  const running = p.state === "running";
+  const [log, setLog] = useState(false);
+  const running = t.progress.state === "running";
   return (
     <Card className="flex flex-col">
       <div className="flex items-start gap-3 p-5 pb-3">
@@ -120,6 +121,9 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
           <MenuItem icon={<Pencil />} onClick={onEdit}>
             Edit
           </MenuItem>
+          <MenuItem icon={<FileText />} onClick={() => setLog(true)}>
+            View log
+          </MenuItem>
           <MenuItem icon={<Trash2 />} danger onClick={() => setConfirm(true)}>
             Delete
           </MenuItem>
@@ -127,16 +131,7 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
       </div>
       <div className="flex-1 space-y-3 px-5 pb-4">
         {running ? (
-          <div className="rounded-xl bg-zinc-50 p-3.5 dark:bg-white/[0.03]">
-            <div className="flex items-baseline justify-between gap-3 text-[13px]">
-              <span className="min-w-0 font-medium break-words">
-                Backing up {p.share} · {(p.index ?? 0) + 1} of {p.total}
-              </span>
-              <span className="tabular shrink-0 font-semibold text-zinc-500">{Math.round(p.percent ?? 0)}%</span>
-            </div>
-            <Progress value={p.percent ?? 0} className="mt-2 h-2" />
-            {p.speed ? <div className="mt-1 text-xs text-zinc-500">{rate(p.speed)}</div> : null}
-          </div>
+          <RunProgress p={t.progress} />
         ) : t.last ? (
           <div className="text-[13px]">
             <span className="font-medium">Last backup</span>{" "}
@@ -175,9 +170,9 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
           <div className="flex flex-wrap gap-2">
             {t.snapshots.map((s) => (
               <Button
-                key={s}
+                key={s.name}
                 size="sm"
-                onClick={() => navigate(`/browser?${new URLSearchParams({ volume: t.disk!.id, path: `${backupDir}/${s}` })}`)}
+                onClick={() => navigate(`/browser?${new URLSearchParams({ volume: t.disk!.id, path: `${backupDir}/${s.name}` })}`)}
               >
                 {snapLabel(s)}
               </Button>
@@ -185,6 +180,7 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
           </div>
         </Modal>
       )}
+      {log && <LogDialog t={t} onClose={() => setLog(false)} />}
       <ConfirmDialog
         open={confirm}
         onClose={() => setConfirm(false)}
@@ -196,6 +192,48 @@ function TaskCard({ t, onEdit, backupDir }: { t: Task; onEdit: () => void; backu
         message="Only the backup task is deleted. The backups already on the disk stay there."
       />
     </Card>
+  );
+}
+
+/** Which folder is being copied, how far the run is and how fast it goes. */
+function RunProgress({ p }: { p: Task["progress"] }) {
+  return (
+    <div className="rounded-xl bg-zinc-50 p-3.5 dark:bg-white/[0.03]">
+      <div className="flex items-baseline justify-between gap-3 text-[13px]">
+        <span className="min-w-0 font-medium break-words">
+          Backing up {p.share} · {(p.index ?? 0) + 1} of {p.total}
+        </span>
+        <span className="tabular shrink-0 font-semibold text-zinc-500">{Math.round(p.percent ?? 0)}%</span>
+      </div>
+      <Progress value={p.percent ?? 0} className="mt-2 h-2" />
+      {p.speed ? <div className="mt-1 text-xs text-zinc-500">{rate(p.speed)}</div> : null}
+    </div>
+  );
+}
+
+/** The running or the last run's log, as for OneDrive tasks: every file copied or deleted, and any error. */
+function LogDialog({ t, onClose }: { t: Task; onClose: () => void }) {
+  const q = useQuery({
+    queryKey: ["backup-log", t.id],
+    queryFn: () => api.get<string[]>(`/backup/${t.id}/log`),
+    refetchInterval: 2000,
+  });
+  const running = t.progress.state === "running";
+  return (
+    <Modal open onClose={onClose} size="lg" title={`Log: ${t.name}`} footer={<Button onClick={onClose}>Close</Button>}>
+      {/* the last run's error, until the backup runs again */}
+      {!running && t.last && !t.last.ok && !t.last.stopped && t.last.error && (
+        <Callout tone="danger" title={`Last run failed on ${dateTime(t.last.at)}`} className="mb-3">
+          {t.last.error}
+        </Callout>
+      )}
+      {running && (
+        <div className="mb-3">
+          <RunProgress p={t.progress} />
+        </div>
+      )}
+      <LogList lines={q.data} />
+    </Modal>
   );
 }
 

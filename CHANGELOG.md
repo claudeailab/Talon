@@ -1,3 +1,8 @@
+## 1.0.144
+- Backup: ⋯ → View log shows a running backup's progress and every file it copies, like OneDrive
+- Backup versions are named in the date format of Settings, and a stopped or failed backup no longer leaves a .partial folder
+- RAID, Volumes and Backup use the full page width, like Disks and OneDrive
+
 ## 1.0.143
 - Phones: a swipe from the screen edge no longer triggers the browser's back gesture, which closed the menu again
 

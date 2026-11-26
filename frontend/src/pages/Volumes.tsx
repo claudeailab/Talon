@@ -102,7 +102,7 @@ export default function VolumesPage() {
           />
         </Card>
       ) : (
-        <div className="grid gap-5 2xl:grid-cols-2">
+        <div className="grid gap-5">
           {vols.data.map((v) => (
             <VolumeCard key={v.name} v={v} onJob={setJob} />
           ))}
