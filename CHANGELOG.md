@@ -1,3 +1,7 @@
+## 1.0.156
+- Dashboard: the CPU, Memory, Network and Disk activity charts show the last 30 minutes, recorded all the time, instead of the last 3
+- Right after a restart they start from the saved history, so they are never empty
+
 ## 1.0.155
 - Changelog: 10 versions a page, with Per page, Prev and Next at the bottom right
 

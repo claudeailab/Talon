@@ -11,6 +11,7 @@ is kept in memory and written to one file every 10 minutes (every hour when the
 system disk is an SD card or USB flash drive), about 1 MB in all."""
 from __future__ import annotations
 
+import collections
 import json
 import os
 import random
@@ -183,3 +184,68 @@ def _merge(pts: List[dict], n: int) -> List[dict]:
                 p[k] = max(vals) if k.endswith("^") else round(sum(vals) / len(vals), 3)
         out.append(p)
     return out
+
+
+TREND_KEYS = ("cpu", "mem_used", "rx", "tx", "read", "write", "temp")
+
+
+class Trend:
+    """The Dashboard cards' small charts: the last 30 minutes in 20-second steps, so a
+    short burst (opening the page) does not fill the chart and there is always something
+    to see. Starts from the saved per-minute history after a restart."""
+
+    def __init__(self, step: int = 20, keep: int = 90):
+        self.step = step
+        self.points: "collections.deque[dict]" = collections.deque(maxlen=keep)
+        self._acc: Optional[dict] = None
+        self._lock = threading.Lock()
+
+    def seed(self, minutes: List[dict], now: float) -> None:
+        """Fill with the per-minute history (History "minute" tier) of the last half hour:
+        each minute becomes three steps. Memory is a percentage there."""
+        span = self.step * (self.points.maxlen or 90)
+        with self._lock:
+            for m in minutes:
+                if m["ts"] < now - span or m.get("cpu") is None:
+                    continue
+                for k in range(60 // self.step):
+                    self.points.append({"ts": m["ts"] + k * self.step, "cpu": m.get("cpu", 0.0),
+                                        "mem_used": m.get("mem") or 0.0, "mem_total": 100.0,
+                                        "temp": m.get("temp"), "load": [],
+                                        **{x: m.get(x) or 0.0 for x in ("rx", "tx", "read", "write")}})
+
+    def add(self, p: dict) -> None:
+        """One 2-second sample, as kept for the live numbers."""
+        start = p["ts"] - p["ts"] % self.step
+        with self._lock:
+            a = self._acc
+            if a and a["start"] != start:
+                self.points.append(self._avg(a))
+                a = None
+            if a is None:
+                a = self._acc = {"start": start, "n": 0, "sum": {k: 0.0 for k in TREND_KEYS}, "tn": 0}
+            a["n"] += 1
+            for k in TREND_KEYS:
+                if k == "temp":
+                    if p.get("temp") is not None:
+                        a["sum"]["temp"] += p["temp"]
+                        a["tn"] += 1
+                else:
+                    a["sum"][k] += p.get(k) or 0.0
+            a["last"] = p
+
+    @staticmethod
+    def _avg(a: dict) -> dict:
+        last = a["last"]
+        out = {k: a["sum"][k] / a["n"] for k in TREND_KEYS if k != "temp"}
+        out.update(ts=a["start"], temp=a["sum"]["temp"] / a["tn"] if a["tn"] else None,
+                   mem_total=last.get("mem_total", 0.0), load=last.get("load", []))
+        return out
+
+    def series(self) -> List[dict]:
+        """The finished steps and the one being filled."""
+        with self._lock:
+            out = list(self.points)
+            if self._acc:
+                out.append(self._avg(self._acc))
+        return out

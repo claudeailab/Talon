@@ -222,7 +222,10 @@ export interface Alert {
 
 export interface Dashboard {
   info: SysInfo;
+  /** the cards' charts: the last 30 minutes in 20-second steps */
   history: Point[];
+  /** the latest 2-second sample */
+  now?: Point | null;
   volumes: Volume[];
   disks: Pick<Disk, "name" | "model" | "size" | "kind" | "status" | "health" | "temperature" | "volume" | "array">[];
   services: Service[];

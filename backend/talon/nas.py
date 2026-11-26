@@ -16,7 +16,7 @@ from .folderperms import FolderPerms
 from .jobs import JobRunner, steps
 from .network import Network
 from .antivirus import Antivirus
-from .history import History
+from .history import History, Trend
 from .osupdate import OsUpdate
 from .ramlog import RamLog
 from .backup import Backup
@@ -82,7 +82,10 @@ class Nas:
         self._vol_checked = 0.0
         self.antivirus = Antivirus(self, bool(getattr(platform, "demo", False)))
         self.backup = Backup(self, bool(getattr(platform, "demo", False)))
-        self.history: collections.deque = collections.deque(maxlen=90)
+        self.history: collections.deque = collections.deque(maxlen=90)   # live 2-second samples
+        # the Dashboard cards' charts: 30 minutes, already filled from the saved history
+        self.trend = Trend()
+        self.trend.seed(self.usage.tiers.get("minute", []), time.time())
         self._last_sample: Optional[dict] = None
         self._stop = threading.Event()
 
@@ -170,6 +173,7 @@ class Nas:
                     point["write"] = max(s["disk_write"] - prev["disk_write"], 0) / dt
                 self._last_sample = s
                 self.history.append(point)
+                self.trend.add(point)
                 self._record_usage(point)
             except Exception:
                 pass
@@ -1204,7 +1208,8 @@ class Nas:
         disks = self.disks()
         return {
             "info": self.p.system_info(),
-            "history": list(self.history),
+            "history": self.trend.series(),
+            "now": self.history[-1] if self.history else None,
             "volumes": volumes,
             "disks": [{k: d[k] for k in ("name", "model", "size", "kind", "status", "health",
                                          "temperature", "volume", "array")} for d in disks],

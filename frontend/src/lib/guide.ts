@@ -105,7 +105,7 @@ export const GUIDE: Topic[] = [
           { img: "dashboard", alt: "Dashboard" },
           {
             list: [
-              "**CPU, Memory, Network and Disk activity**: live values and the last few minutes as a chart. Tap a card for its history.",
+              "**CPU, Memory, Network and Disk activity**: live values and the last 30 minutes as a chart, recorded all the time, also while the page is closed. Tap a card for its history.",
               "**Storage**: each volume with its free space, each RAID array with its health and disks and, when turned on, OneDrive.",
               "**System**: model, operating system, kernel, processor, memory, uptime, network addresses, and the number of shared folders and users.",
               "**Disks**: every disk with its health and temperature.",

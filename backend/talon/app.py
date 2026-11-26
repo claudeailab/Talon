@@ -492,7 +492,8 @@ def create_app(cfg, platform) -> FastAPI:
 
     @app.get("/api/stats")
     def stats(_u: str = Depends(current_user)):
-        return {"history": list(nas.history)}
+        # history: the cards' charts (30 minutes in 20-second steps); now: the latest 2-second sample
+        return {"history": nas.trend.series(), "now": nas.history[-1] if nas.history else None}
 
     # ------------------------------------------------------------ disks
     @app.get("/api/disks")

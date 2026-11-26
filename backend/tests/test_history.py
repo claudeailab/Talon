@@ -35,3 +35,33 @@ def test_history_api(client):
     assert r["disks"] and r["volumes"]
     assert any(v["forecast"] for v in r["volumes"].values())
     assert client.get("/api/history", params={"range": "1y"}).json()["step"] == 21600
+
+
+def test_trend_steps_and_seed():
+    from talon.history import Trend
+    t = Trend(step=20, keep=90)
+    # after a restart: the last half hour of the saved per-minute history, each minute as three steps
+    now = 100_000.0
+    minutes = [{"ts": now - 3600, "cpu": 99.0, "mem": 50.0},                      # too old
+               {"ts": now - 120, "cpu": 10.0, "mem": 40.0, "rx": 100.0},
+               {"ts": now - 60, "cpu": 20.0, "mem": 42.0}]
+    t.seed(minutes, now)
+    s = t.series()
+    assert len(s) == 6 and [p["cpu"] for p in s] == [10.0] * 3 + [20.0] * 3
+    assert s[0]["mem_used"] / s[0]["mem_total"] == 0.4 and s[0]["rx"] == 100.0 and s[3]["rx"] == 0.0
+    # 2-second samples are averaged into 20-second steps; the step being filled is included
+    for i in range(15):                                                               # 30 s
+        t.add({"ts": now + i * 2, "cpu": 10.0 if i < 10 else 40.0, "mem_used": 1.0, "mem_total": 4.0,
+               "temp": 50.0, "load": [0.1], "rx": 0.0, "tx": 0.0, "read": float(i), "write": 0.0})
+    s = t.series()
+    assert len(s) == 8 and s[-2]["ts"] == now and s[-2]["cpu"] == 10.0 and s[-2]["read"] == 4.5
+    assert s[-1]["ts"] == now + 20 and s[-1]["cpu"] == 40.0 and s[-1]["temp"] == 50.0 and s[-1]["mem_total"] == 4.0
+
+
+def test_stats_api(client):
+    import time as _t
+    _t.sleep(2.5)                                       # one sample at least
+    st = client.get("/api/stats").json()
+    assert st["now"] and "cpu" in st["now"] and st["history"]
+    d = client.get("/api/dashboard").json()
+    assert d["history"] and "now" in d

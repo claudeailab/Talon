@@ -26,11 +26,12 @@ import { HistoryModal, type HistoryMetric } from "../components/history";
 
 export default function DashboardPage() {
   const { data } = useQuery({ queryKey: ["dashboard"], queryFn: () => api.get<Dashboard>("/dashboard"), refetchInterval: 10000 });
-  const stats = useQuery({ queryKey: ["stats"], queryFn: () => api.get<{ history: Point[] }>("/stats"), refetchInterval: 2000 });
+  // charts: the last 30 minutes (20-second steps, kept by Talon all the time); numbers: the latest 2-second sample
+  const stats = useQuery({ queryKey: ["stats"], queryFn: () => api.get<{ history: Point[]; now: Point | null }>("/stats"), refetchInterval: 2000 });
   const [histView, setHist] = useState<HistoryMetric | null>(null);
   if (!data) return <PageLoader />;
   const hist = stats.data?.history ?? data.history;
-  const last = hist[hist.length - 1];
+  const last = stats.data?.now ?? data.now ?? hist[hist.length - 1];
   const totalSize = data.volumes.reduce((a, v) => a + v.size, 0);
   const totalUsed = data.volumes.reduce((a, v) => a + v.used, 0);
 
