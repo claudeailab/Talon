@@ -1,3 +1,7 @@
+## 1.0.169
+- Wipe disk and Delete RAID now erase the volumes inside an old RAID array, not only its signatures
+- A new RAID array always starts empty, also on disks of an earlier array with the same layout
+
 ## 1.0.168
 - Entra ID Users: a clear message when the tenant ID does not match the app registration
 

@@ -229,7 +229,35 @@ class RealPlatform:
             for h in glob.glob(f"/sys/class/block/{node}/holders/md*"):
                 md = os.path.basename(h)
                 log(f"-- stopping old RAID {md}")
+                self._release_md(md, log)
                 run(["mdadm", "--stop", _dev(md)], log=log)
+
+    def _release_md(self, md: str, log: Logger) -> None:
+        """Close LVM volumes that live on a RAID array, so it can be stopped or erased
+        (udev opens the volumes of an old LVM pool as soon as the array appears)."""
+        cp = run(["pvs", "--noheadings", "-o", "vg_name", _dev(md)], check=False, timeout=30)
+        vg = cp.stdout.strip() if cp.returncode == 0 else ""
+        if vg:
+            run(["vgchange", "-an", vg], check=False, log=log)
+        for h in glob.glob(f"/sys/block/{md}/holders/dm-*"):
+            name = read_file(os.path.join(h, "dm", "name")).strip()
+            if name:
+                run(["dmsetup", "remove", name], check=False, log=log)
+
+    def _zero(self, name: str, log: Logger, mib: int = 1024, end_mib: int = 0) -> None:
+        """Overwrite the first `mib` MiB (and the last `end_mib` MiB) of a block device.
+        Erasing signatures alone is not enough: a RAID array's contents start about 128 MiB
+        into each disk, so an LVM pool and the filesystems in it would come back as soon
+        as a new array with the same layout is built on the same disks."""
+        total = self.block_size(name) // 2**20
+        if total <= 0:
+            return
+        path = _dev(name)
+        dd = ["dd", "if=/dev/zero", f"of={path}", "bs=1M", "oflag=direct", "conv=notrunc,fsync", "status=none"]
+        run(dd + [f"count={min(mib, total)}"], check=False, log=log, timeout=1800)
+        if end_mib and total > mib:
+            n = min(end_mib, total - mib)
+            run(dd + [f"seek={total - n}", f"count={n}"], check=False, log=log, timeout=1800)
 
     def wipe_disk(self, disk: str, log: Logger, step=lambda n: None) -> None:
         dev = _dev(disk)
@@ -240,8 +268,10 @@ class RealPlatform:
             pn = os.path.basename(p)
             run(["mdadm", "--zero-superblock", _dev(pn)], check=False, log=log)
             run(["wipefs", "-a", _dev(pn)], check=False, log=log)
+            self._zero(pn, log)                  # RAID, LVM and filesystem headers inside it
         run(["mdadm", "--zero-superblock", dev], check=False, log=log)
         run(["wipefs", "-a", dev], log=log)
+        self._zero(disk, log, end_mib=16)        # also the backup partition table at the end
         step(3)
         run(["partprobe", dev], check=False, log=log)
         self._settle(log)
@@ -280,6 +310,16 @@ class RealPlatform:
         cmd += [_dev(p) for p in parts + spares]
         run(cmd, input="y\n", log=log)
         self._settle(log)
+        found = self._md_find(name)
+        # a new array starts empty: nothing from an earlier array on the same disks may
+        # show up in it (an old LVM pool and its volumes, a filesystem)
+        self._release_md(found["dev"], log)
+        run(["wipefs", "-a", _dev(found["dev"])], check=False, log=log)
+        self._zero(found["dev"], log)
+        self._settle(log)
+        return found
+
+    def _md_find(self, name: str) -> dict:
         link = f"/dev/md/{name}"
         for _ in range(20):
             if os.path.exists(link):
@@ -371,6 +411,8 @@ class RealPlatform:
         run(["mdadm", "--manage", _dev(md), "--remove", "detached"], check=False, log=log)
 
     def md_destroy(self, md: str, parts: List[str], log: Logger) -> None:
+        self._release_md(md, log)
+        run(["wipefs", "-a", _dev(md)], check=False, log=log)
         run(["mdadm", "--stop", _dev(md)], log=log)
         for p in parts:
             run(["mdadm", "--zero-superblock", _dev(p)], check=False, log=log)

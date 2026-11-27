@@ -163,7 +163,7 @@
     "title": "Wipe a disk",
     "blocks": [
      {
-      "p": "**Wipe disk** in a disk's **⋯** menu removes old partitions and RAID information, so the disk can be used for a new RAID array or volume."
+      "p": "**Wipe disk** in a disk's **⋯** menu removes old partitions and RAID information, and erases the volume and filesystem data that came with them, so nothing from an old RAID array or volume comes back when the disk is used for a new one. It takes seconds: the rest of the disk is not overwritten, but the old files can no longer be found."
      },
      {
       "warn": "Everything on the disk is lost. Disks that belong to one of Talon's RAID arrays or volumes cannot be wiped."

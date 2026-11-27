@@ -384,7 +384,7 @@ class Nas:
         if not d["selectable"]:
             raise UserError(f"Disk {name} is in use ({d['status_detail']})")
         def work(log):
-            go = steps(log, ["Stopping anything that uses the disk", "Removing RAID and filesystem signatures",
+            go = steps(log, ["Stopping anything that uses the disk", "Erasing RAID, volume and filesystem data",
                              "Reading the empty disk again"])
             self.p.wipe_disk(name, log, step=go)       # stops an old RAID array on it first
             if d["status"] == "raid_member":
