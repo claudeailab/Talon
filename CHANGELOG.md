@@ -1,3 +1,6 @@
+## 1.0.165
+- Changelog: Talon asks GitHub only after it was updated, or when a new version is out; otherwise it uses its own copy and never waits
+
 ## 1.0.164
 - Changelog opens at once: Talon keeps it on disk, refreshes it from GitHub in the background and fetches it ahead of time after starting
 

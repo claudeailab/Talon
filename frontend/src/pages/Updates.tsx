@@ -608,7 +608,7 @@ function PkgList({ pkgs }: { pkgs: Pkg[] }) {
 /* ---------------------------------------------------------------- Changelog */
 
 type Release = { version: string; date: number | null; items: string[] };
-type Changelog = { current: string; versions: Release[]; error: string | null };
+type Changelog = { current: string; versions: Release[]; error: string | null; refreshing?: boolean };
 
 /** 1.0.12 → [1, 0, 12]; newer(a, b): a is a later version than b */
 const parts = (v: string) => v.split(".").map((x) => parseInt(x, 10) || 0);
@@ -632,7 +632,13 @@ const PER_PAGE = [10, 25, 50, 100];
 
 /** Every Talon version and what it changed, by day, newest first; or only the versions after the installed one. A page at a time. */
 function ChangelogTab() {
-  const q = useQuery({ queryKey: ["update-changelog"], queryFn: () => api.get<Changelog>("/update/changelog"), staleTime: 300_000 });
+  // shown at once; after an update the release dates fill in a moment later
+  const q = useQuery({
+    queryKey: ["update-changelog"],
+    queryFn: () => api.get<Changelog>("/update/changelog"),
+    staleTime: 300_000,
+    refetchInterval: (query) => (query.state.data?.refreshing ? 2000 : false),
+  });
   const [since, setSince] = useState<"all" | "since">("all");
   const [perPage, setPerPage] = useState(10);
   const [page, setPage] = useState(0);
@@ -662,7 +668,7 @@ function ChangelogTab() {
             { value: "since", label: `Since ${current}` },
           ]}
         />
-        {error && <span className="text-xs text-zinc-500">Dates appear when Talon can reach GitHub.</span>}
+        {error && !q.data.versions.some((v) => v.date) && <span className="text-xs text-zinc-500">Dates appear when Talon can reach GitHub.</span>}
       </div>
       {list.length === 0 ? (
         <RowCard>

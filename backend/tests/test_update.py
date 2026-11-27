@@ -100,40 +100,66 @@ def test_parse_changelog():
                                             {"version": "1.0.1", "items": ["One"]}]
 
 
-def test_changelog_from_github_with_dates(tmp_path, monkeypatch):
+def test_changelog_asks_github_only_when_there_is_something_new(tmp_path, monkeypatch):
+    import os
     from talon.config import Config
     from talon.state import State
     cfg = Config(state_file=str(tmp_path / "s.json"), update_status_file=str(tmp_path / "u.json"))
-    u = update.Updater(cfg, State(cfg.state_file))
+    st = State(cfg.state_file)
+    u = update.Updater(cfg, st)
+    calls = []
 
     def fake_get(url, timeout=15):
+        calls.append(url)
         if url.endswith("CHANGELOG.md"):
             return b"## 9.0.2\n- Never released\n\n## 9.0.1\n- Newer\n\n## 9.0.0\n- Older\n"
         return json.dumps([{"tag_name": "v9.0.1", "published_at": "2026-11-26T15:04:36Z"},
                            {"tag_name": "v9.0.0", "published_at": "2026-11-23T12:00:00Z"}]).encode()
     monkeypatch.setattr(update, "_get", fake_get)
+
+    # nothing saved: the installed CHANGELOG.md at once, GitHub asked in the background
+    first = u.changelog()
+    assert first["versions"] and first["versions"][0]["date"] is None
+    for _ in range(50):
+        if not u._changelog_busy:
+            break
+        time.sleep(0.05)
     cl = u.changelog()
-    assert cl["error"] is None and cl["current"] == u.current
-    assert [v["version"] for v in cl["versions"]] == ["9.0.1", "9.0.0"]
-    assert cl["versions"][0]["date"] == 1795705476.0                       # 2026-11-26 15:04:36 UTC
+    assert [v["version"] for v in cl["versions"]] == ["9.0.1", "9.0.0"]            # 9.0.2 was never released
+    assert cl["versions"][0]["date"] == 1795705476.0                               # 2026-11-26 15:04:36 UTC
 
-    # saved on disk: a restarted Talon answers at once, without asking GitHub
-    monkeypatch.setattr(update, "_get", lambda url, timeout=15: (_ for _ in ()).throw(AssertionError("no network")))
-    again = update.Updater(cfg, State(cfg.state_file))
-    assert [v["version"] for v in again.changelog()["versions"]] == ["9.0.1", "9.0.0"]
+    # nothing new: no more questions, also after a restart (it is saved)
+    asked = len(calls)
+    assert not u._changelog_due(u._saved_changelog())
+    again = update.Updater(cfg, st)
+    assert [v["version"] for v in again.changelog()["versions"]] == ["9.0.1", "9.0.0"] and len(calls) == asked
 
-    # offline with nothing saved: the copy installed with Talon, without dates, and the reason
-    import os
+    # something new: a newer version found by the update check, or Talon was updated
+    st.update(lambda d: d.__setitem__("update_check", {"latest": "99.0.0"}))
+    assert again._changelog_due(again._saved_changelog())
+    st.update(lambda d: d.__setitem__("update_check", {}))
+    again.current = "9.9.9"
+    assert again._changelog_due(again._saved_changelog())
+
+    # offline with nothing saved: the installed copy without dates; a failed try waits an hour
     os.remove(u._changelog_file)
     u._changelog = {}
     monkeypatch.setattr(update, "fetch_changelog", lambda repo: (_ for _ in ()).throw(update.UserError("Could not reach GitHub: down")))
     cl = u.changelog()
-    assert cl["error"].startswith("Could not reach GitHub") and cl["versions"]
     assert cl["versions"][0]["date"] is None and cl["versions"][0]["items"]
+    for _ in range(50):
+        if not u._changelog_busy:
+            break
+        time.sleep(0.05)
+    assert u.changelog()["error"].startswith("Could not reach GitHub") and not u._changelog_due(u._saved_changelog())
 
 
 def test_changelog_api(client):
-    cl = client.get("/api/update/changelog").json()
+    for _ in range(50):                                 # the demo fills in made-up dates in the background
+        cl = client.get("/api/update/changelog").json()
+        if not cl["refreshing"] and all(v["date"] for v in cl["versions"]):
+            break
+        time.sleep(0.1)
     assert cl["versions"] and all(v["items"] for v in cl["versions"])
     assert any(v["version"] == cl["current"] for v in cl["versions"])            # the installed one is listed
-    assert all(v["date"] for v in cl["versions"])                                # the demo makes up dates
+    assert all(v["date"] for v in cl["versions"])

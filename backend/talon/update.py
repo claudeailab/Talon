@@ -57,7 +57,6 @@ def fetch_latest_release(repo: str, timeout: float = 15) -> dict:
 
 
 # ---------------------------------------------------------------- changelog
-CHANGELOG_TTL = 3600
 _PKG = os.path.dirname(os.path.abspath(__file__))
 # the installer copies CHANGELOG.md next to the package; in a checkout it is two levels up
 LOCAL_CHANGELOG = (os.path.join(os.path.dirname(_PKG), "CHANGELOG.md"),
@@ -160,19 +159,33 @@ class Updater:
         return result
 
     def changelog(self) -> dict:
-        """Every version with its changes and release date, newest first. Answered at once from
-        the saved copy, which is refreshed from GitHub in the background when it is over an hour
-        old; only the very first time is it fetched while you wait. Offline and with nothing
-        saved: the copy installed with Talon (without dates)."""
+        """Every version with its changes and release date, newest first, answered at once.
+
+        The changes come with Talon (CHANGELOG.md is installed with it). GitHub is asked only
+        when there is something new to learn: once after Talon was updated (the new entry and
+        the release dates) and once when the update check found a newer version (what it brings,
+        shown as New). In between the saved copy is used, without contacting anyone."""
         c = self._saved_changelog()
-        if c.get("versions"):
-            if time.time() - c.get("at", 0) >= CHANGELOG_TTL:
-                self.refresh_changelog_soon()
-            return {"current": self.current, "versions": c["versions"], "error": c.get("error")}
-        try:
-            return {"current": self.current, "versions": self._refresh_changelog(), "error": None}
-        except UserError as e:
-            return {"current": self.current, "versions": local_changelog(), "error": str(e)}
+        due = self._changelog_due(c)
+        if due:
+            self.refresh_changelog_soon()
+        if c.get("versions") and c.get("for") == self.current:
+            versions = c["versions"]
+        else:                                          # nothing saved for this version yet
+            dates = {v["version"]: v.get("date") for v in c.get("versions") or []}
+            versions = [{**v, "date": dates.get(v["version"])} for v in local_changelog()] or c.get("versions") or []
+        return {"current": self.current, "versions": versions, "error": c.get("error"),
+                "refreshing": due and self._changelog_busy}
+
+    def _changelog_due(self, c: dict) -> bool:
+        """Is there anything new on GitHub: Talon was updated, or a newer version is out that
+        the saved copy does not have yet. A failed try waits an hour before the next."""
+        if time.time() - c.get("failed_at", 0) < 3600:
+            return False
+        if not c.get("versions") or c.get("for") != self.current:
+            return True
+        latest = (self.state.get("update_check") or {}).get("latest")
+        return bool(latest and is_newer(latest, self.current) and not any(v["version"] == latest for v in c["versions"]))
 
     def _saved_changelog(self) -> dict:
         if not self._changelog:
@@ -187,7 +200,7 @@ class Updater:
 
     def _refresh_changelog(self) -> list:
         versions = self._fetch_changelog()
-        self._changelog = {"versions": versions, "at": time.time(), "error": None}
+        self._changelog = {"versions": versions, "for": self.current, "at": time.time(), "error": None}
         try:
             write_atomic(self._changelog_file, json.dumps(self._changelog), 0o644)
         except OSError:
@@ -195,7 +208,7 @@ class Updater:
         return versions
 
     def refresh_changelog_soon(self) -> None:
-        """Refresh the saved changelog in the background (once at a time)."""
+        """Ask GitHub in the background (once at a time)."""
         if self._changelog_busy:
             return
         self._changelog_busy = True
@@ -203,9 +216,8 @@ class Updater:
         def work():
             try:
                 self._refresh_changelog()
-            except Exception as e:   # noqa: BLE001 - keep what is saved; try again in 10 minutes
-                if self._changelog.get("versions"):
-                    self._changelog = {**self._changelog, "error": str(e), "at": time.time() - CHANGELOG_TTL + 600}
+            except Exception as e:   # noqa: BLE001 - keep what is saved; try again in an hour
+                self._changelog = {**self._changelog, "error": str(e), "failed_at": time.time()}
             finally:
                 self._changelog_busy = False
         threading.Thread(target=work, daemon=True, name="changelog").start()
@@ -246,10 +258,8 @@ class Updater:
     def background_loop(self, stop: threading.Event) -> None:
         stop.wait(60)
         while not stop.is_set():
-            if self.cfg.update_check:
-                c = self._saved_changelog()
-                if not c.get("versions") or time.time() - c.get("at", 0) >= CHANGELOG_TTL:
-                    self.refresh_changelog_soon()          # ready before the tab is opened
+            if self.cfg.update_check and self._changelog_due(self._saved_changelog()):
+                self.refresh_changelog_soon()              # only after an update, or when a new version is out
             if self.cfg.update_check and self.interval():
                 try:
                     self.check()                  # only asks GitHub when the interval has passed
