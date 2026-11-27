@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Info, Search, XCircle } from "lucide-react";
 import { api } from "../lib/api";
-import { ago, cx, dateTime } from "../lib/format";
+import { ago, clock, cx, date } from "../lib/format";
 import { JobDialog } from "../components/jobs";
 import { Button, Card, Empty, Input, PageHeader, PageLoader, Select } from "../components/ui";
 
@@ -36,6 +36,14 @@ function parseShow(v: string): Record<string, string> {
 }
 
 /** Everything that happens: Talon's own activity and the system logs, in one list. */
+/** When an event happened: the time today (with seconds), else the date and time. */
+function when(ts: number): string {
+  const d = new Date(ts * 1000);
+  const today = new Date();
+  const sameDay = d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+  return sameDay ? clock(ts, true) : `${date(ts)} ${clock(ts, true)}`;
+}
+
 export default function ActivityPage() {
   const [perPage, setPerPage] = useState(10);
   const [page, setPage] = useState(0);
@@ -120,7 +128,7 @@ export default function ActivityPage() {
               return (
                 <li
                   key={k}
-                  className="grid cursor-pointer grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 px-4 py-2.5 hover:bg-zinc-50 sm:grid-cols-[1rem_minmax(0,1fr)_13rem_6.5rem] sm:items-center dark:hover:bg-white/[0.02]"
+                  className="grid cursor-pointer grid-cols-[1rem_minmax(0,1fr)] items-start gap-x-3 px-4 py-2.5 hover:bg-zinc-50 sm:grid-cols-[1rem_minmax(0,1fr)_13rem_9.5rem] sm:items-center dark:hover:bg-white/[0.02]"
                   onClick={() => setOpen(open === k ? null : k)}
                   aria-expanded={open === k}
                 >
@@ -136,7 +144,7 @@ export default function ActivityPage() {
                   </div>
                   <div className="col-start-2 truncate text-xs text-zinc-500 sm:col-start-auto" title={who}>
                     {who}
-                    <span className="sm:hidden"> · {ago(e.ts)}</span>
+                    <span className="sm:hidden"> · {when(e.ts)}</span>
                     {e.job && (
                       <>
                         {" · "}
@@ -152,8 +160,8 @@ export default function ActivityPage() {
                       </>
                     )}
                   </div>
-                  <div className="tabular hidden text-right text-xs text-zinc-500 sm:block" title={dateTime(e.ts)}>
-                    {ago(e.ts)}
+                  <div className="tabular hidden text-right text-xs text-zinc-500 sm:block" title={ago(e.ts)}>
+                    {when(e.ts)}
                   </div>
                 </li>
               );

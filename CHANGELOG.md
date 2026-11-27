@@ -1,3 +1,6 @@
+## 1.0.161
+- Activity: each event shows when it happened (the time today, the date and time before), instead of "2 min ago"
+
 ## 1.0.160
 - Settings save by themselves everywhere: a choice right away, a text field when you leave it or press Enter; no Save buttons on any settings page
 - Only moving the NAS to another network address has a button (Apply); dialogs keep Create and Save
