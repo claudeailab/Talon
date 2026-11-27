@@ -1,4 +1,4 @@
-## 1.0.162
+## 1.0.163
 - System updates that install automatically are now run by Talon every night (03:00–05:00), and each run is kept: Updates → Settings shows the last run (what it installed, or why it failed) and the next one
 - A failed or successful night is also in Activity and, with email set up, sent by email
 
