@@ -1,3 +1,8 @@
+## 1.0.173
+- Disks: disks of a RAID array that is building or rebuilding are animated, with the progress
+- RAID: View log shows what Talon did and what Linux reported about the array, live while it syncs
+- RAID: the time left is shown next to the sync progress
+
 ## 1.0.172
 - RAID: syncing and rebuilding disks are animated, with light flowing across the array
 

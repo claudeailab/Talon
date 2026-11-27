@@ -258,6 +258,7 @@
        "**Add disk**: add a disk as a **Hot spare** (stands by and automatically replaces a failing disk), to **Expand capacity** (RAID 5 and RAID 6) or to **Add mirror** (RAID 1). RAID 0 and RAID 10 arrays cannot be extended, and RAID 0 has no hot spares.",
        "**Replace failed disk**: shown instead of **Add disk** when the array is degraded; rebuilds the missing data onto a new disk.",
        "**Run data scrub**: reads every block on every disk. A sector that cannot be read is rewritten from the other disks before it causes trouble in a rebuild. Running one every month or two is good practice. **Stop data scrub** stops it. Not available for RAID 0.",
+       "**View log**: what happened to the array, with dates and times: what was done in Talon (created, disks added, scrubs) and what Linux reported (building, rebuilding, disk errors). While the array syncs, the progress, speed and time left are shown on top and new lines appear as they come.",
        "**Delete RAID**: only possible after its volume is deleted."
       ]
      },

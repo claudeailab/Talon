@@ -1,6 +1,6 @@
 import { Check, Trash2 } from "lucide-react";
 import type { ReactNode } from "react";
-import { bytes, cx } from "../lib/format";
+import { bytes, cx, duration } from "../lib/format";
 import type { Disk, Member, StorageStatus, SyncInfo } from "../lib/types";
 import { DiskIcon, kindLabel } from "./disk";
 import { Badge, IconButton, Progress } from "./ui";
@@ -46,6 +46,7 @@ export function SyncProgress({ sync }: { sync: SyncInfo | null }) {
         <span>{sync.label ?? SYNC_LABEL[sync.sync_action] ?? sync.sync_action}</span>
         <span className="tabular">
           {sync.sync_progress.toFixed(1)}% · {(sync.sync_speed_kbs / 1000).toFixed(0)} MB/s
+          {sync.sync_eta ? ` · about ${duration(sync.sync_eta)} left` : ""}
         </span>
       </div>
       <Progress value={sync.sync_progress} tone="blue" />
@@ -127,6 +128,28 @@ export function Detail({ label, children }: { label: string; children: ReactNode
 
 const MEMBER_DOT: Record<string, string> = { active: "bg-emerald-500", spare: "bg-sky-500", rebuilding: "bg-violet-500", syncing: "bg-sky-500" };
 
+/** Light sweeping across a disk that is syncing; put it in a relative, overflow-hidden box. */
+export function SyncSweep({ delay = 0 }: { delay?: number }) {
+  return (
+    <span
+      aria-hidden
+      style={{ animationDelay: `${delay}s` }}
+      className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-sky-400/20 to-transparent motion-safe:animate-[sweep_1.8s_ease-in-out_infinite] motion-reduce:hidden dark:via-sky-400/15"
+    />
+  );
+}
+
+/** A disk's activity light while it syncs: it blinks, with a soft glow. */
+export function SyncDot({ delay = 0, color = "bg-sky-500" }: { delay?: number; color?: string }) {
+  const style = { animationDelay: `${delay}s` };
+  return (
+    <span className="relative flex size-1.5 shrink-0">
+      <span style={style} className={cx("absolute inset-0 rounded-full opacity-75 motion-safe:animate-ping", color)} />
+      <span style={style} className={cx("relative size-1.5 rounded-full motion-safe:animate-[blink_0.9s_steps(2,jump-none)_infinite]", color)} />
+    </span>
+  );
+}
+
 /** Member disks as chips: name, size and, unless it is simply active, its state. */
 export function MemberChips({ members, onRemove }: { members: Member[]; onRemove?: (m: Member) => void }) {
   return (
@@ -134,7 +157,6 @@ export function MemberChips({ members, onRemove }: { members: Member[]; onRemove
       {members.map((m, i) => {
         const busy = m.state === "syncing" || m.state === "rebuilding";
         // each disk's sweep starts a little later than the one before: data flowing across the array
-        const delay = { animationDelay: `${i * 0.35}s` };
         return (
         <span
           key={m.part}
@@ -144,21 +166,12 @@ export function MemberChips({ members, onRemove }: { members: Member[]; onRemove
             busy ? "ring-sky-300 dark:ring-sky-400/40" : "ring-zinc-200 dark:ring-white/10",
           )}
         >
-          {busy && (
-            <span
-              aria-hidden
-              style={delay}
-              className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-sky-400/20 to-transparent motion-safe:animate-[sweep_1.8s_ease-in-out_infinite] motion-reduce:hidden dark:via-sky-400/15"
-            />
-          )}
+          {busy && <SyncSweep delay={i * 0.35} />}
           <DiskIcon kind={m.kind} className={cx("size-3.5", busy ? "text-sky-500" : "text-zinc-400")} />
           <span className="font-mono text-xs font-semibold text-zinc-900 dark:text-zinc-100">{m.disk}</span>
           <span className="tabular text-xs text-zinc-500">{bytes(m.size, 0)}</span>
           {busy ? (
-            <span className="relative flex size-1.5">
-              <span style={delay} className={cx("absolute inset-0 rounded-full opacity-75 motion-safe:animate-ping", MEMBER_DOT[m.state])} />
-              <span style={delay} className={cx("relative size-1.5 rounded-full motion-safe:animate-[blink_0.9s_steps(2,jump-none)_infinite]", MEMBER_DOT[m.state])} />
-            </span>
+            <SyncDot delay={i * 0.35} color={MEMBER_DOT[m.state]} />
           ) : (
             <span className={cx("size-1.5 rounded-full", MEMBER_DOT[m.state] ?? "bg-rose-500")} />
           )}

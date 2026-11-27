@@ -424,7 +424,7 @@ class Nas:
                 item["free"] = pool["free"] if pool else (0 if item["volumes"] else a["size"])
                 item["raid_disks"] = a["raid_disks"]
                 item["degraded"] = a["degraded"]
-                item["sync"] = {k: a[k] for k in ("sync_action", "sync_progress", "sync_speed_kbs")}
+                item["sync"] = {k: a.get(k) for k in ("sync_action", "sync_progress", "sync_speed_kbs", "sync_eta")}
                 for m in a["members"]:
                     d = disks.get(m["disk"], {})
                     item["members"].append({**m, "model": d.get("model", "?"),

@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, Layers, MoreHorizontal, Plus, ScanSearch, ShieldCheck, Sparkles, Trash2, Zap } from "lucide-react";
+import { ChevronLeft, FileText, Layers, MoreHorizontal, Plus, ScanSearch, ShieldCheck, Sparkles, Trash2, Zap } from "lucide-react";
 import { api } from "../lib/api";
-import { bytes, cx, dateTime, levelLabel } from "../lib/format";
-import { useAction } from "../lib/hooks";
+import { bytes, clock, cx, date, dateTime, levelLabel } from "../lib/format";
+import { useAction, useFollow } from "../lib/hooks";
 import { Link } from "../lib/router";
-import type { Disk, Job, Member, RaidArray, RaidOption } from "../lib/types";
+import type { Disk, Job, Member, RaidArray, RaidOption, SyncInfo } from "../lib/types";
 import { JobDialog } from "../components/jobs";
 import { Detail, Details, DiskRow, Dots, ITEM_CARD, ITEM_LIST, ITEM_MENU, ITEM_WRAP, ITEM_ROW, ItemTitle, MemberChips, NAME_HINT, NAME_RE, Stat, StatusBadge, Stepper, SyncProgress, statusTone } from "../components/storage";
 import { Acknowledge, Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Segmented } from "../components/ui";
@@ -67,6 +67,7 @@ export default function RaidPage() {
 function RaidCard({ a, disks, onJob }: { a: RaidArray; disks: Disk[]; onJob: (id: string) => void }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [addDisk, setAddDisk] = useState(false);
+  const [showLog, setShowLog] = useState(false);
   const [remove, setRemove] = useState<Member | null>(null);
   const idle = a.sync?.sync_action === "idle";
 
@@ -177,6 +178,9 @@ function RaidCard({ a, disks, onJob }: { a: RaidArray; disks: Disk[]; onJob: (id
               Stop data scrub
             </MenuItem>
           )}
+          <MenuItem icon={<FileText />} onClick={() => setShowLog(true)}>
+            View log
+          </MenuItem>
           <MenuItem icon={<Trash2 />} danger disabled={a.volumes.length > 0} onClick={() => setConfirmDelete(true)}>
             {a.volumes.length ? `Delete RAID (delete its volume${a.volumes.length > 1 ? "s" : ""} first)` : "Delete RAID"}
           </MenuItem>
@@ -190,6 +194,7 @@ function RaidCard({ a, disks, onJob }: { a: RaidArray; disks: Disk[]; onJob: (id
         </div>
       )}
 
+      {showLog && <RaidLog name={a.name} onClose={() => setShowLog(false)} />}
       <ConfirmDialog
         open={confirmDelete}
         onClose={() => setConfirmDelete(false)}
@@ -600,5 +605,59 @@ function LevelRow({ o, selected, hide, onClick }: { o: RaidOption; selected: boo
         </span>
       )}
     </button>
+  );
+}
+
+/* ====================================================================== log */
+
+type RaidLogEntry = { ts: number; level: string; source: string; message: string; user?: string };
+type RaidLogData = { name: string; dev: string | null; status: string; status_detail: string; sync: SyncInfo | null; items: RaidLogEntry[] };
+
+/** What happened to an array: Talon's actions and what Linux reported, newest at the bottom;
+ *  while it syncs, the progress on top and new lines as they come. */
+function RaidLog({ name, onClose }: { name: string; onClose: () => void }) {
+  const q = useQuery({ queryKey: ["raid-log", name], queryFn: () => api.get<RaidLogData>(`/raid/${name}/log`), refetchInterval: 4000 });
+  const items = q.data?.items;
+  const follow = useFollow<HTMLUListElement>(items?.length);
+  const d = q.data;
+  return (
+    <Modal open onClose={onClose} size="lg" title={`Log: RAID ${name}`} description={d?.dev ? `/dev/${d.dev} · Talon and system messages` : undefined} footer={<Button onClick={onClose}>Close</Button>}>
+      {!d ? (
+        <PageLoader />
+      ) : (
+        <>
+          {d.sync && d.sync.sync_action !== "idle" && (
+            <div className="mb-3">
+              <SyncProgress sync={d.sync} />
+            </div>
+          )}
+          {!items?.length ? (
+            <div className="py-8 text-center text-sm text-zinc-500">No messages yet.</div>
+          ) : (
+            <ul {...follow} className="max-h-[50vh] max-h-[50dvh] divide-y divide-zinc-100 overflow-y-auto rounded-xl ring-1 ring-zinc-200 sm:max-h-[60vh] dark:divide-white/5 dark:ring-white/10">
+              {items.map((e, i) => {
+                const prev = items[i - 1];
+                const day = !prev || date(prev.ts) !== date(e.ts);
+                return (
+                  <li key={i} className="px-3 py-2">
+                    {day && <div className="mb-1 text-[11px] font-semibold tracking-wide text-zinc-400 uppercase">{date(e.ts)}</div>}
+                    <div className="flex items-baseline gap-2 text-[13px]">
+                      <span className="tabular shrink-0 text-xs text-zinc-400">{clock(e.ts, true)}</span>
+                      <Badge tone={e.source === "Talon" ? "violet" : "neutral"} className="shrink-0">
+                        {e.source}
+                      </Badge>
+                      <span className={cx("min-w-0 break-words", e.level === "error" ? "font-medium text-rose-600 dark:text-rose-400" : e.level === "warning" && "text-amber-700 dark:text-amber-400")}>
+                        {e.message}
+                        {e.user && e.source === "Talon" && <span className="text-zinc-400"> · {e.user}</span>}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </Modal>
   );
 }

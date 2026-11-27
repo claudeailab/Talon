@@ -48,6 +48,8 @@ export interface SyncInfo {
   sync_action: string;
   sync_progress: number | null;
   sync_speed_kbs: number;
+  /** seconds left at the current speed */
+  sync_eta?: number | null;
   label?: string;
 }
 

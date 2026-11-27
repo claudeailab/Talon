@@ -2,10 +2,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Activity, CheckCircle2, Eraser, HardDrive, MoreHorizontal, Thermometer } from "lucide-react";
 import { api } from "../lib/api";
-import { bytes } from "../lib/format";
+import { bytes, cx } from "../lib/format";
 import { useAction } from "../lib/hooks";
-import type { Disk, Job } from "../lib/types";
+import type { Disk, Job, RaidArray } from "../lib/types";
 import { DiskIcon, DiskStatusBadge, HealthBadge, kindLabel } from "../components/disk";
+import { SyncDot, SyncSweep } from "../components/storage";
 import { JobProgress } from "../components/jobs";
 import { Badge, Button, Card, Empty, IconButton, Menu, MenuItem, Modal, PageHeader, PageLoader, Spinner } from "../components/ui";
 
@@ -40,6 +41,15 @@ function TempBadge({ d }: { d: { temperature: number | null; temp_limit?: number
 
 export default function DisksPage() {
   const { data } = useQuery({ queryKey: ["disks"], queryFn: () => api.get<Disk[]>("/disks"), refetchInterval: 15000 });
+  // disks of a RAID array that is building, rebuilding or checking: animated like on the RAID page
+  const raid = useQuery({ queryKey: ["raid"], queryFn: () => api.get<RaidArray[]>("/raid"), refetchInterval: 5000 });
+  const busy = new Map<string, { array: string; label: string; progress: number | null; i: number }>();
+  for (const a of raid.data ?? []) {
+    a.members.forEach((m, i) => {
+      if (m.state === "syncing" || m.state === "rebuilding")
+        busy.set(m.disk, { array: a.name, label: a.sync?.label ?? (m.state === "rebuilding" ? "Rebuilding" : "Syncing"), progress: a.sync?.sync_progress ?? null, i });
+    });
+  }
   const [smart, setSmart] = useState<Disk | null>(null);
   const [wipe, setWipe] = useState<Disk | null>(null);
   if (!data) return <PageLoader />;
@@ -65,12 +75,25 @@ export default function DisksPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-100 dark:divide-white/5">
-                {data.map((d) => (
+                {data.map((d) => {
+                  const b = busy.get(d.name);
+                  return (
                   <tr key={d.name} className="transition hover:bg-zinc-50/70 dark:hover:bg-white/[0.02]">
                     <td className="px-4 py-3.5 sm:px-5">
                       <div className="flex items-center gap-3">
-                        <div className="hidden size-10 shrink-0 items-center justify-center rounded-xl bg-zinc-100 text-zinc-500 sm:flex dark:bg-white/5 dark:text-zinc-400">
+                        <div
+                          className={cx(
+                            "relative hidden size-10 shrink-0 items-center justify-center overflow-hidden rounded-xl sm:flex",
+                            b ? "bg-sky-50 text-sky-500 ring-1 ring-sky-200 ring-inset dark:bg-sky-500/10 dark:text-sky-400 dark:ring-sky-400/30" : "bg-zinc-100 text-zinc-500 dark:bg-white/5 dark:text-zinc-400",
+                          )}
+                        >
+                          {b && <SyncSweep delay={b.i * 0.35} />}
                           <DiskIcon kind={d.kind} />
+                          {b && (
+                            <span className="absolute right-1 bottom-1">
+                              <SyncDot delay={b.i * 0.35} />
+                            </span>
+                          )}
                         </div>
                         <div className="min-w-0">
                           <div className="font-mono text-[13px] font-semibold">
@@ -84,6 +107,7 @@ export default function DisksPage() {
                             <HealthBadge health={d.health} />
                             <TempBadge d={d} />
                             <DiskStatusBadge d={d} />
+                            {b && <SyncBadge b={b} />}
                           </div>
                         </div>
                       </div>
@@ -104,7 +128,10 @@ export default function DisksPage() {
                     </td>
                     <td className="hidden px-3 py-3.5 sm:table-cell">
                       <div className="flex flex-col items-start gap-0.5">
-                        <DiskStatusBadge d={d} />
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <DiskStatusBadge d={d} />
+                          {b && <SyncBadge b={b} />}
+                        </div>
                         <span className="hidden max-w-[16rem] text-xs break-words text-zinc-500 sm:block">{d.status_detail}</span>
                       </div>
                     </td>
@@ -125,7 +152,8 @@ export default function DisksPage() {
                       </Menu>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -349,5 +377,17 @@ function OldRaidNote({ disk, disks }: { disk: Disk; disks: Disk[] }) {
         "."
       )}
     </>
+  );
+}
+
+/** "Building 44.6%" next to a disk whose RAID array is syncing, with the blinking light. */
+function SyncBadge({ b }: { b: { array: string; label: string; progress: number | null; i: number } }) {
+  return (
+    <span title={`RAID ${b.array}`} className="relative inline-flex items-center gap-1.5 overflow-hidden rounded-md bg-sky-50 px-1.5 py-0.5 text-xs font-medium text-sky-700 ring-1 ring-sky-200 ring-inset dark:bg-sky-500/10 dark:text-sky-300 dark:ring-sky-400/30">
+      <SyncSweep delay={b.i * 0.35} />
+      <SyncDot delay={b.i * 0.35} />
+      {b.label}
+      {b.progress != null && <span className="tabular">{b.progress.toFixed(1)}%</span>}
+    </span>
   );
 }

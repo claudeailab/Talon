@@ -451,3 +451,13 @@ def test_os_updates_install_at_night_and_say_how_it_went(tmp_path):
     sec = sum(1 for p in DEMO_PACKAGES if p["security"])
     assert last["result"] == "installed" and last["ok"] and last["count"] == sec and last["mode"] == "security"
     assert os_.info()["next_auto"] > _t.time()                               # done for today: the next one is later
+
+
+def test_raid_log(client):
+    r = client.post("/api/raid", json={"name": "logged", "level": "raid1", "disks": ["sdh", "sdi"]})
+    assert wait_job(client, r.json())["status"] == "success"
+    log = client.get("/api/raid/logged/log").json()
+    assert log["name"] == "logged" and log["dev"]
+    assert any(e["source"] == "Talon" and "logged" in e["message"] for e in log["items"])
+    assert [e["ts"] for e in log["items"]] == sorted(e["ts"] for e in log["items"])
+    assert client.get("/api/raid/nothere/log").status_code == 404

@@ -372,16 +372,19 @@ class RealPlatform:
             sync_action = r("sync_action") or "idle"
             completed = r("sync_completed")
             progress = None
+            left = 0                                   # sectors still to go
             if completed and "/" in completed:
                 a, b = completed.split("/")
                 try:
                     progress = round(int(a) / max(int(b), 1) * 100, 1)
+                    left = max(0, int(b) - int(a))
                 except ValueError:
                     pass
             try:
                 speed = int(r("sync_speed") or 0)
             except ValueError:
                 speed = 0
+            eta = int(left * 512 / (speed * 1024)) if speed and left else None
             try:
                 degraded = int(r("degraded") or 0)
             except ValueError:
@@ -391,7 +394,7 @@ class RealPlatform:
                 "level": level, "raid_disks": int(r("raid_disks") or 0),
                 "size": int(read_file(f"/sys/block/{dev}/size", "0").strip() or 0) * 512,
                 "array_state": r("array_state"), "degraded": degraded,
-                "sync_action": sync_action, "sync_progress": progress, "sync_speed_kbs": speed,
+                "sync_action": sync_action, "sync_progress": progress, "sync_speed_kbs": speed, "sync_eta": eta,
                 "members": members,
             })
         return arrays

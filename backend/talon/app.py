@@ -6,6 +6,7 @@ import tempfile
 import urllib.parse
 import html as htmllib
 import json
+import re
 import os
 import threading
 import time
@@ -381,6 +382,27 @@ def create_app(cfg, platform) -> FastAPI:
         if body.get("run_now") and not body.get("prepare_disk"):     # a prepared disk runs once it is ready
             nas.backup.run_now(t["id"], user)
         return t
+
+    @app.get("/api/raid/{name}/log")
+    def raid_log(name: str, _u: str = Depends(current_user)):
+        """What happened to a RAID array: Talon's own actions (activity log) and what
+        Linux reported about it (kernel and mdadm messages in the journal), oldest first."""
+        arr = next((a for a in nas.raid_arrays() if a["name"] == name), None)
+        if not arr:
+            raise HTTPException(404, f"RAID array {name} not found")
+        mine = re.compile(rf"\bRAID(?: array)? {re.escape(name)}\b")
+        items = [{"ts": e["ts"], "level": e.get("level", "info"), "source": "Talon",
+                  "message": e["message"], "user": e.get("user", "")}
+                 for e in nas.state.activity.entries()[:20000] if mine.search(e.get("message", ""))][:200]
+        dev = arr.get("dev")
+        if dev:
+            for e in syslog_reader.query(0, 300, "", "", dev, cap=300)["items"]:
+                if re.search(rf"\b{re.escape(dev)}\b", e["message"]):
+                    items.append({"ts": e["ts"], "level": e["level"], "source": e.get("program") or "system",
+                                  "message": e["message"]})
+        items.sort(key=lambda e: e["ts"])
+        return {"name": name, "dev": dev, "status": arr["status"], "status_detail": arr["status_detail"],
+                "sync": arr.get("sync"), "items": items[-300:]}
 
     @app.get("/api/backup/{tid}/log")
     def backup_log(tid: str, _u: str = Depends(current_user)):
