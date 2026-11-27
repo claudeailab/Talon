@@ -23,6 +23,9 @@ type OsInfo = {
   auto: { mode: "off" | "security" | "all"; restart: boolean; restart_time: string; interval_hours: number };
   checking: Run;
   last_install: { at: number; ok: boolean; count: number; error?: string } | null;
+  /** the last nightly run: what it did, or why it did nothing or failed */
+  last_auto: { at: number; ok: boolean; count: number; error?: string | null; result: "installed" | "nothing" | "failed" | "skipped"; mode: string; note?: string | null } | null;
+  next_auto: number | null;
 };
 
 type TabId = "settings" | "talon" | "system" | "changelog";
@@ -181,9 +184,12 @@ function SystemSettings({ o }: { o: OsInfo }) {
       <Row
         label="Install automatically"
         hint={
-          o.auto.mode === "off"
-            ? "Nothing installs by itself; you are told about security updates"
-            : `Every night, ${o.auto.mode === "all" ? "all updates" : "security updates"} install by themselves; you get an email (with email set up)`
+          <>
+            {o.auto.mode === "off"
+              ? "Nothing installs by itself; you are told about security updates"
+              : `Every night between 03:00 and 05:00, ${o.auto.mode === "all" ? "all updates" : "security updates"} install by themselves`}
+            <AutoRun last={o.last_auto} next={o.next_auto} />
+          </>
         }
       >
         <Segmented
@@ -210,6 +216,29 @@ function SystemSettings({ o }: { o: OsInfo }) {
         <Switch checked={o.auto.restart} disabled={o.auto.mode === "off"} onChange={(v) => auto.mutate({ restart: v })} label="Restart when needed" />
       </Row>
     </RowCard>
+  );
+}
+
+/** The last nightly run and the next one, under Install automatically. */
+function AutoRun({ last, next }: { last: OsInfo["last_auto"]; next: number | null }) {
+  if (!last && !next) return null;
+  const when = (ts: number) => `${date(ts)} ${clock(ts)}`;
+  return (
+    <span className="mt-1 block space-y-0.5">
+      {last && (
+        <span className={cx("block", !last.ok && last.result !== "nothing" && "text-rose-600 dark:text-rose-400")}>
+          <b className="font-medium">Last run {when(last.at)}:</b>{" "}
+          {last.result === "installed"
+            ? `installed ${last.count} update${last.count === 1 ? "" : "s"}`
+            : last.result === "nothing"
+              ? last.note ?? "no updates to install"
+              : last.result === "skipped"
+                ? `skipped: ${last.error}`
+                : `failed: ${last.error}`}
+        </span>
+      )}
+      {next && <span className="block">Next run {when(next)}</span>}
+    </span>
   );
 }
 

@@ -2,8 +2,10 @@
 
 Updates → System lists the waiting package updates (security
 updates first), installs them with a progress bar instead of a terminal, says when
-a restart is needed, and turns automatic security updates on or off
-(unattended-upgrades, with an optional automatic restart at 04:00).
+a restart is needed, and installs updates by itself at night when that is on: all of
+them or only security updates, between 03:00 and 05:00, with an optional restart at a
+set time. Talon runs these itself (not unattended-upgrades) so every run, and why one
+installed nothing or failed, is shown under Updates → Settings and in Activity.
 
 Everything runs through apt-get with DEBIAN_FRONTEND=noninteractive: configuration
 files that were changed keep their current version, and services are not
@@ -30,6 +32,7 @@ INST_RE = re.compile(r"^Inst (\S+)(?: \[([^\]]+)\])? \((\S+) ([^\[)]*?)(?: \[[^\
 CHECK_HOURS = 24                       # default; changeable under Updates → Settings
 INTERVAL_CHOICES = (0, 1, 6, 12, 24, 168)   # hours; 0 = only when "Check now" is clicked
 AUTO_MODES = {"off": "off", "security": "security updates only", "all": "all updates"}
+AUTO_HOURS = (3, 5)                    # automatic installs start between 03:00 and 05:00
 
 
 def parse_simulation(text: str) -> List[dict]:
@@ -75,7 +78,8 @@ class OsUpdate:
         return {"os": self._os_name(), "checked_at": s.get("checked_at"), "error": s.get("error"),
                 "packages": pk, "security": sum(1 for p in pk if p["security"]),
                 "restart_needed": self.restart_needed(), "progress": self.progress, "checking": self.checking,
-                "auto": self.auto_settings(), "last_install": s.get("last_install")}
+                "auto": self.auto_settings(), "last_install": s.get("last_install"),
+                "last_auto": s.get("last_auto"), "next_auto": self.next_auto()}
 
     def _os_name(self) -> str:
         if self.demo:
@@ -158,20 +162,21 @@ class OsUpdate:
         return self.info()
 
     # ------------------------------------------------------------ install
-    def install(self, actor: str) -> dict:
+    def install(self, actor: str, only: Optional[List[str]] = None, auto: bool = False) -> dict:
+        """Install every update, or only the packages in `only` (security updates at night)."""
         with self._lock:
             if self.progress.get("state") == "running":
                 raise UserError("Updates are already being installed")
-            total = len(self._saved().get("packages") or [])
+            total = len(only) if only is not None else len(self._saved().get("packages") or [])
             if not total:
                 raise UserError("There are no updates to install")
             self.progress = {"state": "running", "phase": "download", "percent": 0, "package": "",
                              "done": 0, "total": total, "started": time.time(), "log": []}
         self.state.log_activity(actor, f"Started installing {total} operating system update(s)", "info", "updates")
-        threading.Thread(target=self._install, args=(actor, total), daemon=True, name="os-update").start()
+        threading.Thread(target=self._install, args=(actor, total, only, auto), daemon=True, name="os-update").start()
         return self.info()
 
-    def _install(self, actor: str, total: int) -> None:
+    def _install(self, actor: str, total: int, only: Optional[List[str]] = None, auto: bool = False) -> None:
         p = self.progress
         seen: set = set()
 
@@ -199,20 +204,25 @@ class OsUpdate:
                                                                          "demo_installed": True, "demo_restart": True}))
                 rc, err = 0, ""
             else:
-                rc, err = _stream(["apt-get", "-y", "-q", *APT_OPTS, "-o", "APT::Status-Fd=1", "full-upgrade"], on_line)
+                cmd = ["full-upgrade"] if only is None else ["install", "--only-upgrade", *only]
+                rc, err = _stream(["apt-get", "-y", "-q", *APT_OPTS, "-o", "APT::Status-Fd=1", *cmd], on_line)
             if rc != 0:
                 raise UserError(_first_error(err) or _first_error("\n".join(p["log"])) or f"apt-get failed (exit code {rc})")
-            # everything is installed: no list until the next check says otherwise
-            self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}), "packages": []}))
+            # what was installed leaves the list until the next check says otherwise
+            done = set(only or [])
+            self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}), "packages":
+                [x for x in (d.get("os_updates") or {}).get("packages") or [] if only is not None and x["name"] not in done]}))
             p.update(state="success", percent=100, finished=time.time())
             self.state.log_activity(actor, f"Installed {total} operating system update(s)", "info", "updates")
         except Exception as e:   # noqa: BLE001 - reported in the page and the activity log
             p.update(state="error", error=str(e), finished=time.time())
             self.state.log_activity(actor, f"Installing operating system updates failed: {e}", "error", "updates")
         finally:
-            self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}),
-                                                                     "last_install": {"at": time.time(), "ok": p["state"] == "success",
-                                                                                      "count": total, "error": p.get("error")}}))
+            run_info = {"at": time.time(), "ok": p["state"] == "success", "count": total, "error": p.get("error")}
+            self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}), "last_install": run_info,
+                                                                     **({"last_auto": {**run_info, "result": "installed" if run_info["ok"] else "failed"}} if auto else {})}))
+            if auto:
+                self._after_auto(p["state"] == "success", total, p.get("error"))
             if not self.demo and p["state"] != "success":
                 try:
                     self.check()
@@ -257,20 +267,71 @@ class OsUpdate:
         return self.info()
 
     def _apply_auto(self, mode: str, restart: bool, t: str) -> None:
-        if mode != "off" and run(["sh", "-c", "command -v unattended-upgrade"], check=False).returncode != 0:
-            cp = run(["apt-get", "install", "-y", "-q", *APT_OPTS, "unattended-upgrades"], check=False, timeout=900, env=ENV)
-            if cp.returncode != 0:
-                raise UserError("Could not install unattended-upgrades: " + (_first_error(cp.stderr) or "apt-get failed"))
-        on = "0" if mode == "off" else "1"
-        write_atomic(AUTO_FILE, f'APT::Periodic::Update-Package-Lists "{on}";\nAPT::Periodic::Unattended-Upgrade "{on}";\n')
-        lines = ["// Talon: Updates → Settings → System",
-                 f'Unattended-Upgrade::Automatic-Reboot "{"true" if restart else "false"}";',
-                 f'Unattended-Upgrade::Automatic-Reboot-Time "{t}";',
-                 'Unattended-Upgrade::Automatic-Reboot-WithUsers "true";']
-        if mode == "all":
-            # every repository, like Install all updates; the distribution's defaults only take security updates
-            lines += ['Unattended-Upgrade::Origins-Pattern { "origin=*"; };']
-        write_atomic(TALON_FILE, "\n".join(lines) + "\n")
+        """Talon installs at night itself; the distribution's own automatic upgrades
+        (unattended-upgrades, on apt's timers) are switched off so they do not run as well."""
+        if os.path.exists(AUTO_FILE) or mode != "off":
+            write_atomic(AUTO_FILE, 'APT::Periodic::Update-Package-Lists "0";\nAPT::Periodic::Unattended-Upgrade "0";\n')
+        try:
+            os.remove(TALON_FILE)
+        except OSError:
+            pass
+
+    # ------------------------------------------------------------ the nightly run
+    def next_auto(self) -> Optional[float]:
+        """When the next automatic install starts, or None when it is off."""
+        if self.auto_settings()["mode"] == "off":
+            return None
+        lt = time.localtime()
+        start = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, AUTO_HOURS[0], 0, 0, 0, 0, -1))
+        ran_today = self._saved().get("auto_day") == time.strftime("%Y-%m-%d", lt)
+        if not ran_today and time.time() < start + (AUTO_HOURS[1] - AUTO_HOURS[0]) * 3600:
+            return max(start, time.time())
+        return start + 86400
+
+    def _auto_record(self, **rec) -> None:
+        rec = {"at": time.time(), "mode": self.auto_settings()["mode"], **rec}
+        self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}), "last_auto": rec}))
+
+    def run_auto(self) -> None:
+        """The nightly run: check, then install all updates or only security updates. Every
+        outcome is kept (Updates → Settings) and logged, including when there was nothing to do."""
+        mode = self.auto_settings()["mode"]
+        if mode == "off":
+            return
+        self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}), "auto_day": time.strftime("%Y-%m-%d")}))
+        if self.progress.get("state") == "running":
+            self._auto_record(result="skipped", ok=False, count=0, error="Updates were already being installed")
+            return
+        try:
+            self.check()
+        except Exception as e:   # noqa: BLE001
+            self._auto_record(result="failed", ok=False, count=0, error=f"Could not check for updates: {e}")
+            self.state.log_activity("system", f"Automatic updates: could not check for updates: {e}", "error", "updates")
+            return
+        s = self._saved()
+        if s.get("error"):
+            self._auto_record(result="failed", ok=False, count=0, error=s["error"])
+            self.state.log_activity("system", f"Automatic updates: {s['error']}", "error", "updates")
+            return
+        pk = s.get("packages") or []
+        names = [p["name"] for p in pk if mode == "all" or p["security"]]
+        if not names:
+            left = len(pk)
+            self._auto_record(result="nothing", ok=True, count=0,
+                              note=f"{left} other update(s) wait: only security updates install by themselves" if left else None)
+            return
+        self.state.log_activity("system", f"Automatic updates: installing {len(names)} update(s)", "info", "updates")
+        self.install("system", only=None if mode == "all" else names, auto=True)
+
+    def _after_auto(self, ok: bool, count: int, error: Optional[str]) -> None:
+        a = self.auto_settings()
+        if ok and self.notifier:
+            self.notifier.send("os_updates", "Updates were installed automatically", f"{count} update(s) were installed automatically.")
+        if not ok and self.notifier:
+            self.notifier.send("os_updates", "Automatic updates failed", f"Installing {count} update(s) failed: {error}\nSee Talon under Updates → System.")
+        if ok and a["restart"] and self.restart_needed() and not self.demo:
+            run(["shutdown", "-r", a["restart_time"], "Talon: restart to finish the updates"], check=False)
+            self.state.log_activity("system", f"Restart at {a['restart_time']} to finish the updates", "info", "updates")
 
     def report_automatic(self) -> None:
         """Log (and email) what unattended-upgrades installed since the last look."""
@@ -296,7 +357,25 @@ class OsUpdate:
 
     def background_loop(self, stop: threading.Event) -> None:
         stop.wait(120)
+        if not self.demo:
+            try:
+                a = self.auto_settings()
+                self._apply_auto(a["mode"], a["restart"], a["restart_time"])
+            except Exception:   # noqa: BLE001
+                pass
+        last_check_loop = 0.0
         while not stop.is_set():
+            try:
+                lt = time.localtime()
+                if (self.auto_settings()["mode"] != "off" and AUTO_HOURS[0] <= lt.tm_hour < AUTO_HOURS[1]
+                        and self._saved().get("auto_day") != time.strftime("%Y-%m-%d", lt)):
+                    self.run_auto()
+            except Exception:   # noqa: BLE001
+                pass
+            if time.time() - last_check_loop < 3600:
+                stop.wait(300)
+                continue
+            last_check_loop = time.time()
             last = self._saved().get("checked_at") or 0
             hours = self.auto_settings()["interval_hours"]
             if hours and time.time() - last > hours * 3600:
@@ -308,7 +387,7 @@ class OsUpdate:
                 self.report_automatic()
             except Exception:   # noqa: BLE001
                 pass
-            stop.wait(3600)
+            stop.wait(300)
 
 
 def _stream(cmd: List[str], on_line: Callable[[str], None]):

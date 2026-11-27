@@ -432,3 +432,22 @@ def test_smtp_fields_save_one_at_a_time(client):
     r = client.put("/api/settings/smtp", json={**base, "host": "smtp.example.com", "sender": "nas@example.com"})
     assert r.json()["configured"]
     assert client.put("/api/settings/smtp", json={**base, "host": "smtp.example.com", "sender": "not an address"}).status_code == 400
+
+
+def test_os_updates_install_at_night_and_say_how_it_went(tmp_path):
+    import time as _t
+    from talon.osupdate import OsUpdate, DEMO_PACKAGES
+    from talon.state import State
+    os_ = OsUpdate(State(str(tmp_path / "s.json")), demo=True)
+    assert os_.info()["next_auto"] is None                                   # off: no nightly run
+    os_.set_auto({"mode": "security"}, "admin")
+    assert os_.info()["next_auto"] > _t.time() - 1
+    os_.run_auto()                                                           # checks, then installs the security updates
+    for _ in range(100):
+        if os_.progress.get("state") != "running":
+            break
+        _t.sleep(0.1)
+    last = os_.info()["last_auto"]
+    sec = sum(1 for p in DEMO_PACKAGES if p["security"])
+    assert last["result"] == "installed" and last["ok"] and last["count"] == sec and last["mode"] == "security"
+    assert os_.info()["next_auto"] > _t.time() + 3600                        # done for today: tomorrow night

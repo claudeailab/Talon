@@ -1,3 +1,7 @@
+## 1.0.162
+- System updates that install automatically are now run by Talon every night (03:00–05:00), and each run is kept: Updates → Settings shows the last run (what it installed, or why it failed) and the next one
+- A failed or successful night is also in Activity and, with email set up, sent by email
+
 ## 1.0.161
 - Activity: each event shows when it happened (the time today, the date and time before), instead of "2 min ago"
 
