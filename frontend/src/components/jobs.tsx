@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Check, CheckCircle2, ChevronDown, Loader2, XCircle } from "lucide-react";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
+import { useFollow } from "../lib/hooks";
 import type { Job } from "../lib/types";
 import { Button, Callout, Modal, Progress } from "./ui";
 
@@ -92,12 +93,18 @@ export function JobProgress({ job, hint }: { job: Job | undefined; hint?: string
           </button>
         )}
       </div>
-      {open && (
-        <pre className="mt-2 max-h-56 overflow-auto rounded-xl bg-zinc-50 p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-zinc-600 ring-1 ring-zinc-200 [overflow-wrap:anywhere] dark:bg-white/[0.03] dark:text-zinc-300 dark:ring-white/10">
-          {rest.join("\n")}
-        </pre>
-      )}
+      {open && <Details text={rest.join("\n")} />}
     </div>
+  );
+}
+
+/** The commands and their output, scrolled to the newest line. */
+function Details({ text }: { text: string }) {
+  const follow = useFollow<HTMLPreElement>(text);
+  return (
+        <pre {...follow} className="mt-2 max-h-56 overflow-auto rounded-xl bg-zinc-50 p-3 font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-zinc-600 ring-1 ring-zinc-200 [overflow-wrap:anywhere] dark:bg-white/[0.03] dark:text-zinc-300 dark:ring-white/10">
+          {text}
+        </pre>
   );
 }
 

@@ -1,3 +1,7 @@
+## 1.0.170
+- Logs and command output stay scrolled to the newest line while a task runs
+- Deleting a RAID or volume asks for a tick instead of typing its name
+
 ## 1.0.169
 - Wipe disk and Delete RAID now erase the volumes inside an old RAID array, not only its signatures
 - A new RAID array always starts empty, also on disks of an earlier array with the same layout

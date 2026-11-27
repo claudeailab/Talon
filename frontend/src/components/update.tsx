@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Sparkles } from "lucide-react";
 import { api } from "../lib/api";
 import { cx } from "../lib/format";
+import { useFollow } from "../lib/hooks";
 import type { UpdateStatus } from "../lib/types";
 import { Button } from "./ui";
 import { clock, Dot, Halo, useEasedProgress } from "./halo";
@@ -132,14 +133,20 @@ export function UpdateOverlay() {
           <button onClick={() => setShowLog((v) => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-indigo-300/80 hover:text-white">
             <ChevronDown className={cx("size-3.5 transition", showLog && "rotate-180")} /> Details
           </button>
-          {showLog && (
-            <pre className="mt-2 max-h-48 overflow-auto rounded-xl bg-black/40 p-3 text-left font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-zinc-300 ring-1 ring-white/10 [overflow-wrap:anywhere]">
-              {st.log!.slice(-80).join("\n")}
-            </pre>
-          )}
+          {showLog && <UpdateLog text={st.log!.slice(-80).join("\n")} />}
         </div>
       )}
     </Halo>
+  );
+}
+
+/** The update's log, scrolled to the newest line. */
+function UpdateLog({ text }: { text: string }) {
+  const follow = useFollow<HTMLPreElement>(text);
+  return (
+            <pre {...follow} className="mt-2 max-h-48 overflow-auto rounded-xl bg-black/40 p-3 text-left font-mono text-[11px] leading-relaxed whitespace-pre-wrap text-zinc-300 ring-1 ring-white/10 [overflow-wrap:anywhere]">
+              {text}
+            </pre>
   );
 }
 

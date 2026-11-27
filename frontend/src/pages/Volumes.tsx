@@ -246,7 +246,11 @@ function VolumeCard({ v, onJob }: { v: Volume; onJob: (id: string) => void }) {
         danger
         title={`Delete volume ${v.name}?`}
         confirmText="Delete volume"
-        typeToConfirm={v.name}
+        acknowledge={
+          <>
+            I understand that everything on <b>{v.name}</b> is erased
+          </>
+        }
         message={
           <>
             All data on <b>{v.name}</b> will be <b>permanently erased</b>.{" "}

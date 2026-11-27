@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type UIEvent } from "react";
 import { sameValue } from "./format";
 import { useToast } from "../components/ui";
 
@@ -60,4 +60,31 @@ export function useDraft<T>(saved: T | undefined) {
     setAll: (v: T) => setDraft(v),
     reset: () => setDraft(saved),
   };
+}
+
+/**
+ * A scrolling box that shows the newest lines (a log, a command's output): it opens
+ * scrolled to the end and stays there as lines arrive, unless the user scrolls up to
+ * read something; scrolling back to the end follows again. Spread on the element:
+ * `<pre {...useFollow(lines)}>`.
+ */
+export function useFollow<T extends HTMLElement>(content: unknown) {
+  const el = useRef<T | null>(null);
+  const follow = useRef(true);
+  const ref = useCallback((node: T | null) => {
+    el.current = node;
+    if (node) {
+      follow.current = true;
+      node.scrollTop = node.scrollHeight;
+    }
+  }, []);
+  useLayoutEffect(() => {
+    const node = el.current;
+    if (node && follow.current) node.scrollTop = node.scrollHeight;
+  }, [content]);
+  const onScroll = (e: UIEvent<T>) => {
+    const node = e.currentTarget;
+    follow.current = node.scrollHeight - node.scrollTop - node.clientHeight < 40;
+  };
+  return { ref, onScroll };
 }

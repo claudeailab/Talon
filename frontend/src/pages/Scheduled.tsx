@@ -1,10 +1,10 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Clock, Copy, FileText, MoreHorizontal, Pause, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { FormHint } from "../components/rows";
 import { ago, bytes, cx, dateTime, sameValue } from "../lib/format";
-import { useAction } from "../lib/hooks";
+import { useAction, useFollow } from "../lib/hooks";
 import type { ScheduledTask, TaskRun, TaskSchedule } from "../lib/types";
 import { Badge, Button, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Select, TimeInput } from "../components/ui";
 import { ToggleBox } from "./OneDrive";
@@ -281,6 +281,7 @@ function TaskDialog({ task, copy, runAs, onClose }: { task: ScheduledTask | null
     onSuccess: (r) => setTest(r),
   });
   useEffect(() => setTest(null), [f.script, f.run_as]);
+  const testFollow = useFollow<HTMLPreElement>(test?.output);
   const ready = !!f.name.trim() && !!f.script.trim() && (f.schedule !== "cron" || f.cron.trim().split(/\s+/).length === 5);
   const changed = !task || !sameValue(f, initial);
   const missing = !f.name.trim()
@@ -351,7 +352,7 @@ function TaskDialog({ task, copy, runAs, onClose }: { task: ScheduledTask | null
               </Badge>
               <span className="text-zinc-500">{took(test.seconds)}</span>
             </div>
-            <pre className="max-h-28 overflow-auto rounded-xl bg-zinc-950 px-4 py-3 font-mono text-[12px] leading-5 whitespace-pre-wrap text-zinc-300 [overflow-wrap:anywhere]">
+            <pre {...testFollow} className="max-h-28 overflow-auto rounded-xl bg-zinc-950 px-4 py-3 font-mono text-[12px] leading-5 whitespace-pre-wrap text-zinc-300 [overflow-wrap:anywhere]">
               {test.output || "No output"}
             </pre>
           </div>
@@ -442,11 +443,7 @@ function OutputDialog({ task, onClose }: { task: ScheduledTask; onClose: () => v
   const runs = q.data ?? [];
   const run = runs[0];            // the latest run only; earlier runs are in the activity log
   // keep the newest output in view, unless the user scrolled up to read something
-  const out = useRef<HTMLUListElement>(null);
-  const follow = useRef(true);
-  useEffect(() => {
-    if (out.current && follow.current) out.current.scrollTop = out.current.scrollHeight;
-  }, [run?.output, run?.id]);
+  const follow = useFollow<HTMLUListElement>(`${run?.id}:${run?.output?.length}`);
   return (
     <Modal open onClose={onClose} size="xl" title={task.name} description="Earlier runs are in the activity log" footer={<Button onClick={onClose}>Close</Button>}>
       {!q.data ? (
@@ -468,11 +465,7 @@ function OutputDialog({ task, onClose }: { task: ScheduledTask; onClose: () => v
               {run.status === "running" && <Activity idle={run.idle ?? 0} />}
               {run.output ? (
                 <ul
-                  ref={out}
-                  onScroll={(e) => {
-                    const el = e.currentTarget;
-                    follow.current = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
-                  }}
+                  {...follow}
                   className="max-h-[50vh] max-h-[50dvh] divide-y divide-zinc-100 overflow-y-auto rounded-xl ring-1 ring-zinc-200 sm:max-h-[60vh] dark:divide-white/5 dark:ring-white/10"
                 >
                   {run.output.replace(/\n$/, "").split("\n").map((line, i) => (

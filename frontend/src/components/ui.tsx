@@ -727,7 +727,7 @@ export function ConfirmDialog({
   message,
   confirmText = "Confirm",
   danger,
-  typeToConfirm,
+  acknowledge,
   loading,
 }: {
   open: boolean;
@@ -737,12 +737,13 @@ export function ConfirmDialog({
   message: ReactNode;
   confirmText?: string;
   danger?: boolean;
-  typeToConfirm?: string;
+  /** a box to tick first, e.g. "I understand that everything on sda is erased" */
+  acknowledge?: ReactNode;
   loading?: boolean;
 }) {
-  const [typed, setTyped] = useState("");
-  useEffect(() => setTyped(""), [open]);
-  const ok = !typeToConfirm || typed === typeToConfirm;
+  const [sure, setSure] = useState(false);
+  useEffect(() => setSure(false), [open]);
+  const ok = !acknowledge || sure;
   return (
     <Modal
       open={open}
@@ -774,28 +775,19 @@ export function ConfirmDialog({
     >
       <div className="space-y-4 text-sm text-zinc-600 dark:text-zinc-300">
         <div>{message}</div>
-        {typeToConfirm && (
-          <Field
-            label={
-              <>
-                Type{" "}
-                <span className="font-mono font-semibold text-zinc-900 dark:text-white">
-                  {typeToConfirm}
-                </span>{" "}
-                to confirm
-              </>
-            }
-          >
-            <Input
-              value={typed}
-              onChange={(e) => setTyped(e.target.value)}
-              autoComplete="off"
-              onKeyDown={(e) => e.key === "Enter" && ok && onConfirm()}
-            />
-          </Field>
-        )}
+        {acknowledge && <Acknowledge checked={sure} onChange={setSure}>{acknowledge}</Acknowledge>}
       </div>
     </Modal>
+  );
+}
+
+/** The box to tick before erasing something: "I understand that everything on sda is erased". */
+export function Acknowledge({ checked, onChange, children }: { checked: boolean; onChange: (v: boolean) => void; children: ReactNode }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2 text-[13px] text-zinc-700 dark:text-zinc-300">
+      <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-rose-600" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+      <span>{children}</span>
+    </label>
   );
 }
 

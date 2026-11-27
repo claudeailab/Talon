@@ -8,7 +8,7 @@ import { Link } from "../lib/router";
 import type { Disk, Job, Member, RaidArray, RaidOption } from "../lib/types";
 import { JobDialog } from "../components/jobs";
 import { Detail, Details, DiskRow, Dots, ITEM_CARD, ITEM_LIST, ITEM_MENU, ITEM_WRAP, ITEM_ROW, ItemTitle, MemberChips, NAME_HINT, NAME_RE, Stat, StatusBadge, Stepper, SyncProgress, statusTone } from "../components/storage";
-import { Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Segmented } from "../components/ui";
+import { Acknowledge, Badge, Button, Callout, Card, ConfirmDialog, Empty, Field, IconButton, Input, Menu, MenuItem, Modal, PageHeader, PageLoader, Progress, Segmented } from "../components/ui";
 
 export default function RaidPage() {
   const arrays = useQuery({ queryKey: ["raid"], queryFn: () => api.get<RaidArray[]>("/raid"), refetchInterval: 4000 });
@@ -198,7 +198,11 @@ function RaidCard({ a, disks, onJob }: { a: RaidArray; disks: Disk[]; onJob: (id
         danger
         title={`Delete RAID ${a.name}?`}
         confirmText="Delete RAID"
-        typeToConfirm={a.name}
+        acknowledge={
+          <>
+            I understand that everything on <b>{a.members.map((m) => m.disk).join(", ")}</b> is erased
+          </>
+        }
         message={
           <>
             The array is stopped and its disks ({a.members.map((m) => m.disk).join(", ")}) are <b>wiped</b>.
@@ -312,7 +316,7 @@ function CreateRaidWizard({ disks, existing, onClose, onJob }: { disks: Disk[]; 
   const [sel, setSel] = useState<string[]>([]);
   const [spares, setSpares] = useState(0);
   const [level, setLevel] = useState<string | null>(null);
-  const [confirm, setConfirm] = useState("");
+  const [sure, setSure] = useState(false);
 
   const selectable = disks.filter((d) => d.selectable);
   const unusable = disks.filter((d) => !d.selectable);
@@ -365,7 +369,7 @@ function CreateRaidWizard({ disks, existing, onClose, onJob }: { disks: Disk[]; 
     invalidate: ["raid", "disks"],
     onSuccess: (j) => onJob(j.id),
   });
-  const canNext = [sel.length > 1, !!chosen?.available, !nameErr && confirm === name][step];
+  const canNext = [sel.length > 1, !!chosen?.available, !!name && !nameErr && sure][step];
   const toggle = (n: string) => setSel((s) => (s.includes(n) ? s.filter((x) => x !== n) : [...s, n]));
 
   return (
@@ -503,15 +507,9 @@ function CreateRaidWizard({ disks, existing, onClose, onJob }: { disks: Disk[]; 
                 ))}
               </ul>
             </Callout>
-            <Field
-              label={
-                <>
-                  Type <span className="font-mono font-semibold">{name}</span> to confirm
-                </>
-              }
-            >
-              <Input value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="off" />
-            </Field>
+            <Acknowledge checked={sure} onChange={setSure}>
+              I understand that everything on <b>{[...dataDisks, ...spareDisks].join(", ")}</b> is erased
+            </Acknowledge>
             {level !== "raid0" && <p className="text-xs text-zinc-500">The RAID synchronises in the background, which can take several hours on large disks.</p>}
           </div>
           <div className="rounded-2xl bg-zinc-50 p-5 ring-1 ring-zinc-200/70 dark:bg-white/[0.03] dark:ring-white/5">

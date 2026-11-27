@@ -221,7 +221,7 @@
        "On the [RAID](/raid) page, click **Create RAID**.",
        "**Disks**: select at least two unused disks and click **Continue**.",
        "**RAID level**: pick a level. Each card shows the usable capacity, how many disk failures it survives and its speed. Click **Continue**.",
-       "**Confirm**: check the **RAID name** (you can change it), type it again to confirm, then click **Erase disks & create**."
+       "**Confirm**: check the **RAID name** (you can change it), tick **I understand that everything on … is erased**, then click **Erase disks & create**."
       ]
      },
      {
