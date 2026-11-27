@@ -12,10 +12,11 @@ export function useAction<TVars = void, TRes = unknown>(
   const qc = useQueryClient();
   return useMutation({
     mutationFn: fn,
-    onSuccess: (r, v) => {
+    // the refreshed data is in before onSuccess runs (and the button stops spinning)
+    onSuccess: async (r, v) => {
       const msg = typeof opts.success === "function" ? opts.success(r, v) : opts.success;
       if (msg) toast("success", msg);
-      (opts.invalidate ?? []).forEach((k) => qc.invalidateQueries({ queryKey: [k] }));
+      await Promise.all((opts.invalidate ?? []).map((k) => qc.invalidateQueries({ queryKey: [k] })));
       opts.onSuccess?.(r, v);
     },
     onError: (e: Error) => toast("error", e.message),
@@ -49,9 +50,12 @@ export function useTheme(): [boolean, () => void] {
 export function useDraft<T>(saved: T | undefined) {
   const key = JSON.stringify(saved ?? null);
   const [draft, setDraft] = useState<T | undefined>(saved);
+  // bumped after a save: the draft starts again from the saved values even when they did
+  // not change (e.g. "a,b" saved as "a, b"), so the bar does not keep saying "Unsaved changes"
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     if (saved !== undefined) setDraft(saved);
-  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key, tick]); // eslint-disable-line react-hooks/exhaustive-deps
   const dirty = saved !== undefined && draft !== undefined && !sameValue(draft, saved);
   return {
     draft,
@@ -59,6 +63,8 @@ export function useDraft<T>(saved: T | undefined) {
     set: <K extends keyof T>(k: K, v: T[K]) => setDraft((d) => (d === undefined ? d : { ...d, [k]: v })),
     setAll: (v: T) => setDraft(v),
     reset: () => setDraft(saved),
+    /** call when a save succeeded (after the data was refreshed) */
+    saved: () => setTick((n) => n + 1),
   };
 }
 

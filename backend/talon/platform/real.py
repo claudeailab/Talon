@@ -10,6 +10,7 @@ import pwd
 import re
 import shutil
 import socket
+import subprocess
 import threading
 import time
 import zoneinfo
@@ -235,10 +236,11 @@ class RealPlatform:
     def _release_md(self, md: str, log: Logger) -> None:
         """Close LVM volumes that live on a RAID array, so it can be stopped or erased
         (udev opens the volumes of an old LVM pool as soon as the array appears)."""
-        cp = run(["pvs", "--noheadings", "-o", "vg_name", _dev(md)], check=False, timeout=30)
+        # by the pool's UUID: disks from another NAS may carry a pool with the same name
+        cp = run(["pvs", "--noheadings", "-o", "vg_uuid", _dev(md)], check=False, timeout=30)
         vg = cp.stdout.strip() if cp.returncode == 0 else ""
         if vg:
-            run(["vgchange", "-an", vg], check=False, log=log)
+            run(["vgchange", "-an", "--select", f"vg_uuid={vg}"], check=False, log=log)
         for h in glob.glob(f"/sys/block/{md}/holders/dm-*"):
             name = read_file(os.path.join(h, "dm", "name")).strip()
             if name:
@@ -254,12 +256,15 @@ class RealPlatform:
             return
         path = _dev(name)
         dd = ["dd", "if=/dev/zero", f"of={path}", "bs=1M", "oflag=direct", "conv=notrunc,fsync", "status=none"]
-        run(dd + [f"count={min(mib, total)}"], check=False, log=log, timeout=1800)
-        if end_mib and total > mib:
-            n = min(end_mib, total - mib)
-            run(dd + [f"seek={total - n}", f"count={n}"], check=False, log=log, timeout=1800)
+        try:                                     # best effort: a dying disk may not finish
+            run(dd + [f"count={min(mib, total)}"], check=False, log=log, timeout=600)
+            if end_mib and total > mib:
+                n = min(end_mib, total - mib)
+                run(dd + [f"seek={total - n}", f"count={n}"], check=False, log=log, timeout=120)
+        except subprocess.TimeoutExpired:
+            log(f"-- {name} could not be overwritten in time; its signatures are erased")
 
-    def wipe_disk(self, disk: str, log: Logger, step=lambda n: None) -> None:
+    def wipe_disk(self, disk: str, log: Logger, step=lambda n: None, zero: bool = True) -> None:
         dev = _dev(disk)
         step(1)
         self._stop_holders(disk, log)
@@ -268,10 +273,12 @@ class RealPlatform:
             pn = os.path.basename(p)
             run(["mdadm", "--zero-superblock", _dev(pn)], check=False, log=log)
             run(["wipefs", "-a", _dev(pn)], check=False, log=log)
-            self._zero(pn, log)                  # RAID, LVM and filesystem headers inside it
+            if zero:
+                self._zero(pn, log)              # RAID, LVM and filesystem headers inside it
         run(["mdadm", "--zero-superblock", dev], check=False, log=log)
         run(["wipefs", "-a", dev], log=log)
-        self._zero(disk, log, end_mib=16)        # also the backup partition table at the end
+        if zero:
+            self._zero(disk, log, end_mib=16)    # also the backup partition table at the end
         step(3)
         run(["partprobe", dev], check=False, log=log)
         self._settle(log)

@@ -301,9 +301,10 @@ def app_token(cfg: dict) -> dict:
     if codes & {700016, 7000229}:
         # Microsoft knows the app (sign-in works) but not in this directory: the app was
         # registered in another tenant, or it was never approved in this one
-        raise UserError("The app is not registered in the directory with this Directory (tenant) ID. "
-                        "In Entra, open the app's Overview page and copy the Directory (tenant) ID shown "
-                        "next to its Application (client) ID into Settings → Entra ID.")
+        raise UserError("The app is not registered in the directory with this Directory (tenant) ID, "
+                        "or the Application (client) ID is wrong. In Entra, open the app's Overview page "
+                        "and copy both IDs from there into Settings → Entra ID: the Directory (tenant) ID "
+                        "shown next to its Application (client) ID.")
     if status != 200 or "access_token" not in payload:
         raise UserError(explain(codes,
                                 payload.get("error_description", "Could not read the directory").split("\r\n")[0]))

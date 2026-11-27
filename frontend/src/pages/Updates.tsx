@@ -154,10 +154,11 @@ function CheckEvery({ value, onChange }: { value: number; onChange: (h: number) 
 }
 
 function TalonSettings({ t }: { t: UpdateInfo }) {
-  const { draft: f, dirty, set, reset } = useDraft({ interval_hours: t.interval_hours, auto_install: t.auto_install, auto_time: t.auto_time });
+  const { draft: f, dirty, set, reset, saved: done } = useDraft({ interval_hours: t.interval_hours, auto_install: t.auto_install, auto_time: t.auto_time });
   const save = useAction((body: { interval_hours?: number; auto_install?: boolean; auto_time?: string }) => api.put<UpdateInfo>("/update/settings", body), {
     invalidate: ["update"],
     success: "Update settings saved",
+    onSuccess: () => done(),
   });
   if (!f) return null;
   return (
@@ -192,8 +193,8 @@ function TalonSettings({ t }: { t: UpdateInfo }) {
 }
 
 function SystemSettings({ o }: { o: OsInfo }) {
-  const { draft: f, dirty, set, reset } = useDraft(o.auto);
-  const auto = useAction((body: Partial<OsInfo["auto"]>) => api.put<OsInfo>("/os-update/auto", body), { invalidate: ["os-update"], success: "System update settings saved" });
+  const { draft: f, dirty, set, reset, saved: done } = useDraft(o.auto);
+  const auto = useAction((body: Partial<OsInfo["auto"]>) => api.put<OsInfo>("/os-update/auto", body), { invalidate: ["os-update"], success: "System update settings saved", onSuccess: () => done() });
   if (!f) return null;
   return (
     <RowCard>

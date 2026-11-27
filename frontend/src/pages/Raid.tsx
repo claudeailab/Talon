@@ -227,7 +227,7 @@ function RaidCard({ a, disks, onJob }: { a: RaidArray; disks: Disk[]; onJob: (id
             <>The hot spare is taken out of the array and wiped.</>
           ) : remove?.state === "faulty" ? (
             <>The failed disk is taken out of the array and wiped, so it can be replaced.</>
-          ) : a.level === "raid1" && a.members.filter((m) => m.state === "active").length > 2 ? (
+          ) : a.level === "raid1" && a.members.filter((m) => m.state === "active").length > 2 && !a.members.some((m) => m.state === "spare") && remove?.state === "active" ? (
             <>The disk is taken out and wiped; the array keeps one mirror less.</>
           ) : (
             <>
@@ -626,7 +626,7 @@ type RaidLogData = { name: string; dev: string | null; status: string; status_de
 function RaidLog({ name, onClose }: { name: string; onClose: () => void }) {
   const q = useQuery({ queryKey: ["raid-log", name], queryFn: () => api.get<RaidLogData>(`/raid/${name}/log`), refetchInterval: 4000 });
   const items = q.data?.items;
-  const follow = useFollow<HTMLUListElement>(items?.length);
+  const follow = useFollow<HTMLUListElement>(items);
   const d = q.data;
   return (
     <Modal open onClose={onClose} size="lg" title={`Log: RAID ${name}`} description={d?.dev ? `/dev/${d.dev} · Talon and system messages` : undefined} footer={<Button onClick={onClose}>Close</Button>}>

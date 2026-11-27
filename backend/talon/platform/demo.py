@@ -197,7 +197,7 @@ class DemoPlatform:
         if kind not in ("short", "long"):
             raise UserError("Test type must be short or long")
 
-    def wipe_disk(self, disk: str, log, step=lambda n: None) -> None:
+    def wipe_disk(self, disk: str, log, step=lambda n: None, zero: bool = True) -> None:
         with self.lock:
             d = self.disks[disk]
             names = {p["name"] for p in d["parts"]}

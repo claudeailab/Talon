@@ -196,7 +196,7 @@ export const GUIDE: Topic[] = [
           },
           { img: "raid-create", alt: "Create RAID: selecting disks" },
           { warn: "All data on the selected disks is erased." },
-          { p: "The array synchronises in the background, which can take several hours on large disks. You can already create a volume on it and use it while it does." },
+          { p: "The array synchronises in the background, which can take several hours on large disks. You can already create a volume on it and use it while it does. Its card shows **Building** with the progress, the speed and the time left, and every disk shows **syncing**, with a light that sweeps across it; on the [Disks](" + t("disks") + ") page those disks are animated too." },
           { p: "Next step: create a volume on the array. See [Volumes](" + t("volumes") + ")." },
         ],
       },

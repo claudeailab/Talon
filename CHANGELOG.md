@@ -1,3 +1,8 @@
+## 1.0.178
+- Review fixes: RAID disk removal is checked again when it runs; no shrink of a RAID 1 with a spare; a failing disk is not overwritten
+- Settings: Save clears the bar also when the saved text is reformatted; http:// redirect is not cached by browsers
+- Docs: new screenshots of the settings pages, Updates and Antivirus; feature lists updated
+
 ## 1.0.177
 - http:// addresses open the same page over https:// while HTTPS is on (not when it is turned off)
 

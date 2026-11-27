@@ -127,10 +127,11 @@ function ProgressBox({ title, text, percent, note, action }: { title: string; te
 /** Volumes, Scan now and the schedule; the schedule (and the volumes it scans) is kept until Save. */
 function Scanner({ d, volumes }: { d: AvInfo; volumes: Volume[] }) {
   const [sel, setSel] = useState<string[]>(d.settings.volumes);
-  const { draft: f, dirty: changed, set, reset } = useDraft({ schedule: d.settings.schedule, weekday: d.settings.weekday, time: d.settings.time });
+  const { draft: f, dirty: changed, set, reset, saved: done } = useDraft({ schedule: d.settings.schedule, weekday: d.settings.weekday, time: d.settings.time });
   const save = useAction((body: Partial<AvInfo["settings"]>) => api.put<AvInfo>("/antivirus/settings", { ...d.settings, ...body }), {
     invalidate: ["antivirus"],
     success: "Schedule saved",
+    onSuccess: () => done(),
   });
   const volumesChanged = [...sel].sort().join() !== [...d.settings.volumes].sort().join();
   const dirty = changed || (f?.schedule !== "off" && volumesChanged);

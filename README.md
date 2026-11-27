@@ -58,9 +58,9 @@ https://<nas-ip>/
 
 </div>
 
-- **Dashboard:** live system stats and storage health; issues in one place, the bell
+- **Dashboard:** live system stats with the last 30 minutes of graphs, storage health; issues in one place, the bell
 - **Disks:** S.M.A.R.T. health, temperatures, self-tests and wipe
-- **RAID:** hot spares, expansion, disk replacement and data scrub
+- **RAID:** hot spares, expansion, disk replacement and data scrub; live build progress with time left, and a log
 - **Volumes:** ext4 or XFS on a single disk, or several on one RAID array, each with its own size
 - **Backup:** to a USB or internal disk when plugged in or daily, with earlier versions and a live log
 - **Browser:** browse volumes, other disks and OneDrive in the web interface
@@ -73,9 +73,9 @@ https://<nas-ip>/
 - **Discovery:** appears in Windows Network, and in macOS Finder with Bonjour on
 - **Activity:** one searchable log of everything Talon and the system do
 - **Usage history:** a year of CPU, memory, network, disk and storage graphs
-- **Updates:** Talon and the operating system, each with its own schedule, optionally automatic
+- **Updates:** Talon and the operating system, each optionally automatic at a time you choose, with a restart when needed and a changelog
 - **Antivirus:** ClamAV scans of volumes with quarantine
-- **Network:** DHCP or static IP, HTTPS on or off
+- **Network:** DHCP or static IP, HTTPS on or off (http:// opens https:// while it is on)
 - **Scheduled:** scripts on a schedule, with live output and progress
 - **SD cards:** fewer writes to an SD or USB flash system disk
 - **Notifications:** email alerts with adjustable thresholds

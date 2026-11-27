@@ -26,7 +26,7 @@ def test_listener_redirects(monkeypatch):
         c = http.client.HTTPConnection("127.0.0.1", port, timeout=5)
         c.request("GET", "/settings?tab=network", headers={"Host": "nas.local"})
         r = c.getresponse()
-        assert r.status == 301 and r.getheader("Location") == "https://nas.local/settings?tab=network"
+        assert r.status == 302 and r.getheader("Cache-Control") == "no-store" and r.getheader("Location") == "https://nas.local/settings?tab=network"
         assert not redirect.start(443, "127.0.0.1")          # the port is taken: not started twice
     finally:
         redirect.server.shutdown()

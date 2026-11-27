@@ -397,7 +397,9 @@ def create_app(cfg, platform) -> FastAPI:
         dev = arr.get("dev")
         if dev:
             for e in syslog_reader.query(0, 300, "", "", dev, cap=300)["items"]:
-                if re.search(rf"\b{re.escape(dev)}\b", e["message"]):
+                # not an earlier array that had the same md number
+                since = (arr.get("created") or 0) - 120
+                if e["ts"] >= since and re.search(rf"\b{re.escape(dev)}\b", e["message"]):
                     items.append({"ts": e["ts"], "level": e["level"], "source": e.get("program") or "system",
                                   "message": e["message"]})
         items.sort(key=lambda e: e["ts"])

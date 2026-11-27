@@ -44,7 +44,7 @@ export default function EntraTab() {
   const [guide, setGuide] = useState(false);
   const [checks, setChecks] = useState<EntraCheck[] | null>(null);
   const d = q.data;
-  const { draft: f, dirty, set, reset } = useDraft<Draft>(
+  const { draft: f, dirty, set, reset, saved: done } = useDraft<Draft>(
     d && {
       client_id: d.client_id,
       tenant: GUID.test(d.tenant) ? d.tenant : "",
@@ -57,7 +57,7 @@ export default function EntraTab() {
   const save = useAction((body: Body) => api.put<EntraConfig>("/settings/entra", { ...body, origin: location.origin }), {
     success: "Entra ID settings saved",
     invalidate: ["entra", "onedrive"],
-    onSuccess: () => set("client_secret", ""),
+    onSuccess: () => done(),
   });
   // tests what is saved (fields left out use the saved values)
   const test = useAction(() => api.post<{ checks: EntraCheck[] }>("/settings/entra/test", { config: {}, origin: location.origin }), {

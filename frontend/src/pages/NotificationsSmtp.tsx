@@ -26,13 +26,13 @@ export default function SmtpCard() {
   });
   const d = q.data;
   // the saved settings; an empty password keeps the saved one
-  const { draft: f, dirty, set, reset } = useDraft<Draft>(
+  const { draft: f, dirty, set, reset, saved: done } = useDraft<Draft>(
     d && { host: d.host, port: String(d.port), security: d.security, username: d.username, password: "", sender: d.sender },
   );
   const save = useAction((body: Body) => api.put<SmtpConfig>("/settings/smtp", body), {
     success: "Email server saved",
     invalidate: ["smtp", "notifications"],
-    onSuccess: () => set("password", ""),
+    onSuccess: () => done(),
   });
   if (!d || !f) return <PageLoader />;
   const body: Body = { ...f, host: f.host.trim(), sender: f.sender.trim(), port: Number(f.port) };

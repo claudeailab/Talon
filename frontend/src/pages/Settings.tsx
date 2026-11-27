@@ -53,10 +53,11 @@ function GeneralTab() {
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.get<Settings>("/settings") });
   const tz = useQuery({ queryKey: ["timezones"], queryFn: () => api.get<string[]>("/settings/timezones"), staleTime: Infinity });
   const saved = settings.data && (Object.fromEntries(GENERAL.map((k) => [k, settings.data![k]])) as Pick<Settings, (typeof GENERAL)[number]>);
-  const { draft: f, dirty, set, reset } = useDraft(saved);
+  const { draft: f, dirty, set, reset, saved: done } = useDraft(saved);
   const save = useAction((body: Partial<Settings>) => api.put<Settings>("/settings", body), {
     success: "Settings saved",
     invalidate: ["settings", "system", "dashboard"],
+    onSuccess: () => done(),
   });
   if (!settings.data || !f || !saved) return <PageLoader />;
   const d = settings.data;

@@ -49,10 +49,11 @@ const split = (v: string) => v.split(/[,;\s]+/).filter(Boolean);
 function EmailTab() {
   const q = useQuery({ queryKey: ["notifications"], queryFn: () => api.get<NotificationSettings>("/notifications") });
   const d = q.data;
-  const { draft: f, dirty, set, reset } = useDraft<{ recipients: string; events: Record<string, boolean> }>(d && { recipients: d.recipients.join(", "), events: d.events });
+  const { draft: f, dirty, set, reset, saved: done } = useDraft<{ recipients: string; events: Record<string, boolean> }>(d && { recipients: d.recipients.join(", "), events: d.events });
   const save = useAction((body: { recipients: string[]; events: Record<string, boolean> }) => api.put<NotificationSettings>("/notifications", body), {
     success: "Notifications saved",
     invalidate: ["notifications"],
+    onSuccess: () => done(),
   });
   const test = useAction(() => api.post("/notifications/test"), { success: "Test notification sent" });
   if (!d || !f) return <PageLoader />;
@@ -107,10 +108,11 @@ const toDraft = (l: Limits): Draft => ({ ...(Object.fromEntries(ROWS.map((r) => 
 /** Notifications → Thresholds: when the bell and emails warn. Changes are kept until Save. */
 function ThresholdsCard() {
   const q = useQuery({ queryKey: ["thresholds"], queryFn: () => api.get<ThresholdInfo>("/thresholds") });
-  const { draft: f, dirty, set, setAll, reset } = useDraft<Draft>(q.data && toDraft(q.data.values));
+  const { draft: f, dirty, set, setAll, reset, saved: done } = useDraft<Draft>(q.data && toDraft(q.data.values));
   const save = useAction((body: Limits) => api.put<ThresholdInfo>("/thresholds", body), {
     success: "Thresholds saved",
     invalidate: ["thresholds", "dashboard", "disks", "alerts"],
+    onSuccess: () => done(),
   });
   if (!q.data || !f) return <PageLoader />;
   const { defaults } = q.data;

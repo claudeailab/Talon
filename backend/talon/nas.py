@@ -628,7 +628,8 @@ class Nas:
         if m["state"] in ("syncing", "rebuilding") or a.get("sync_action", "idle") != "idle":
             return "Wait until the array has finished syncing"
         active = [x for x in a["members"] if x["state"] == "active"]
-        if r["level"] == "raid1" and len(active) > 2 and not a.get("degraded"):
+        spares = [x for x in a["members"] if x["state"] == "spare"]
+        if r["level"] == "raid1" and len(active) > 2 and not a.get("degraded") and not spares:
             return None
         if health in ("failing", "warning"):
             tolerance = raid.fault_tolerance(r["level"], a["raid_disks"])
@@ -645,17 +646,29 @@ class Nas:
         why = self._cannot_remove(r, a, member, self._disk_health(member["disk"]))
         if why:
             raise UserError(why)
-        shrink = (member["state"] == "active" and r["level"] == "raid1"
-                  and len([m for m in a["members"] if m["state"] == "active"]) > 2)
 
         def work(log):
             go = steps(log, ["Taking the disk out of the array", "Erasing the disk", "Saving the RAID configuration"])
             go(1)
-            self.p.md_fail_remove(a["dev"], part, log)
+            # check again now: another removal may have run since the request was made
+            r2, a2 = self._array(name)
+            m2 = next((m for m in a2["members"] if m["part"] == part), None)
+            if not m2:
+                raise UserError("The disk is no longer in this array")
+            health = self._disk_health(m2["disk"])
+            why2 = self._cannot_remove(r2, a2, m2, health)
+            if why2:
+                raise UserError(why2)
+            shrink = (m2["state"] == "active" and r2["level"] == "raid1"
+                      and len([m for m in a2["members"] if m["state"] == "active"]) > 2
+                      and not any(m["state"] == "spare" for m in a2["members"]))
+            self.p.md_fail_remove(a2["dev"], part, log)
             if shrink:                                   # one mirror less, not a missing one
-                self.p.md_grow(a["dev"], a["raid_disks"] - 1, log)
+                self.p.md_grow(a2["dev"], a2["raid_disks"] - 1, log)
             go(2)
-            self.p.wipe_disk(member["disk"], log)
+            # a failed or failing disk is not overwritten (that could take very long on a
+            # dying disk); erasing its signatures is enough
+            self.p.wipe_disk(m2["disk"], log, zero=m2["state"] in ("active", "spare") and health not in ("failing", "warning"))
             go(3)
             self.p.save_mdadm_conf(log)
 

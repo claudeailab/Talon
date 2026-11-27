@@ -34,12 +34,16 @@ def _handler(https_port: int):
     class Redirect(BaseHTTPRequestHandler):
         server_version = "Talon"
         sys_version = ""
+        timeout = 10                                       # idle connections are closed
 
         def _go(self) -> None:
             local = self.connection.getsockname()[0]
             url = target(self.headers.get("Host", ""), self.path, https_port, local)
-            self.send_response(308 if self.command not in ("GET", "HEAD") else 301)
+            # temporary and not cached: when HTTPS is turned off later, browsers must not
+            # keep sending http:// to https:// (nothing would answer there)
+            self.send_response(307 if self.command not in ("GET", "HEAD") else 302)
             self.send_header("Location", url)
+            self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Length", "0")
             self.send_header("Connection", "close")
             self.end_headers()

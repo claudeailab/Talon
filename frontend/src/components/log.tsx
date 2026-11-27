@@ -4,7 +4,7 @@ import { Badge } from "./ui";
 
 /** A run's log (OneDrive, Backup), keeping the newest line in view unless the user scrolled up to read something. */
 export function LogList({ lines }: { lines: string[] | undefined }) {
-  const follow = useFollow<HTMLUListElement>(lines?.length);
+  const follow = useFollow<HTMLUListElement>(lines);
   if (!lines?.length) return <div className="py-8 text-center text-sm text-zinc-500">No log yet.</div>;
   return (
     <ul
