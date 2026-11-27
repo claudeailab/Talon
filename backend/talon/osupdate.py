@@ -220,7 +220,8 @@ class OsUpdate:
         finally:
             run_info = {"at": time.time(), "ok": p["state"] == "success", "count": total, "error": p.get("error")}
             self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}), "last_install": run_info,
-                                                                     **({"last_auto": {**run_info, "result": "installed" if run_info["ok"] else "failed"}} if auto else {})}))
+                                                                     **({"last_auto": {**run_info, "mode": self.auto_settings()["mode"],
+                                                                                       "result": "installed" if run_info["ok"] else "failed"}} if auto else {})}))
             if auto:
                 self._after_auto(p["state"] == "success", total, p.get("error"))
             if not self.demo and p["state"] != "success":
