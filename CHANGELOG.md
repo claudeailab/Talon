@@ -1,3 +1,6 @@
+## 1.0.168
+- Entra ID Users: a clear message when the tenant ID does not match the app registration
+
 ## 1.0.167
 - Every settings card has Save and Discard, greyed out until something changes
 - Save stays off while a required value is missing, with a hint saying what to fill in

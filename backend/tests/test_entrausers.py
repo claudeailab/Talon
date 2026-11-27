@@ -134,3 +134,12 @@ def test_old_account_types_keep_onedrive_and_fill_in_the_tenant(client):
 def entra_personal():
     from talon import entra
     return entra.PERSONAL_TENANT
+
+
+def test_app_registered_in_another_directory(monkeypatch):
+    import pytest
+    from talon import entra
+    from talon.util import UserError
+    monkeypatch.setattr(entra, "_request", lambda url, *a, **k: (400, '{"error": "unauthorized_client", "error_codes": [700016]}'))
+    with pytest.raises(UserError, match="shown next to its Application"):
+        entra.app_token({"tenant": TENANT, "client_id": GUID, "client_secret": "s"})

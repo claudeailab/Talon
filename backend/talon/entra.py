@@ -297,8 +297,15 @@ def app_token(cfg: dict) -> dict:
             "grant_type": "client_credentials", "scope": "https://graph.microsoft.com/.default"}
     status, text = _request(f"{LOGIN}/{tenant_of(cfg)}/oauth2/v2.0/token", data)
     payload = _json(text)
+    codes = _error_codes(payload, text)
+    if codes & {700016, 7000229}:
+        # Microsoft knows the app (sign-in works) but not in this directory: the app was
+        # registered in another tenant, or it was never approved in this one
+        raise UserError("The app is not registered in the directory with this Directory (tenant) ID. "
+                        "In Entra, open the app's Overview page and copy the Directory (tenant) ID shown "
+                        "next to its Application (client) ID into Settings → Entra ID.")
     if status != 200 or "access_token" not in payload:
-        raise UserError(explain(_error_codes(payload, text),
+        raise UserError(explain(codes,
                                 payload.get("error_description", "Could not read the directory").split("\r\n")[0]))
     return payload
 
