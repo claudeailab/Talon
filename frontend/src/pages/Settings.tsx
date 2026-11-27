@@ -3,11 +3,10 @@ import { useEffect, useState } from "react";
 import { KeyRound, Network, SlidersHorizontal } from "lucide-react";
 import { api } from "../lib/api";
 import { DATE_FORMATS } from "../lib/format";
-import { useAction } from "../lib/hooks";
+import { useAction, useDraft } from "../lib/hooks";
 import type { Settings } from "../lib/types";
-import { PageHeader, PageLoader, Select, Switch, Tabs } from "../components/ui";
-import { Row, RowCard, Section } from "../components/rows";
-import { AutoField } from "../components/autosave";
+import { Input, PageHeader, PageLoader, Select, Switch, Tabs } from "../components/ui";
+import { Row, RowCard, SaveBar, Section } from "../components/rows";
 import { useSearch } from "../lib/router";
 import EntraTab from "./SettingsEntra";
 import NetworkTab from "./SettingsNetwork";
@@ -45,72 +44,75 @@ export default function SettingsPage() {
   );
 }
 
-/** Settings → General: every setting saves as soon as it changes (a text field when you leave it). */
+const HOSTNAME_RE = /^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/;
+const WORKGROUP_RE = /^[A-Z0-9_-]{1,15}$/;
+const GENERAL = ["hostname", "timezone", "date_format", "time_format", "workgroup", "smb_min_protocol", "smb_macos_compat"] as const;
+
+/** Settings → General: changes are kept until Save. */
 function GeneralTab() {
   const settings = useQuery({ queryKey: ["settings"], queryFn: () => api.get<Settings>("/settings") });
   const tz = useQuery({ queryKey: ["timezones"], queryFn: () => api.get<string[]>("/settings/timezones"), staleTime: Infinity });
+  const saved = settings.data && (Object.fromEntries(GENERAL.map((k) => [k, settings.data![k]])) as Pick<Settings, (typeof GENERAL)[number]>);
+  const { draft: f, dirty, set, reset } = useDraft(saved);
   const save = useAction((body: Partial<Settings>) => api.put<Settings>("/settings", body), {
-    success: "Saved",
+    success: "Settings saved",
     invalidate: ["settings", "system", "dashboard"],
   });
+  if (!settings.data || !f || !saved) return <PageLoader />;
   const d = settings.data;
-  if (!d) return <PageLoader />;
-  const put = <K extends keyof Settings>(k: K, v: Settings[K]) => save.mutateAsync({ [k]: v } as Partial<Settings>);
+  const problem = !f.hostname
+    ? "Enter a name for the NAS"
+    : !HOSTNAME_RE.test(f.hostname)
+      ? "Name: letters, digits and - (not at the start or end)"
+      : !f.workgroup
+        ? "Enter the workgroup"
+        : !WORKGROUP_RE.test(f.workgroup)
+          ? "Workgroup: up to 15 letters, digits, - and _"
+          : null;
+  const changed = Object.fromEntries(GENERAL.filter((k) => f[k] !== saved[k]).map((k) => [k, f[k]])) as Partial<Settings>;
   const W = "w-full sm:w-72";
   return (
     <RowCard>
       <Section title="This NAS" />
-      <Row label="Name" hint={`Reachable as ${d.hostname}.local when Bonjour is on under Services`}>
-        <AutoField
-          value={d.hostname}
-          onSave={(v) => put("hostname", v)}
-          filter={(v) => v.replace(/\s/g, "")}
-          validate={(v) => (/^[A-Za-z0-9]([A-Za-z0-9-]{0,61}[A-Za-z0-9])?$/.test(v) ? null : "Letters, digits and - (not at the start or end)")}
-          aria-label="Name"
-        />
+      <Row label="Name" hint={`Reachable as ${f.hostname || d.hostname}.local when Bonjour is on under Services`}>
+        <Input value={f.hostname} onChange={(e) => set("hostname", e.target.value.replace(/\s/g, ""))} aria-invalid={!!f.hostname && !HOSTNAME_RE.test(f.hostname)} className={W} aria-label="Name" />
       </Row>
       <Section title="Date and time" />
       <Row label="Time zone">
-        <Select value={d.timezone} onChange={(e) => put("timezone", e.target.value)} className={W} aria-label="Time zone">
-          {(tz.data ?? [d.timezone]).map((t) => (
+        <Select value={f.timezone} onChange={(e) => set("timezone", e.target.value)} className={W} aria-label="Time zone">
+          {(tz.data ?? [f.timezone]).map((t) => (
             <option key={t}>{t}</option>
           ))}
         </Select>
       </Row>
       <Row label="Format">
-        <Select value={d.date_format} onChange={(e) => put("date_format", e.target.value)} className="w-full sm:w-44" aria-label="Date format">
-          {DATE_FORMATS.map((f) => (
-            <option key={f} value={f}>
-              {example(f)}
+        <Select value={f.date_format} onChange={(e) => set("date_format", e.target.value)} className="w-full sm:w-44" aria-label="Date format">
+          {DATE_FORMATS.map((x) => (
+            <option key={x} value={x}>
+              {example(x)}
             </option>
           ))}
         </Select>
-        <Select value={d.time_format} onChange={(e) => put("time_format", e.target.value)} className="w-full sm:w-26" aria-label="Time format">
+        <Select value={f.time_format} onChange={(e) => set("time_format", e.target.value)} className="w-full sm:w-26" aria-label="Time format">
           <option value="24h">17:45</option>
           <option value="12h">5:45 PM</option>
         </Select>
       </Row>
       <Section title="Windows and macOS sharing" />
       <Row label="Workgroup">
-        <AutoField
-          value={d.workgroup}
-          onSave={(v) => put("workgroup", v)}
-          filter={(v) => v.toUpperCase().replace(/\s/g, "")}
-          validate={(v) => (/^[A-Z0-9_-]{1,15}$/.test(v) ? null : "Up to 15 letters, digits, - and _")}
-          maxLength={15}
-          aria-label="Workgroup"
-        />
+        <Input value={f.workgroup} onChange={(e) => set("workgroup", e.target.value.toUpperCase().replace(/\s/g, ""))} maxLength={15} aria-invalid={!!f.workgroup && !WORKGROUP_RE.test(f.workgroup)} className={W} aria-label="Workgroup" />
       </Row>
       <Row label="Minimum SMB version" hint="SMB2_10 or newer is recommended">
-        <Select value={d.smb_min_protocol} onChange={(e) => put("smb_min_protocol", e.target.value)} className={W} aria-label="Minimum SMB version">
+        <Select value={f.smb_min_protocol} onChange={(e) => set("smb_min_protocol", e.target.value)} className={W} aria-label="Minimum SMB version">
           {d.smb_protocols.map((p) => (
             <option key={p}>{p}</option>
           ))}
         </Select>
       </Row>
       <Row inline label="macOS compatibility" hint="Faster Finder browsing and correct metadata">
-        <Switch checked={d.smb_macos_compat} onChange={(v) => put("smb_macos_compat", v)} label="macOS compatibility" />
+        <Switch checked={f.smb_macos_compat} onChange={(v) => set("smb_macos_compat", v)} label="macOS compatibility" />
       </Row>
+      <SaveBar dirty={dirty} problem={problem} onDiscard={reset} loading={save.isPending} onSave={() => save.mutate(changed)} />
     </RowCard>
   );
 }

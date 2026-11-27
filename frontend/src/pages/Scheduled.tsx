@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { Clock, Copy, FileText, MoreHorizontal, Pause, Pencil, Play, Plus, Square, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
+import { FormHint } from "../components/rows";
 import { ago, bytes, cx, dateTime, sameValue } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { ScheduledTask, TaskRun, TaskSchedule } from "../lib/types";
@@ -282,6 +283,13 @@ function TaskDialog({ task, copy, runAs, onClose }: { task: ScheduledTask | null
   useEffect(() => setTest(null), [f.script, f.run_as]);
   const ready = !!f.name.trim() && !!f.script.trim() && (f.schedule !== "cron" || f.cron.trim().split(/\s+/).length === 5);
   const changed = !task || !sameValue(f, initial);
+  const missing = !f.name.trim()
+    ? "Enter a name"
+    : !f.script.trim()
+      ? "Enter the commands to run"
+      : f.schedule === "cron" && f.cron.trim().split(/\s+/).length !== 5
+        ? "The cron expression needs 5 fields"
+        : null;
 
   return (
     <Modal
@@ -295,7 +303,8 @@ function TaskDialog({ task, copy, runAs, onClose }: { task: ScheduledTask | null
           <Button icon={<Play className="size-4" />} loading={testRun.isPending} disabled={!f.script.trim()} onClick={() => testRun.mutate()}>
             Test run
           </Button>
-          <div className="flex gap-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <FormHint text={changed ? missing : null} />
             <Button variant="ghost" onClick={onClose}>
               Cancel
             </Button>

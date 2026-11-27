@@ -110,13 +110,18 @@ export default function NetworkTab() {
           dns2: f.dns2 && !IP_RE.test(f.dns2.trim()) ? "Enter an address like 8.8.8.8" : null,
         }
       : {};
-  const complete = f.mode === "dhcp" || (!!f.address && !!f.subnet && !!f.gateway && !!f.dns1);
-  const valid = complete && Object.values(errors).every((e) => !e);
   const start = formOf(iface);
   const changed =
     f.mode !== iface.mode ||
     (f.mode === "static" && (["address", "subnet", "gateway", "dns1", "dns2"] as const).some((k) => f[k].trim() !== start[k]));
-  const locked = !iface.manager || !!q.data.pending;
+  const missing = f.mode === "static" && ([["address", "the address"], ["subnet", "the subnet mask"], ["gateway", "the gateway"], ["dns1", "a DNS server"]] as const).find(([k]) => !f[k].trim());
+  const problem = !iface.manager
+    ? "This interface is not managed by a supported network tool"
+    : q.data.pending
+      ? "A network change is still being confirmed"
+      : missing
+        ? `Enter ${missing[1]}`
+        : Object.values(errors).find((e) => e) ?? null;
   const sameAddress = f.mode === "static" && f.address.trim() === iface.address;
 
   const field = (k: "address" | "subnet" | "gateway" | "dns1" | "dns2", placeholder: string) => (
@@ -129,7 +134,6 @@ export default function NetworkTab() {
 
   return (
     <div className="space-y-5">
-    {/* HTTPS applies by itself (after a confirmation); the Save bar below is only for the address */}
     <WebCard />
     <RowCard>
       <Section
@@ -189,13 +193,12 @@ export default function NetworkTab() {
           <Row label="Second DNS server" hint="Optional">{field("dns2", "1.1.1.1")}</Row>
         </>
       )}
-      {/* the one setting with a button: it moves the NAS, so it is applied on purpose, with a way back */}
-      <SaveBar
-        show={changed}
+            <SaveBar
+        dirty={changed}
+        problem={problem}
         note="Applied together: Talon moves to the new address and comes back if it is not reached there in 3 minutes"
         saveText="Apply"
         onDiscard={() => setF(start)}
-        disabled={!valid || locked}
         onSave={() => setConfirm(true)}
       />
       <ConfirmDialog
@@ -245,12 +248,14 @@ type Web = { https: boolean; port: number; https_port: number; serving_https: bo
 /** HTTPS on or off, in a card of its own: it applies on its own, not with the Save button of the network settings. */
 function WebCard() {
   const q = useQuery({ queryKey: ["web"], queryFn: () => api.get<Web>("/settings/web") });
-  const [ask, setAsk] = useState<boolean | null>(null);
+  const [ask, setAsk] = useState(false);
+  const [want, setWant] = useState<boolean | null>(null);
   const [restarting, setRestarting] = useState<string | null>(null);
   const save = useAction((on: boolean) => api.put<{ https: boolean; port: number; restarting: boolean }>("/settings/web", { https: on }), {
     invalidate: ["web"],
     onSuccess: (r) => {
-      setAsk(null);
+      setAsk(false);
+      setWant(null);
       if (!r.restarting) return;
       // Behind a proxy (a domain name) the address stays the same; on the LAN the scheme and port change.
       const direct = /^(\d+\.){3}\d+$|\.local$|^localhost$/.test(location.hostname);
@@ -262,6 +267,7 @@ function WebCard() {
   });
   if (!q.data) return null;
   const on = q.data.https;
+  const next = want ?? on;
   return (
     <RowCard>
       <Section title="Web interface" />
@@ -274,17 +280,18 @@ function WebCard() {
         }
         hint="Turn off when Cloudflare or another proxy provides HTTPS"
       >
-        <Switch checked={on} onChange={(v) => setAsk(v)} label="HTTPS" />
+        <Switch checked={next} onChange={(v) => setWant(v === on ? null : v)} label="HTTPS" />
       </Row>
+      <SaveBar dirty={next !== on} note="Talon restarts to apply this" onDiscard={() => setWant(null)} onSave={() => setAsk(true)} />
       <ConfirmDialog
-        open={ask !== null}
-        onClose={() => setAsk(null)}
-        onConfirm={() => ask !== null && save.mutate(ask)}
+        open={ask}
+        onClose={() => setAsk(false)}
+        onConfirm={() => save.mutate(next)}
         loading={save.isPending}
-        title={ask ? "Turn HTTPS on?" : "Turn HTTPS off?"}
-        confirmText={ask ? "Turn on" : "Turn off"}
+        title={next ? "Turn HTTPS on?" : "Turn HTTPS off?"}
+        confirmText={next ? "Turn on" : "Turn off"}
         message={
-          ask
+          next
             ? `Talon restarts and is served over https:// on port ${q.data.https_port} again.`
             : "Talon restarts and is served over plain http:// on port 80. Passwords then cross your network unencrypted unless a proxy such as Cloudflare adds HTTPS."
         }

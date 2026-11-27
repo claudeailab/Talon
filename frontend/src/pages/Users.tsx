@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { KeyRound, MoreHorizontal, Pencil, Plus, ShieldCheck, Trash2, User as UserIcon, UserPlus, Users as UsersIcon, UserX } from "lucide-react";
 import { api } from "../lib/api";
+import { FormHint } from "../components/rows";
 import { cx, sameSet } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import { navigate } from "../lib/router";
@@ -288,6 +289,7 @@ function GroupDialog({ group, users, onClose }: { group: Group | null; users: Us
   const words = search.toLowerCase().split(/\s+/).filter(Boolean);
   const shown = users.filter((u) => words.every((w) => `${u.name} ${u.full_name}`.toLowerCase().includes(w)));
   const changed = isNew || description.trim() !== group!.description || !sameSet(members, group!.members);
+  const missing = !name ? "Enter a name for the group" : err ? "The group name is not valid" : null;
   return (
     <Modal
       open
@@ -298,7 +300,8 @@ function GroupDialog({ group, users, onClose }: { group: Group | null; users: Us
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={!name || !!err || !changed} loading={save.isPending} onClick={() => save.mutate()}>
+          <FormHint text={changed ? missing : null} />
+          <Button variant="primary" disabled={!!missing || !changed} loading={save.isPending} onClick={() => save.mutate()}>
             {isNew ? "Create group" : "Save"}
           </Button>
         </>
@@ -363,6 +366,17 @@ function UserDialog({ user, groups, isSelf, onClose }: { user: User | null; grou
   const valid = !!name && !nameErr && !pwErr && (isNew ? pw.length >= 8 && pw === pw2 : !pw || pw === pw2);
   const changed =
     isNew || fullName !== user!.full_name || admin !== user!.admin || !sameSet(sel, user!.groups) || pw !== "";
+  const missing = !name
+    ? "Enter a user name"
+    : nameErr
+      ? "The user name is not valid"
+      : isNew && !pw
+        ? "Enter a password"
+        : pw && pw.length < 8
+          ? "The password needs at least 8 characters"
+          : pw && pw !== pw2
+            ? pw2 ? "The passwords do not match" : "Enter the password again"
+            : null;
   return (
     <Modal
       open
@@ -373,6 +387,7 @@ function UserDialog({ user, groups, isSelf, onClose }: { user: User | null; grou
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
+          <FormHint text={changed ? missing : null} />
           <Button variant="primary" disabled={!valid || !changed} loading={save.isPending} onClick={() => save.mutate()}>
             {isNew ? "Create user" : "Save"}
           </Button>
@@ -638,7 +653,7 @@ function EntraSetupNeeded() {
       <p className="mt-1 text-sm text-zinc-500">To choose people from your organization's directory:</p>
       <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm">
         <li>
-          In <b>Settings → Entra ID</b>, enter the <b>Directory (tenant) ID</b> from the app's Overview page in the Entra portal; it saves by itself.
+          In <b>Settings → Entra ID</b>, enter the <b>Directory (tenant) ID</b> from the app's Overview page in the Entra portal and click <b>Save</b>.
         </li>
         <li>
           In the Entra portal, open the app's <b>API permissions → Add a permission → Microsoft Graph → Application permissions</b>, add <b>User.Read.All</b>{" "}

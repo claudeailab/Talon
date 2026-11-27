@@ -2,7 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Check, ChevronDown, DatabaseBackup, FileText, HardDrive, Minus, MoreHorizontal, Pencil, Play, Plus, RotateCcw, Square, Trash2, Usb } from "lucide-react";
 import { api } from "../lib/api";
-import { ago, bytes, cx, dateTime, duration, pct, rate } from "../lib/format";
+import { FormHint } from "../components/rows";
+import { ago, bytes, cx, dateTime, duration, pct, rate, sameValue } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import { Detail, Details, ITEM_CARD, ITEM_LIST, ITEM_MENU, ITEM_WRAP, ITEM_ROW, ItemTitle } from "../components/storage";
 import { LogList } from "../components/log";
@@ -313,6 +314,28 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
     },
   );
   const steps = ["Disk", "What to back up", "When", "Name"];
+  const changed =
+    !task ||
+    !sameValue(
+      { name: body.name, sources, when, time, eject, keep_days: keep },
+      { name: task.name, sources: task.sources.map((x) => ({ volume: x.volume, folders: x.folders })), when: task.when, time: task.time, eject: task.eject, keep_days: task.keep_days },
+    );
+  const hint =
+    step === 0
+      ? !d && !blank
+        ? "Choose a disk"
+        : blank && !erase
+          ? "Confirm that the disk may be erased"
+          : null
+      : step === 1
+        ? !sources.length
+          ? "Choose what to back up"
+          : null
+        : step === 2
+          ? when !== "plug" && !timeOk
+            ? "Enter the time as hh:mm"
+            : null
+          : null;
   const canNext = step === 0 ? !!d || (!!blank && erase) : step === 1 ? sources.length > 0 : step === 2 ? timeOk || when === "plug" : true;
   return (
     <Modal
@@ -323,6 +346,7 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
       description={`Step ${step + 1} of 4 · ${steps[step]}`}
       footer={
         <>
+          <FormHint text={step < 3 ? hint : null} />
           {step > (editing ? 1 : 0) ? (
             <Button variant="ghost" onClick={() => setStep(step - 1)}>
               Back
@@ -337,7 +361,7 @@ function Wizard({ info, task, onClose }: { info: Info; task: Task | null; onClos
               Next
             </Button>
           ) : (
-            <Button variant="primary" loading={save.isPending} onClick={() => save.mutate()}>
+            <Button variant="primary" disabled={!changed} loading={save.isPending} onClick={() => save.mutate()}>
               {editing ? "Save" : "Create and back up now"}
             </Button>
           )}

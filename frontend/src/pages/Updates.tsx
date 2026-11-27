@@ -3,12 +3,12 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Package, RefreshCw, RotateCcw, ShieldAlert } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, clock, cx, date } from "../lib/format";
-import { useAction } from "../lib/hooks";
+import { useAction, useDraft } from "../lib/hooks";
 import { useSearch } from "../lib/router";
 import { restartNas } from "../components/restart";
 import type { UpdateInfo } from "../lib/types";
 import { Badge, Button, Callout, ConfirmDialog, PageHeader, PageLoader, Progress, Segmented, Select, Switch, Tabs, TimeInput } from "../components/ui";
-import { Row, RowBlock, RowCard, Section } from "../components/rows";
+import { Row, RowBlock, RowCard, SaveBar, Section } from "../components/rows";
 
 type Pkg = { name: string; old: string; new: string; security: boolean; restart: boolean };
 type Run = { state: "idle" | "running" | "success" | "error"; percent?: number; text?: string; error?: string };
@@ -154,20 +154,22 @@ function CheckEvery({ value, onChange }: { value: number; onChange: (h: number) 
 }
 
 function TalonSettings({ t }: { t: UpdateInfo }) {
+  const { draft: f, dirty, set, reset } = useDraft({ interval_hours: t.interval_hours, auto_install: t.auto_install, auto_time: t.auto_time });
   const save = useAction((body: { interval_hours?: number; auto_install?: boolean; auto_time?: string }) => api.put<UpdateInfo>("/update/settings", body), {
     invalidate: ["update"],
-    success: "Saved",
+    success: "Update settings saved",
   });
+  if (!f) return null;
   return (
     <RowCard>
       <Section title="Talon" />
       <Row label="How often to check">
-        <CheckEvery value={t.interval_hours} onChange={(h) => save.mutate({ interval_hours: h })} />
+        <CheckEvery value={f.interval_hours} onChange={(h) => set("interval_hours", h)} />
       </Row>
-      <Row label="Install automatically" hint={t.auto_install ? "A new version installs by itself at the time below" : "You are told about a new version; nothing installs by itself"}>
+      <Row label="Install automatically" hint={f.auto_install ? "A new version installs by itself at the time below" : "You are told about a new version; nothing installs by itself"}>
         <Segmented
-          value={t.auto_install ? "on" : "off"}
-          onChange={(v) => save.mutate({ auto_install: v === "on" })}
+          value={f.auto_install ? "on" : "off"}
+          onChange={(v) => set("auto_install", v === "on")}
           options={[
             { value: "off", label: "Off" },
             { value: "on", label: "On" },
@@ -176,40 +178,43 @@ function TalonSettings({ t }: { t: UpdateInfo }) {
       </Row>
       <Row
         inline
-        className={cx(!t.auto_install && "pointer-events-none opacity-50")}
+        className={cx(!f.auto_install && "pointer-events-none opacity-50")}
         label="Install at"
         hint="Talon restarts for a few seconds; shared folders stay available"
       >
         <div className="w-20">
-          <TimeInput value={t.auto_time} onChange={(v) => save.mutate({ auto_time: v })} />
+          <TimeInput value={f.auto_time} onChange={(v) => set("auto_time", v)} />
         </div>
       </Row>
+      <SaveBar dirty={dirty} onDiscard={reset} loading={save.isPending} onSave={() => save.mutate(f)} />
     </RowCard>
   );
 }
 
 function SystemSettings({ o }: { o: OsInfo }) {
-  const auto = useAction((body: Partial<OsInfo["auto"]>) => api.put<OsInfo>("/os-update/auto", body), { invalidate: ["os-update"], success: "Saved" });
+  const { draft: f, dirty, set, reset } = useDraft(o.auto);
+  const auto = useAction((body: Partial<OsInfo["auto"]>) => api.put<OsInfo>("/os-update/auto", body), { invalidate: ["os-update"], success: "System update settings saved" });
+  if (!f) return null;
   return (
     <RowCard>
       <Section title="System" />
       <Row label="How often to check">
-        <CheckEvery value={o.auto.interval_hours} onChange={(h) => auto.mutate({ interval_hours: h })} />
+        <CheckEvery value={f.interval_hours} onChange={(h) => set("interval_hours", h)} />
       </Row>
       <Row
         label="Install automatically"
         hint={
           <>
-            {o.auto.mode === "off"
+            {f.mode === "off"
               ? "Nothing installs by itself; you are told about security updates"
-              : `Every day at the time below, ${o.auto.mode === "all" ? "all updates" : "security updates"} install by themselves`}
+              : `Every day at the time below, ${f.mode === "all" ? "all updates" : "security updates"} install by themselves`}
             <AutoRun last={o.last_auto} next={o.next_auto} />
           </>
         }
       >
         <Segmented
-          value={o.auto.mode}
-          onChange={(v) => auto.mutate({ mode: v })}
+          value={f.mode}
+          onChange={(v) => set("mode", v)}
           options={[
             { value: "off", label: "Off" },
             { value: "security", label: "Security" },
@@ -219,22 +224,23 @@ function SystemSettings({ o }: { o: OsInfo }) {
       </Row>
       <Row
         inline
-        className={cx(o.auto.mode === "off" && "pointer-events-none opacity-50")}
+        className={cx(f.mode === "off" && "pointer-events-none opacity-50")}
         label="Install at"
         hint="If the NAS is off or busy then, it installs within the next two hours"
       >
         <div className="w-20">
-          <TimeInput value={o.auto.time} onChange={(v) => auto.mutate({ time: v })} />
+          <TimeInput value={f.time} onChange={(v) => set("time", v)} />
         </div>
       </Row>
       <Row
         inline
-        className={cx(o.auto.mode === "off" && "opacity-50")}
+        className={cx(f.mode === "off" && "opacity-50")}
         label="Restart after updates"
         hint="Right after they are installed, only if one needs it; shared folders are unavailable for a minute or two"
       >
-        <Switch checked={o.auto.restart} disabled={o.auto.mode === "off"} onChange={(v) => auto.mutate({ restart: v })} label="Restart after updates" />
+        <Switch checked={f.restart} disabled={f.mode === "off"} onChange={(v) => set("restart", v)} label="Restart after updates" />
       </Row>
+      <SaveBar dirty={dirty} onDiscard={reset} loading={auto.isPending} onSave={() => auto.mutate(f)} />
     </RowCard>
   );
 }

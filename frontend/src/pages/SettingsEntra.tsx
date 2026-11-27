@@ -1,14 +1,14 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { BookOpen, Copy, PlugZap } from "lucide-react";
 import { api } from "../lib/api";
 import { dateFormat, dateToIso, isoToDate } from "../lib/format";
-import { useAction } from "../lib/hooks";
+import { useAction, useDraft } from "../lib/hooks";
 import type { EntraCheck, EntraConfig } from "../lib/types";
 import { TestResult } from "../components/testresult";
 import { Badge, Button, DateInput, Modal, PageLoader, Select, useToast } from "../components/ui";
-import { Row, RowCard, Section } from "../components/rows";
-import { AutoField } from "../components/autosave";
+import { Row, RowCard, SaveBar, Section } from "../components/rows";
+import { TextField } from "../components/field";
 
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -32,28 +32,71 @@ export function CopyField({ value }: { value: string }) {
   );
 }
 
-/** Settings → Entra ID: the app registration. Each field saves by itself. */
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+type Draft = { client_id: string; tenant: string; client_secret: string; expires: string; remind_days: number; remind_to: string };
+type Body = { tenant: string; client_id: string; client_secret: string; secret_expires: string; remind_days: number; remind_to: string[] };
+const split = (v: string) => v.split(/[\s,;]+/).filter(Boolean);
+
+/** Settings → Entra ID: the app registration. Changes are kept until Save. */
 export default function EntraTab() {
   const q = useQuery({ queryKey: ["entra"], queryFn: () => api.get<EntraConfig>("/settings/entra") });
   const smtp = useQuery({ queryKey: ["smtp"], queryFn: () => api.get<{ configured: boolean }>("/settings/smtp") });
   const [guide, setGuide] = useState(false);
   const [checks, setChecks] = useState<EntraCheck[] | null>(null);
-  type Body = { tenant: string; client_id: string; client_secret: string; secret_expires: string; remind_days: number; remind_to: string[] };
+  const d = q.data;
+  const { draft: f, dirty, set, reset } = useDraft<Draft>(
+    d && {
+      client_id: d.client_id,
+      tenant: GUID.test(d.tenant) ? d.tenant : "",
+      client_secret: "",
+      expires: isoToDate(d.secret_expires),
+      remind_days: d.remind_days,
+      remind_to: d.remind_to.join(", "),
+    },
+  );
   const save = useAction((body: Body) => api.put<EntraConfig>("/settings/entra", { ...body, origin: location.origin }), {
-    success: "Saved",
+    success: "Entra ID settings saved",
     invalidate: ["entra", "onedrive"],
+    onSuccess: () => set("client_secret", ""),
   });
   // tests what is saved (fields left out use the saved values)
   const test = useAction(() => api.post<{ checks: EntraCheck[] }>("/settings/entra/test", { config: {}, origin: location.origin }), {
     onSuccess: (r) => setChecks(r.checks),
   });
-  if (!q.data) return <PageLoader />;
-  const d = q.data;
-  const saved: Body = { tenant: d.tenant, client_id: d.client_id, client_secret: "", secret_expires: d.secret_expires, remind_days: d.remind_days, remind_to: d.remind_to };
-  const put = (patch: Partial<Body>) => save.mutateAsync({ ...saved, ...patch });
+  if (!d || !f) return <PageLoader />;
   const guid = (v: string) => (!v || GUID.test(v) ? null : "Looks like 00000000-0000-0000-0000-000000000000");
+  const iso = f.expires.trim() === "" ? "" : dateToIso(f.expires);
+  const err = {
+    client_id: guid(f.client_id),
+    tenant: guid(f.tenant),
+    expires: iso === null ? `Enter the date as ${dateFormat()}` : null,
+    remind_to: split(f.remind_to).every((x) => EMAIL_RE.test(x)) ? null : "Enter email addresses, separated by commas",
+  };
+  const secretSet = d.secret_set || !!f.client_secret;
+  const problem = err.client_id
+    ? "The application (client) ID is not valid"
+    : err.tenant
+      ? "The directory (tenant) ID is not valid"
+      : f.client_id && !secretSet
+        ? "Enter the client secret value"
+        : !f.client_id && (f.tenant || f.client_secret)
+          ? "Enter the application (client) ID"
+          : err.expires
+            ? "The expiry date is not valid"
+            : err.remind_to
+              ? "The reminder addresses are not valid"
+              : null;
+  const body: Body = {
+    tenant: f.tenant || "common",
+    client_id: f.client_id,
+    client_secret: f.client_secret,
+    secret_expires: iso ?? "",
+    remind_days: f.remind_days,
+    remind_to: split(f.remind_to),
+  };
   const W = "w-full sm:w-80";
-  const split = (v: string) => v.split(/[\s,;]+/).filter(Boolean);
+  const mono = "font-mono text-[13px]";
+  const zero = "00000000-0000-0000-0000-000000000000";
 
   return (
     <RowCard>
@@ -65,78 +108,48 @@ export default function EntraTab() {
             <Button size="sm" variant="link" icon={<BookOpen className="size-3.5" />} onClick={() => setGuide(true)}>
               Setup guide
             </Button>
-            <Button size="sm" variant="link" icon={<PlugZap className="size-3.5" />} loading={test.isPending} onClick={() => test.mutate()}>
+            <Button size="sm" variant="link" icon={<PlugZap className="size-3.5" />} disabled={dirty || !d.configured} title={dirty ? "Save first" : undefined} loading={test.isPending} onClick={() => test.mutate()}>
               Test
             </Button>
           </>
         }
       />
       <Row label="Application (client) ID">
-        <AutoField value={d.client_id} onSave={(v) => put({ client_id: v })} filter={(v) => v.trim()} validate={guid} placeholder="00000000-0000-0000-0000-000000000000" width={W} className="font-mono text-[13px]" aria-label="Application (client) ID" />
+        <TextField value={f.client_id} onChange={(v) => set("client_id", v.trim())} error={err.client_id} placeholder={zero} width={W} className={mono} aria-label="Application (client) ID" />
       </Row>
       <Row label="Directory (tenant) ID">
-        <AutoField
-          value={GUID.test(d.tenant) ? d.tenant : ""}
-          onSave={(v) => put({ tenant: v || "common" })}
-          filter={(v) => v.trim()}
-          validate={guid}
-          placeholder="00000000-0000-0000-0000-000000000000"
-          width={W}
-          className="font-mono text-[13px]"
-          aria-label="Directory (tenant) ID"
-        />
+        <TextField value={f.tenant} onChange={(v) => set("tenant", v.trim())} error={err.tenant} placeholder={zero} width={W} className={mono} aria-label="Directory (tenant) ID" />
       </Row>
       <Row label="Redirect URI" hint={<span className="font-mono break-all">{redirectUri()}</span>}>
         <CopyButton value={redirectUri()} />
       </Row>
       <Section title="Client secret" badge={<ExpiryBadge expiry={d.expiry} />} />
       <Row label="Value" hint={d.secret_set ? "Saved. Type a new one to change it." : "Not saved yet"}>
-        <AutoField value="" secret onSave={(v) => put({ client_secret: v })} placeholder={d.secret_set ? "••••••••••••" : ""} autoComplete="new-password" width={W} className="font-mono text-[13px]" aria-label="Client secret value" />
+        <TextField type="password" value={f.client_secret} onChange={(v) => set("client_secret", v.trim())} placeholder={d.secret_set ? "••••••••••••" : ""} autoComplete="new-password" width={W} className={mono} aria-label="Client secret value" />
       </Row>
       <Row label="Expires on" hint="Shown in Entra next to the secret">
-        <ExpiryField saved={d.secret_expires} onSave={(iso) => put({ secret_expires: iso })} />
+        <div className="w-full sm:w-44">
+          <DateInput value={f.expires} onChange={(v) => set("expires", v)} />
+          {err.expires && <div className="mt-1 text-xs text-rose-600 dark:text-rose-400">{err.expires}</div>}
+        </div>
       </Row>
       <Row
         label="Reminder"
         hint={smtp.data && !smtp.data.configured ? <span className="text-amber-600 dark:text-amber-400">Set up SMTP first, under Notifications</span> : "An email before the secret expires"}
       >
-        <Select value={d.remind_days} onChange={(e) => put({ remind_days: Number(e.target.value) })} className="w-full sm:w-44" aria-label="Send a reminder">
+        <Select value={f.remind_days} onChange={(e) => set("remind_days", Number(e.target.value))} className="w-full sm:w-44" aria-label="Send a reminder">
           {[7, 14, 30, 60, 90].map((n) => (
             <option key={n} value={n}>
               {n} days before
             </option>
           ))}
         </Select>
-        <AutoField
-          value={d.remind_to.join(", ")}
-          onSave={(v) => put({ remind_to: split(v) })}
-          validate={(v) => (split(v).every((x) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)) ? null : "Enter email addresses, separated by commas")}
-          placeholder="it@example.com"
-          width="w-full sm:w-56"
-          aria-label="Send the reminder to"
-        />
+        <TextField value={f.remind_to} onChange={(v) => set("remind_to", v)} error={err.remind_to} placeholder="it@example.com" width="w-full sm:w-56" aria-label="Send the reminder to" />
       </Row>
       {checks && <TestResult checks={checks} />}
+      <SaveBar dirty={dirty} problem={problem} onDiscard={reset} loading={save.isPending} onSave={() => save.mutate(body)} />
       {guide && <SetupGuide onClose={() => setGuide(false)} />}
     </RowCard>
-  );
-}
-
-/** The secret's expiry date: saves once a whole date is typed or picked, or when it is cleared. */
-function ExpiryField({ saved, onSave }: { saved: string; onSave: (iso: string) => Promise<unknown> }) {
-  const [text, setText] = useState(isoToDate(saved));
-  useEffect(() => setText(isoToDate(saved)), [saved]);
-  const iso = text.trim() === "" ? "" : dateToIso(text);
-  useEffect(() => {
-    if (iso === null || iso === saved) return;
-    const t = setTimeout(() => onSave(iso).catch(() => undefined), 700);
-    return () => clearTimeout(t);
-  }, [iso]); // eslint-disable-line react-hooks/exhaustive-deps
-  return (
-    <div className="w-full sm:w-44">
-      <DateInput value={text} onChange={setText} />
-      {iso === null && <div className="mt-1 text-xs text-rose-600 dark:text-rose-400">Enter the date as {dateFormat()}</div>}
-    </div>
   );
 }
 
@@ -248,7 +261,7 @@ export function SetupGuide({ onClose }: { onClose: () => void }) {
         </Step>
         <Step n={6} title="Save and test in Talon">
           <p>
-            Each field saves by itself; click <B>Test</B>.
+            Click <B>Save</B>, then <B>Test</B>.
           </p>
         </Step>
       </ol>

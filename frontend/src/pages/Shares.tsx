@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Apple, Check, Copy, FolderOpen, Globe, Lock, MonitorSmartphone, Pencil, Plus, Recycle, Server, Trash2, Users as UsersIcon, X } from "lucide-react";
 import { api } from "../lib/api";
+import { FormHint } from "../components/rows";
 import { cx, sameValue } from "../lib/format";
 import { useAction } from "../lib/hooks";
 import type { Access, Group, Share, User, Volume } from "../lib/types";
@@ -261,6 +262,7 @@ function ShareEditor({ initial, isNew, volumes, onClose }: { initial: Share; isN
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
+          <FormHint text={!s.name ? "Enter a name for the shared folder" : nameErr ? "The name is not valid" : null} />
           <Button
             variant="primary"
             loading={save.isPending}

@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { sameValue } from "./format";
 import { useToast } from "../components/ui";
 
 /** Mutation that shows a toast on success/error and refreshes the given queries. */
@@ -38,4 +39,25 @@ export function useTheme(): [boolean, () => void] {
         return !d;
       }),
   ];
+}
+
+/**
+ * The edits of a settings form, kept until Save. `saved` is what the NAS has; `draft` starts
+ * as a copy. When the saved values change (after Save, or a change made elsewhere) the
+ * draft starts again from them. A refresh that returns the same values keeps the edits.
+ */
+export function useDraft<T>(saved: T | undefined) {
+  const key = JSON.stringify(saved ?? null);
+  const [draft, setDraft] = useState<T | undefined>(saved);
+  useEffect(() => {
+    if (saved !== undefined) setDraft(saved);
+  }, [key]); // eslint-disable-line react-hooks/exhaustive-deps
+  const dirty = saved !== undefined && draft !== undefined && !sameValue(draft, saved);
+  return {
+    draft,
+    dirty,
+    set: <K extends keyof T>(k: K, v: T[K]) => setDraft((d) => (d === undefined ? d : { ...d, [k]: v })),
+    setAll: (v: T) => setDraft(v),
+    reset: () => setDraft(saved),
+  };
 }

@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
+import { AlertCircle } from "lucide-react";
 import { cx } from "../lib/format";
 import { Button, Card } from "./ui";
 
-/** Settings layout: one card of rows with small section headers. Settings save by themselves
- *  (components/autosave.tsx); only the network address uses the Apply bar below. */
+/** Settings layout: one card of rows with small section headers, and a Save bar at the bottom. */
 export function RowCard({ children, className }: { children: ReactNode; className?: string }) {
   return <Card className={cx("overflow-hidden", className)}>{children}</Card>;
 }
@@ -57,37 +57,59 @@ export function RowBlock({ children, className }: { children: ReactNode; classNa
   return <div className={cx("border-t border-zinc-100 px-5 py-3 first:border-t-0 dark:border-white/5", className)}>{children}</div>;
 }
 
-/** A bar with Discard and Apply for settings that must be applied together, on purpose
- *  (the network address). Everything else saves by itself. */
+/**
+ * The bar at the bottom of every settings card: Discard and Save, greyed out until something
+ * changed. While a required value is missing or one is not valid, Save stays greyed out and
+ * the bar says what to fix.
+ */
 export function SaveBar({
-  show,
+  dirty,
+  problem,
   onSave,
   onDiscard,
-  disabled,
   loading,
   note,
   saveText = "Save",
+  className,
 }: {
-  show: boolean;
+  /** something was changed */
+  dirty: boolean;
+  /** what is missing or wrong, e.g. "Enter the sender address"; null when it can be saved */
+  problem?: string | null;
   onSave: () => void;
   onDiscard?: () => void;
-  disabled?: boolean;
   loading?: boolean;
+  /** shown instead of "Unsaved changes" */
   note?: ReactNode;
   saveText?: string;
+  className?: string;
 }) {
-  if (!show) return null;
+  const blocked = dirty && !!problem;
   return (
-    <div className="flex flex-wrap items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50/80 px-5 py-2.5 dark:border-white/5 dark:bg-white/[0.02]">
-      <span className="mr-auto text-xs text-zinc-500">{note ?? "Unsaved changes"}</span>
+    <div className={cx("flex flex-wrap items-center justify-end gap-2 border-t border-zinc-100 bg-zinc-50/80 px-5 py-2.5 dark:border-white/5 dark:bg-white/[0.02]", className)}>
+      <span className={cx("mr-auto flex min-w-0 items-center gap-1.5 text-xs", blocked ? "font-medium text-amber-700 dark:text-amber-400" : "text-zinc-500")}>
+        {blocked && <AlertCircle className="size-3.5 shrink-0" />}
+        {!dirty ? "No unsaved changes" : blocked ? problem : (note ?? "Unsaved changes")}
+      </span>
       {onDiscard && (
-        <Button size="sm" onClick={onDiscard}>
+        <Button size="sm" disabled={!dirty || loading} onClick={onDiscard}>
           Discard
         </Button>
       )}
-      <Button size="sm" variant="primary" disabled={disabled} loading={loading} onClick={onSave}>
+      <Button size="sm" variant="primary" disabled={!dirty || !!problem} loading={loading} onClick={onSave}>
         {saveText}
       </Button>
     </div>
+  );
+}
+
+/** In a dialog's footer, left of the buttons: why the Save (or Next) button is off. */
+export function FormHint({ text }: { text?: string | null }) {
+  if (!text) return null;
+  return (
+    <span className="mr-auto flex min-w-0 items-center gap-1.5 text-xs font-medium text-amber-700 dark:text-amber-400">
+      <AlertCircle className="size-3.5 shrink-0" />
+      {text}
+    </span>
   );
 }

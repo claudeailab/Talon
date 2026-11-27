@@ -1,3 +1,8 @@
+## 1.0.167
+- Every settings card has Save and Discard, greyed out until something changes
+- Save stays off while a required value is missing, with a hint saying what to fill in
+- Dialogs show the same hint next to Create, Save and Next
+
 ## 1.0.166
 - Updates: choose the time Talon updates and system updates install automatically (03:00 by default)
 - System: Restart after updates restarts the NAS right after them, only when one needs it

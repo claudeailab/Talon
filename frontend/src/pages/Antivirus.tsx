@@ -3,9 +3,10 @@ import { useState } from "react";
 import { MoreHorizontal, Play, RotateCcw, ShieldAlert, ShieldCheck, Square, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { ago, bytes, cx, dateTime, duration } from "../lib/format";
-import { useAction } from "../lib/hooks";
+import { useAction, useDraft } from "../lib/hooks";
 import type { Volume } from "../lib/types";
 import { Badge, Button, Callout, Card, CardHeader, ConfirmDialog, IconButton, Menu, MenuItem, PageHeader, PageLoader, Progress, Segmented, Select, TimeInput } from "../components/ui";
+import { SaveBar } from "../components/rows";
 
 type QItem = { id: string; path: string; virus: string; found: number; size: number };
 type AvInfo = {
@@ -47,7 +48,7 @@ export default function AntivirusPage() {
   return (
     <>
       <PageHeader title="Antivirus" description="Scan volumes for viruses" />
-      <Card>
+      <Card className="overflow-hidden">
         <CardHeader
           icon={<ShieldCheck className="size-4.5" />}
           title="ClamAV"
@@ -123,19 +124,20 @@ function ProgressBox({ title, text, percent, note, action }: { title: string; te
   );
 }
 
-/** Volumes, Scan now and the schedule; changes to the schedule save by themselves. */
+/** Volumes, Scan now and the schedule; the schedule (and the volumes it scans) is kept until Save. */
 function Scanner({ d, volumes }: { d: AvInfo; volumes: Volume[] }) {
   const [sel, setSel] = useState<string[]>(d.settings.volumes);
+  const { draft: f, dirty: changed, set, reset } = useDraft({ schedule: d.settings.schedule, weekday: d.settings.weekday, time: d.settings.time });
   const save = useAction((body: Partial<AvInfo["settings"]>) => api.put<AvInfo>("/antivirus/settings", { ...d.settings, ...body }), {
     invalidate: ["antivirus"],
-    success: "Saved",
+    success: "Schedule saved",
   });
+  const volumesChanged = [...sel].sort().join() !== [...d.settings.volumes].sort().join();
+  const dirty = changed || (f?.schedule !== "off" && volumesChanged);
   const scan = useAction(() => api.post<AvInfo>("/antivirus/scan", { volumes: sel }), { invalidate: ["antivirus"] });
   const stop = useAction(() => api.post("/antivirus/stop"), { invalidate: ["antivirus"] });
-  const pickVolumes = (v: string[]) => {
-    setSel(v);
-    save.mutate({ volumes: v });          // the schedule scans the same volumes
-  };
+  const pickVolumes = (v: string[]) => setSel(v);        // Scan now and the schedule scan the same volumes
+  if (!f) return null;
   const p = d.progress;
   const last = d.last_scan;
   return (
@@ -188,20 +190,20 @@ function Scanner({ d, volumes }: { d: AvInfo; volumes: Volume[] }) {
         <span className="text-[13px] font-medium">Scheduled scan</span>
         <Segmented
           size="sm"
-          value={d.settings.schedule}
-          onChange={(v) => save.mutate({ schedule: v })}
+          value={f.schedule}
+          onChange={(v) => set("schedule", v)}
           options={[
             { value: "off", label: "Off" },
             { value: "daily", label: "Daily" },
             { value: "weekly", label: "Weekly" },
           ]}
         />
-        {d.settings.schedule !== "off" && (
+        {f.schedule !== "off" && (
           // day and time stay together on one line, also on a phone
           <div className="flex items-center gap-2">
-            {d.settings.schedule === "weekly" && (
+            {f.schedule === "weekly" && (
               <div className="w-36 shrink-0">
-                <Select value={d.settings.weekday} onChange={(e) => save.mutate({ weekday: Number(e.target.value) })} aria-label="Day">
+                <Select value={f.weekday} onChange={(e) => set("weekday", Number(e.target.value))} aria-label="Day">
                   {DAYS.map((day, i) => (
                     <option key={day} value={i}>{day}</option>
                   ))}
@@ -210,11 +212,22 @@ function Scanner({ d, volumes }: { d: AvInfo; volumes: Volume[] }) {
             )}
             <span className="text-[13px] text-zinc-500">at</span>
             <div className="w-20 shrink-0">
-              <TimeInput value={d.settings.time} onChange={(t) => save.mutate({ time: t })} />
+              <TimeInput value={f.time} onChange={(t) => set("time", t)} />
             </div>
           </div>
         )}
       </div>
+      <SaveBar
+        className="-mx-5 -mb-5"
+        dirty={dirty}
+        note={f.schedule !== "off" ? "The scheduled scan checks the volumes selected above" : undefined}
+        onDiscard={() => {
+          reset();
+          setSel(d.settings.volumes);
+        }}
+        loading={save.isPending}
+        onSave={() => save.mutate({ ...f, volumes: sel })}
+      />
     </div>
   );
 }
