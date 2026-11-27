@@ -21,6 +21,9 @@
   @keyframes fade-in { from { opacity: 0 } to { opacity: 1 } }
   @keyframes pop-in { from { opacity: 0; transform: translateY(8px) scale(.98) } to { opacity: 1; transform: none } }
   @keyframes indeterminate { from { transform: translateX(-100%) } to { transform: translateX(350%) } }
+  /* a disk that is syncing: light sweeps across its chip; the activity light blinks */
+  @keyframes sweep { from { transform: translateX(-100%) } to { transform: translateX(250%) } }
+  @keyframes blink { 0%, 100% { opacity: 1 } 50% { opacity: .25 } }
   @keyframes slide-in { from { opacity: 0; transform: translateX(24px) } to { opacity: 1; transform: none } }
 }
 

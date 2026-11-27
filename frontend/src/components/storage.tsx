@@ -131,16 +131,37 @@ const MEMBER_DOT: Record<string, string> = { active: "bg-emerald-500", spare: "b
 export function MemberChips({ members, onRemove }: { members: Member[]; onRemove?: (m: Member) => void }) {
   return (
     <div className="flex flex-wrap gap-1.5">
-      {members.map((m) => (
+      {members.map((m, i) => {
+        const busy = m.state === "syncing" || m.state === "rebuilding";
+        // each disk's sweep starts a little later than the one before: data flowing across the array
+        const delay = { animationDelay: `${i * 0.35}s` };
+        return (
         <span
           key={m.part}
           title={`${m.model} · ${bytes(m.size, 0)} · ${m.state}`}
-          className="group inline-flex h-7 items-center gap-1.5 rounded-lg bg-white pr-2 pl-2 text-zinc-700 ring-1 ring-zinc-200 ring-inset dark:bg-white/[0.04] dark:text-zinc-300 dark:ring-white/10"
+          className={cx(
+            "group relative inline-flex h-7 items-center gap-1.5 overflow-hidden rounded-lg bg-white pr-2 pl-2 text-zinc-700 ring-1 ring-inset dark:bg-white/[0.04] dark:text-zinc-300",
+            busy ? "ring-sky-300 dark:ring-sky-400/40" : "ring-zinc-200 dark:ring-white/10",
+          )}
         >
-          <DiskIcon kind={m.kind} className="size-3.5 text-zinc-400" />
+          {busy && (
+            <span
+              aria-hidden
+              style={delay}
+              className="pointer-events-none absolute inset-y-0 left-0 w-1/2 bg-gradient-to-r from-transparent via-sky-400/20 to-transparent motion-safe:animate-[sweep_1.8s_ease-in-out_infinite] motion-reduce:hidden dark:via-sky-400/15"
+            />
+          )}
+          <DiskIcon kind={m.kind} className={cx("size-3.5", busy ? "text-sky-500" : "text-zinc-400")} />
           <span className="font-mono text-xs font-semibold text-zinc-900 dark:text-zinc-100">{m.disk}</span>
           <span className="tabular text-xs text-zinc-500">{bytes(m.size, 0)}</span>
-          <span className={cx("size-1.5 rounded-full", MEMBER_DOT[m.state] ?? "bg-rose-500")} />
+          {busy ? (
+            <span className="relative flex size-1.5">
+              <span style={delay} className={cx("absolute inset-0 rounded-full opacity-75 motion-safe:animate-ping", MEMBER_DOT[m.state])} />
+              <span style={delay} className={cx("relative size-1.5 rounded-full motion-safe:animate-[blink_0.9s_steps(2,jump-none)_infinite]", MEMBER_DOT[m.state])} />
+            </span>
+          ) : (
+            <span className={cx("size-1.5 rounded-full", MEMBER_DOT[m.state] ?? "bg-rose-500")} />
+          )}
           {m.state !== "active" && <span className={cx("text-xs font-medium", m.state === "faulty" ? "text-rose-600 dark:text-rose-400" : "text-zinc-600 dark:text-zinc-300")}>{m.state}</span>}
           {onRemove && (
             <IconButton
@@ -152,7 +173,8 @@ export function MemberChips({ members, onRemove }: { members: Member[]; onRemove
             </IconButton>
           )}
         </span>
-      ))}
+        );
+      })}
     </div>
   );
 }

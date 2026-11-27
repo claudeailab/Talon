@@ -1,3 +1,6 @@
+## 1.0.172
+- RAID: syncing and rebuilding disks are animated, with light flowing across the array
+
 ## 1.0.171
 - RAID: while a new array is being built, every disk shows syncing, not only the last one
 

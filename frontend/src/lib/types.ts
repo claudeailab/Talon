@@ -25,7 +25,7 @@ export interface Disk {
 export interface Member {
   part: string;
   disk: string;
-  state: "active" | "spare" | "faulty" | "rebuilding";
+  state: "active" | "spare" | "faulty" | "rebuilding" | "syncing";
   slot?: string;
   model: string;
   size: number;
