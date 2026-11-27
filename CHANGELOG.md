@@ -1,3 +1,6 @@
+## 1.0.179
+- README: one short bullet per feature
+
 ## 1.0.178
 - Review fixes: RAID disk removal is checked again when it runs; no shrink of a RAID 1 with a spare; a failing disk is not overwritten
 - Settings: Save clears the bar also when the saved text is reformatted; http:// redirect is not cached by browsers

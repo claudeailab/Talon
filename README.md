@@ -58,28 +58,32 @@ https://<nas-ip>/
 
 </div>
 
-- **Dashboard:** live system stats with the last 30 minutes of graphs, storage health; issues in one place, the bell
-- **Disks:** S.M.A.R.T. health, temperatures, self-tests and wipe
-- **RAID:** hot spares, expansion, disk replacement and data scrub; live build progress with time left, and a log
-- **Volumes:** ext4 or XFS on a single disk, or several on one RAID array, each with its own size
-- **Backup:** to a USB or internal disk when plugged in or daily, with earlier versions and a live log
-- **Browser:** browse volumes, other disks and OneDrive in the web interface
-- **Recycle bin:** restore deleted files and earlier versions for 30 days
-- **OneDrive:** backup or two-way sync, verified after each run
-- **Shared Folders:** SMB, NFS and Time Machine, with folder permissions
-- **WebDAV:** shared folders over HTTPS for apps and remote access
-- **Users & Groups:** accounts and groups for shared folders and the web interface
-- **Entra ID users:** people from your organization sign in with Microsoft
-- **Discovery:** appears in Windows Network, and in macOS Finder with Bonjour on
-- **Activity:** one searchable log of everything Talon and the system do
-- **Usage history:** a year of CPU, memory, network, disk and storage graphs
-- **Updates:** Talon and the operating system, each optionally automatic at a time you choose, with a restart when needed and a changelog
-- **Antivirus:** ClamAV scans of volumes with quarantine
-- **Network:** DHCP or static IP, HTTPS on or off (http:// opens https:// while it is on)
-- **Scheduled:** scripts on a schedule, with live output and progress
-- **SD cards:** fewer writes to an SD or USB flash system disk
-- **Notifications:** email alerts with adjustable thresholds
-- **Mobile:** works on phones and tablets, light and dark mode
+- **Dashboard:** live stats, graphs and storage health
+- **Disks:** S.M.A.R.T. health, temperatures and self-tests
+- **RAID:** levels 0, 1, 5, 6 and 10 with hot spares
+- **RAID expansion:** add disks to grow an array
+- **Volumes:** ext4 or XFS, several on one array
+- **Backup:** to a USB or internal disk, with versions
+- **Browser:** files on volumes, USB disks and OneDrive
+- **Recycle bin:** deleted files kept for 30 days
+- **OneDrive:** backup or two-way sync
+- **Shared Folders:** SMB, NFS and Time Machine
+- **Folder permissions:** per user and group
+- **WebDAV:** shared folders over HTTPS
+- **Users & Groups:** for shares and the web interface
+- **Entra ID:** sign in with Microsoft
+- **Discovery:** Windows Network and macOS Finder
+- **Activity:** one searchable log
+- **Usage history:** a year of graphs
+- **Updates:** Talon and the OS, optionally automatic
+- **Changelog:** what changed in each version
+- **Antivirus:** ClamAV scans with quarantine
+- **Network:** DHCP or static IP
+- **HTTPS:** on by default, http:// redirects
+- **Scheduled:** scripts on a schedule
+- **Notifications:** email alerts with thresholds
+- **SD cards:** fewer writes to flash system disks
+- **Mobile:** phones, tablets, light and dark mode
 - **Documentation:** built-in searchable guide
 
 ## Screenshots
