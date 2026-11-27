@@ -1,3 +1,6 @@
+## 1.0.177
+- http:// addresses open the same page over https:// while HTTPS is on (not when it is turned off)
+
 ## 1.0.176
 - README: a note that Talon was written by AI and made with love and care
 

@@ -292,6 +292,7 @@ fi
 if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
   step "Opening firewall ports (ufw)"
   ufw allow "$PORT/tcp" >/dev/null
+  ufw allow 80/tcp >/dev/null           # http:// is sent on to https://
   ufw allow 445/tcp >/dev/null; ufw allow 139/tcp >/dev/null
   ufw allow 137:138/udp >/dev/null
   ufw allow 2049/tcp >/dev/null; ufw allow 111 >/dev/null

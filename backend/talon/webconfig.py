@@ -41,7 +41,9 @@ def set_https(cfg, on: bool, user: str, state) -> dict:
             raise UserError("The HTTPS certificate is missing; run the installer again to create it")
     else:
         port = HTTP_PORT
-        if not cfg.demo and port != cfg.port and not _port_free(port):
+        from . import redirect
+        ours = redirect.server is not None and port == redirect.HTTP_PORT   # our own http:// redirect
+        if not cfg.demo and port != cfg.port and not ours and not _port_free(port):
             raise UserError(f"Port {port} is used by another program")
     if not cfg.demo:
         try:

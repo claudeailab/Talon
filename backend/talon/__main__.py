@@ -58,6 +58,9 @@ def main(argv=None) -> int:
     app.state.serving = {"https": use_tls, "port": cfg.port}
     if use_tls:
         kwargs = {"ssl_certfile": cfg.tls_cert, "ssl_keyfile": cfg.tls_key}
+        # http://<nas>/ (the "s" forgotten) goes to https://; not when HTTPS is off
+        from . import redirect
+        redirect.start(cfg.port, cfg.host)
     uvicorn.run(app, host=cfg.host, port=cfg.port, log_level="warning",
                 proxy_headers=False, server_header=False, **kwargs)
     return 0
