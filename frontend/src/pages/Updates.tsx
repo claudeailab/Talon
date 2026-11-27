@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronLeft, ChevronRight, Download, ExternalLink, Package, RefreshCw, RotateCcw, ShieldAlert } from "lucide-react";
 import { api } from "../lib/api";
@@ -59,6 +59,11 @@ export default function UpdatesPage() {
     return t === "talon" || t === "system" || t === "changelog" ? t : "settings";
   };
   const [tab, setTab] = useState<TabId>(() => tabOf(location.search));
+  // the Changelog tab is ready by the time it is opened
+  const qc = useQueryClient();
+  useEffect(() => {
+    qc.prefetchQuery({ queryKey: ["update-changelog"], queryFn: () => api.get<Changelog>("/update/changelog"), staleTime: 300_000 });
+  }, [qc]);
   // links from the bell or the menu (?tab=talon) while the page is open
   const search = useSearch();
   useEffect(() => setTab(tabOf(search)), [search]);

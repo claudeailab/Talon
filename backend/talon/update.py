@@ -5,6 +5,7 @@ transient systemd unit, so it survives the restart of the web service."""
 from __future__ import annotations
 
 import calendar
+import concurrent.futures
 import json
 import os
 import re
@@ -93,15 +94,22 @@ def fetch_changelog(repo: str) -> list:
     each version's release date from the list of releases."""
     if not re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", repo):
         raise UserError("Invalid update repository")
+    rel_url = f"https://api.github.com/repos/{repo}/releases?per_page=100&page={{}}"
     try:
-        versions = parse_changelog(_get(f"https://raw.githubusercontent.com/{repo}/main/CHANGELOG.md").decode("utf-8", "replace"))
+        # the changelog and the first pages of releases at the same time, not one after another
+        with concurrent.futures.ThreadPoolExecutor(4) as pool:
+            text = pool.submit(_get, f"https://raw.githubusercontent.com/{repo}/main/CHANGELOG.md")
+            pages = [pool.submit(_get, rel_url.format(n)) for n in (1, 2, 3)]
+            versions = parse_changelog(text.result().decode("utf-8", "replace"))
+            rels_by_page = [json.loads(p.result()) for p in pages]
+        n = 4
+        while len(rels_by_page[-1]) == 100 and n <= 10:     # more than 300 releases
+            rels_by_page.append(json.loads(_get(rel_url.format(n))))
+            n += 1
         dates = {}
-        for page in range(1, 6):                   # 100 releases a page, newest first
-            rels = json.loads(_get(f"https://api.github.com/repos/{repo}/releases?per_page=100&page={page}"))
+        for rels in rels_by_page:
             for r in rels:
                 dates[(r.get("tag_name") or "").lstrip("v")] = _iso_ts(r.get("published_at"))
-            if len(rels) < 100:
-                break
     except urllib.error.HTTPError as e:
         raise UserError(f"Update server returned HTTP {e.code}") from e
     except (urllib.error.URLError, OSError, ValueError) as e:
@@ -128,6 +136,9 @@ class Updater:
         self.current = __version__
         self._lock = threading.Lock()
         self._changelog: dict = {}
+        self._changelog_busy = False
+        # kept on disk, so the Changelog tab is there at once, also after Talon restarted
+        self._changelog_file = os.path.join(os.path.dirname(os.path.abspath(cfg.state_file)), "changelog.json")
 
     # ------------------------------------------------------------ checking
     def check(self, force: bool = False) -> dict:
@@ -149,18 +160,55 @@ class Updater:
         return result
 
     def changelog(self) -> dict:
-        """Every version with its changes and release date, newest first. From GitHub,
-        kept for an hour; offline, the copy installed with Talon (without dates)."""
-        c = self._changelog
-        if c.get("versions") and time.time() - c.get("at", 0) < CHANGELOG_TTL:
-            return {"current": self.current, "versions": c["versions"], "error": None}
+        """Every version with its changes and release date, newest first. Answered at once from
+        the saved copy, which is refreshed from GitHub in the background when it is over an hour
+        old; only the very first time is it fetched while you wait. Offline and with nothing
+        saved: the copy installed with Talon (without dates)."""
+        c = self._saved_changelog()
+        if c.get("versions"):
+            if time.time() - c.get("at", 0) >= CHANGELOG_TTL:
+                self.refresh_changelog_soon()
+            return {"current": self.current, "versions": c["versions"], "error": c.get("error")}
         try:
-            versions = self._fetch_changelog()
-            self._changelog = {"versions": versions, "at": time.time()}
-            return {"current": self.current, "versions": versions, "error": None}
+            return {"current": self.current, "versions": self._refresh_changelog(), "error": None}
         except UserError as e:
-            versions = c.get("versions") or local_changelog()
-            return {"current": self.current, "versions": versions, "error": str(e)}
+            return {"current": self.current, "versions": local_changelog(), "error": str(e)}
+
+    def _saved_changelog(self) -> dict:
+        if not self._changelog:
+            try:
+                with open(self._changelog_file) as fh:
+                    data = json.load(fh)
+                if isinstance(data, dict) and isinstance(data.get("versions"), list):
+                    self._changelog = data
+            except (OSError, ValueError):
+                pass
+        return self._changelog
+
+    def _refresh_changelog(self) -> list:
+        versions = self._fetch_changelog()
+        self._changelog = {"versions": versions, "at": time.time(), "error": None}
+        try:
+            write_atomic(self._changelog_file, json.dumps(self._changelog), 0o644)
+        except OSError:
+            pass
+        return versions
+
+    def refresh_changelog_soon(self) -> None:
+        """Refresh the saved changelog in the background (once at a time)."""
+        if self._changelog_busy:
+            return
+        self._changelog_busy = True
+
+        def work():
+            try:
+                self._refresh_changelog()
+            except Exception as e:   # noqa: BLE001 - keep what is saved; try again in 10 minutes
+                if self._changelog.get("versions"):
+                    self._changelog = {**self._changelog, "error": str(e), "at": time.time() - CHANGELOG_TTL + 600}
+            finally:
+                self._changelog_busy = False
+        threading.Thread(target=work, daemon=True, name="changelog").start()
 
     def _fetch_changelog(self) -> list:
         return fetch_changelog(self.cfg.repo)
@@ -198,6 +246,10 @@ class Updater:
     def background_loop(self, stop: threading.Event) -> None:
         stop.wait(60)
         while not stop.is_set():
+            if self.cfg.update_check:
+                c = self._saved_changelog()
+                if not c.get("versions") or time.time() - c.get("at", 0) >= CHANGELOG_TTL:
+                    self.refresh_changelog_soon()          # ready before the tab is opened
             if self.cfg.update_check and self.interval():
                 try:
                     self.check()                  # only asks GitHub when the interval has passed

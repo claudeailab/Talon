@@ -117,7 +117,14 @@ def test_changelog_from_github_with_dates(tmp_path, monkeypatch):
     assert [v["version"] for v in cl["versions"]] == ["9.0.1", "9.0.0"]
     assert cl["versions"][0]["date"] == 1795705476.0                       # 2026-11-26 15:04:36 UTC
 
-    # offline: the copy installed with Talon, without dates, and the reason
+    # saved on disk: a restarted Talon answers at once, without asking GitHub
+    monkeypatch.setattr(update, "_get", lambda url, timeout=15: (_ for _ in ()).throw(AssertionError("no network")))
+    again = update.Updater(cfg, State(cfg.state_file))
+    assert [v["version"] for v in again.changelog()["versions"]] == ["9.0.1", "9.0.0"]
+
+    # offline with nothing saved: the copy installed with Talon, without dates, and the reason
+    import os
+    os.remove(u._changelog_file)
     u._changelog = {}
     monkeypatch.setattr(update, "fetch_changelog", lambda repo: (_ for _ in ()).throw(update.UserError("Could not reach GitHub: down")))
     cl = u.changelog()
