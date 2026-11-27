@@ -167,12 +167,19 @@ def test_expand_and_replace(client):
     part = next(m["part"] for m in tank["members"] if m["state"] == "spare")
     r = client.delete(f"/api/raid/tank/members/{part}")
     assert wait_job(client, r.json())["status"] == "success"
-    # removing an active member of a RAID5 is allowed once (fault tolerance 1)
+    # a healthy, active disk of a RAID 5 stays in: there is no reason to degrade the array
+    tank = next(a for a in client.get("/api/raid").json() if a["name"] == "tank")
+    assert not next(m for m in tank["members"] if m["part"] == "sda1")["removable"]
+    assert client.delete("/api/raid/tank/members/sda1").status_code == 400
+    # a disk that is failing may go (once: fault tolerance 1)
+    nas = client.app.state.nas
+    nas._disk_health = lambda disk: "failing" if disk in ("sda", "sdb") else "good"
     r = client.delete("/api/raid/tank/members/sda1")
     assert wait_job(client, r.json())["status"] == "success"
     tank = next(a for a in client.get("/api/raid").json() if a["name"] == "tank")
     assert tank["status"] == "degraded"
     assert client.delete("/api/raid/tank/members/sdb1").status_code == 400
+    del nas._disk_health
     r = client.post("/api/raid/tank/disks", json={"disk": "sdd", "mode": "replace"})
     assert wait_job(client, r.json())["status"] == "success"
     tank = next(a for a in client.get("/api/raid").json() if a["name"] == "tank")

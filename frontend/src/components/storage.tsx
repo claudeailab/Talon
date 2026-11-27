@@ -176,7 +176,7 @@ export function MemberChips({ members, onRemove }: { members: Member[]; onRemove
             <span className={cx("size-1.5 rounded-full", MEMBER_DOT[m.state] ?? "bg-rose-500")} />
           )}
           {m.state !== "active" && <span className={cx("text-xs font-medium", m.state === "faulty" ? "text-rose-600 dark:text-rose-400" : "text-zinc-600 dark:text-zinc-300")}>{m.state}</span>}
-          {onRemove && (
+          {onRemove && m.removable && (
             // phones: always in the chip. With a mouse it floats over the chip's end when
             // pointed at, so the chip never changes size (a wider chip could wrap the row,
             // move the card and take the chip away from the pointer, over and over)

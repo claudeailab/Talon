@@ -26,6 +26,9 @@ export interface Member {
   part: string;
   disk: string;
   state: "active" | "spare" | "faulty" | "rebuilding" | "syncing";
+  /** may be taken out of the array now (a spare, a failed disk, an extra mirror, a failing disk) */
+  removable?: boolean;
+  remove_reason?: string | null;
   slot?: string;
   model: string;
   size: number;

@@ -311,13 +311,16 @@ class DemoPlatform:
     def md_grow(self, md, n, log) -> None:
         with self.lock:
             a = self.arrays[md]
+            shrink = n < a["raid_disks"]
             a["raid_disks"] = n
+            log(f"$ mdadm --grow /dev/{md} --raid-devices={n}")
+            if shrink:
+                return
             for m in a["members"]:
                 if m["state"] == "spare":
                     m["state"] = "active"
                     break
             a["sync_kind"], a["sync_start"] = "reshape", time.time()
-            log(f"$ mdadm --grow /dev/{md} --raid-devices={n}")
 
     def md_fail_remove(self, md, part, log) -> None:
         with self.lock:

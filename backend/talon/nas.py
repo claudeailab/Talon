@@ -447,6 +447,10 @@ class Nas:
                     elif a["sync_action"] == "idle" and not a["degraded"]:
                         name = r["name"]
                         self.state.update(lambda d: d["arrays"][name].__setitem__("synced", True))
+            if a:
+                for m in item["members"]:
+                    why = self._cannot_remove(r, a, m, self._disk_health(m["disk"]))
+                    m["removable"], m["remove_reason"] = why is None, why
             item["fault_tolerance"] = raid.fault_tolerance(
                 r["level"], len([m for m in item["members"] if m["state"] != "spare"]) or 1)
             out.append(item)
@@ -608,21 +612,48 @@ class Nas:
 
         return self.jobs.submit(title, user, work)
 
+    def _disk_health(self, disk: str) -> str:
+        return self._health(self.p.smart_cached(disk))
+
+    def _cannot_remove(self, r: dict, a: dict, m: dict, health: Optional[str]) -> Optional[str]:
+        """Why a disk may not be taken out of an array (None: it may).
+
+        A spare or a failed disk can always go. A working disk only when the array is
+        idle and keeps its data safe without it: an extra mirror of a RAID 1 (the array
+        then has one mirror less), or a disk whose S.M.A.R.T. health is failing or
+        warning (the array is degraded until a replacement is added; a hot spare takes
+        over at once). Never while the array builds, rebuilds or checks itself."""
+        if m["state"] in ("spare", "faulty"):
+            return None
+        if m["state"] in ("syncing", "rebuilding") or a.get("sync_action", "idle") != "idle":
+            return "Wait until the array has finished syncing"
+        active = [x for x in a["members"] if x["state"] == "active"]
+        if r["level"] == "raid1" and len(active) > 2 and not a.get("degraded"):
+            return None
+        if health in ("failing", "warning"):
+            tolerance = raid.fault_tolerance(r["level"], a["raid_disks"])
+            if a.get("degraded", 0) + 1 <= tolerance and len(active) > 1:
+                return None
+            return "The array would not survive without this disk"
+        return "A healthy disk stays in the array; use Add disk to replace or expand"
+
     def remove_member(self, name: str, part: str, user: str):
         r, a = self._array(name)
         member = next((m for m in a["members"] if m["part"] == part), None)
         if not member:
             raise UserError("Not a member of this array")
-        if member["state"] not in ("spare", "faulty"):
-            active = [m for m in a["members"] if m["state"] == "active"]
-            tolerance = raid.fault_tolerance(r["level"], a["raid_disks"])
-            if a["degraded"] + 1 > tolerance or len(active) <= 1:
-                raise UserError("Removing this disk would destroy the array")
+        why = self._cannot_remove(r, a, member, self._disk_health(member["disk"]))
+        if why:
+            raise UserError(why)
+        shrink = (member["state"] == "active" and r["level"] == "raid1"
+                  and len([m for m in a["members"] if m["state"] == "active"]) > 2)
 
         def work(log):
             go = steps(log, ["Taking the disk out of the array", "Erasing the disk", "Saving the RAID configuration"])
             go(1)
             self.p.md_fail_remove(a["dev"], part, log)
+            if shrink:                                   # one mirror less, not a missing one
+                self.p.md_grow(a["dev"], a["raid_disks"] - 1, log)
             go(2)
             self.p.wipe_disk(member["disk"], log)
             go(3)

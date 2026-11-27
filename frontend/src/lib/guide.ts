@@ -216,7 +216,7 @@ export const GUIDE: Topic[] = [
               "**Delete RAID**: only possible after its volume is deleted.",
             ],
           },
-          { p: "To take a disk out of an array, point at it under **Disks** on the array's card and click its remove button. Talon refuses when the array would not survive it." },
+          { p: "A disk can be taken out of an array only when that is safe and useful: a **hot spare**, a **failed** disk, an extra mirror of a RAID 1, or a disk whose S.M.A.R.T. health is failing (a hot spare then takes over). Point at it under **Disks** on the array's card and click its remove button. Healthy disks stay in, and nothing can be taken out while the array builds, rebuilds or checks itself; to replace or expand, use **Add disk**." },
           { p: "After **Expand capacity** finishes, use **Expand filesystem** on the [Volumes](/volumes) page so the volume can use the new space." },
         ],
       },

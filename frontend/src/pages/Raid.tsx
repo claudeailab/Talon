@@ -144,7 +144,7 @@ function RaidCard({ a, disks, onJob }: { a: RaidArray; disks: Disk[]; onJob: (id
           {a.sync && a.sync.sync_action !== "idle" && <SyncProgress sync={a.sync} />}
           <Details>
             <Detail label="Disks">
-              <MemberChips members={a.members} onRemove={a.members.length > 1 ? setRemove : undefined} />
+              <MemberChips members={a.members} onRemove={setRemove} />
             </Detail>
           </Details>
         </div>
@@ -223,9 +223,17 @@ function RaidCard({ a, disks, onJob }: { a: RaidArray; disks: Disk[]; onJob: (id
         title={`Remove ${remove?.disk} from ${a.name}?`}
         confirmText="Remove disk"
         message={
-          <>
-            The disk is removed and wiped. If it is an active member, the RAID becomes <b>degraded</b> until you add a replacement disk.
-          </>
+          remove?.state === "spare" ? (
+            <>The hot spare is taken out of the array and wiped.</>
+          ) : remove?.state === "faulty" ? (
+            <>The failed disk is taken out of the array and wiped, so it can be replaced.</>
+          ) : a.level === "raid1" && a.members.filter((m) => m.state === "active").length > 2 ? (
+            <>The disk is taken out and wiped; the array keeps one mirror less.</>
+          ) : (
+            <>
+              The disk is taken out and wiped. The array is <b>degraded</b> until a replacement is added; a hot spare, if there is one, takes over at once.
+            </>
+          )
         }
       />
       {addDisk && <AddDiskDialog a={a} disks={disks} onClose={() => setAddDisk(false)} onJob={onJob} />}

@@ -1,3 +1,7 @@
+## 1.0.175
+- RAID: a disk can be removed only when that is safe: a spare, a failed disk, an extra RAID 1 mirror or a failing disk
+- RAID: no disk can be removed while the array builds, rebuilds or checks itself
+
 ## 1.0.174
 - RAID: pointing at a disk no longer makes the card jump; its remove button floats over the chip
 
