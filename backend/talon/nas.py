@@ -440,8 +440,9 @@ class Nas:
                         item["status_detail"] = "Building the new array" + (
                             f" ({prog:.1f}%)" if prog is not None else "")
                         item["sync"]["label"] = "Building"
+                        # every disk takes part in the build (read from or written to)
                         for m in item["members"]:
-                            if m["state"] == "rebuilding":
+                            if m["state"] in ("active", "rebuilding"):
                                 m["state"] = "syncing"
                     elif a["sync_action"] == "idle" and not a["degraded"]:
                         name = r["name"]

@@ -232,7 +232,7 @@ def test_new_raid5_shows_building_not_rebuilding(client):
     assert wait_job(client, r.json())["status"] == "success"
     a = next(x for x in client.get("/api/raid").json() if x["name"] == "fresh")
     assert a["status"] == "building" and a["sync"]["label"] == "Building"
-    assert [m["state"] for m in a["members"]] == ["active", "active", "syncing"]
+    assert [m["state"] for m in a["members"]] == ["syncing", "syncing", "syncing"]
     # once built it is an ordinary array: a later recover is a real rebuild
     nas = client.app.state.nas
     for arr in nas.p.arrays.values():

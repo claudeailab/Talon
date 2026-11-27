@@ -1,3 +1,6 @@
+## 1.0.171
+- RAID: while a new array is being built, every disk shows syncing, not only the last one
+
 ## 1.0.170
 - Logs and command output stay scrolled to the newest line while a task runs
 - Deleting a RAID or volume asks for a tick instead of typing its name
