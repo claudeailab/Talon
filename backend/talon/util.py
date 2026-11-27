@@ -5,7 +5,8 @@ import os
 import re
 import subprocess
 import tempfile
-from typing import Callable, Iterable, Optional, Sequence
+import time
+from typing import Callable, Iterable, Optional, Sequence, Tuple
 
 Logger = Callable[[str], None]
 
@@ -122,3 +123,20 @@ def date_pattern(settings: Optional[dict], with_time: bool = False) -> str:
     s = settings or {}
     d = DATE_FORMATS.get(s.get("date_format", ""), DATE_FORMATS["dd-mm-yyyy"])
     return f"{d} {TIME_FORMATS.get(s.get('time_format', ''), TIME_FORMATS['24h'])}" if with_time else d
+
+
+TIME_RE = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+
+
+def daily_window(hhmm: str, now: float, last_run: float = 0.0, hours: float = 2.0) -> Tuple[bool, float]:
+    """A job that runs once a day, starting at hh:mm (local time) and allowed to start until
+    `hours` later (if the NAS was off or busy at hh:mm). Works across midnight.
+    Returns (due now, when it starts next): due when inside the window and it has not run
+    since the window opened; the next start is now when due, else the next hh:mm."""
+    h, m = (int(x) for x in hhmm.split(":"))
+    lt = time.localtime(now)
+    start = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, h, m, 0, 0, 0, -1))
+    if start > now:                                   # the latest window that opened
+        start -= 86400
+    due = now < start + hours * 3600 and last_run < start
+    return due, (now if due else start + 86400)

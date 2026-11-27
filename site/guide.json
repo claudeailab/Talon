@@ -1193,7 +1193,7 @@
      {
       "list": [
        "**How often to check**: every hour up to every week, or **Never** to check only with **Check now**. Talon checks every 6 hours by default, the system once a day.",
-       "**Install automatically**: for Talon **Off** or **On** (a new version installs at night, between 03:00 and 05:00); for the system **Off**, **Security** or **All** (every night between 03:00 and 05:00, with an email when something was installed or failed, once email is set up). Under it, **Last run** says what the last night installed, that there was nothing to install, or why it failed, and **Next run** when it runs again; each run is also in [Activity](/activity).",
+       "**Install automatically**: for Talon **Off** or **On**; for the system **Off**, **Security** or **All** (with an email when something was installed or failed, once email is set up). **Install at** sets the time for each, 03:00 by default; if the NAS is off or busy then, it installs within the next two hours. For the system, **Restart after updates** restarts the NAS right after them, only when one of them needs it. Under it, **Last run** says what the last night installed, that there was nothing to install, or why it failed, and **Next run** when it runs again; each run is also in [Activity](/activity).",
        "**Restart when needed** (system only): restarts the NAS at the time you choose (04:00 by default), only when an update needs it. Talon updates never need one: only Talon itself restarts, for a few seconds."
       ]
      }

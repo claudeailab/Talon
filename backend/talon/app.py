@@ -468,9 +468,12 @@ def create_app(cfg, platform) -> FastAPI:
         if "interval_hours" in body:
             h = updater.set_interval(body.get("interval_hours"))
             nas.state.log_activity(user, "Talon update checks: " + ("only when checked manually" if not h else f"every {h} hour(s)"), "info", "updates")
+        if "auto_time" in body:
+            t = updater.set_auto_time(body.get("auto_time"))
+            nas.state.log_activity(user, f"Talon updates install automatically at {t}", "info", "updates")
         if "auto_install" in body:
             on = updater.set_auto_install(body.get("auto_install"))
-            nas.state.log_activity(user, "Install Talon updates automatically: " + ("on, at night" if on else "off"), "info", "updates")
+            nas.state.log_activity(user, "Install Talon updates automatically: " + (f"on, at {updater.auto_time()}" if on else "off"), "info", "updates")
         return updater.info()
 
     @app.get("/api/update/status")

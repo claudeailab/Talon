@@ -2,9 +2,9 @@
 
 Updates → System lists the waiting package updates (security
 updates first), installs them with a progress bar instead of a terminal, says when
-a restart is needed, and installs updates by itself at night when that is on: all of
-them or only security updates, between 03:00 and 05:00, with an optional restart at a
-set time. Talon runs these itself (not unattended-upgrades) so every run, and why one
+a restart is needed, and installs updates by itself when that is on: all of them or
+only security updates, every day at a chosen time (03:00 by default), with an optional
+restart right after them when an update needs one. Talon runs these itself (not unattended-upgrades) so every run, and why one
 installed nothing or failed, is shown under Updates → Settings and in Activity.
 
 Everything runs through apt-get with DEBIAN_FRONTEND=noninteractive: configuration
@@ -18,7 +18,7 @@ import threading
 import time
 from typing import Callable, Dict, List, Optional
 
-from .util import UserError, read_file, run, write_atomic
+from .util import TIME_RE, UserError, daily_window, read_file, run, write_atomic
 
 ENV = {"DEBIAN_FRONTEND": "noninteractive", "NEEDRESTART_MODE": "l", "NEEDRESTART_SUSPEND": "1",
        "APT_LISTCHANGES_FRONTEND": "none", "LC_ALL": "C"}
@@ -32,7 +32,7 @@ INST_RE = re.compile(r"^Inst (\S+)(?: \[([^\]]+)\])? \((\S+) ([^\[)]*?)(?: \[[^\
 CHECK_HOURS = 24                       # default; changeable under Updates → Settings
 INTERVAL_CHOICES = (0, 1, 6, 12, 24, 168)   # hours; 0 = only when "Check now" is clicked
 AUTO_MODES = {"off": "off", "security": "security updates only", "all": "all updates"}
-AUTO_HOURS = (3, 5)                    # automatic installs start between 03:00 and 05:00
+AUTO_TIME = "03:00"                    # automatic installs start at this time (changeable)
 
 
 def parse_simulation(text: str) -> List[dict]:
@@ -235,8 +235,11 @@ class OsUpdate:
         a = self._saved().get("auto") or {}
         mode = a.get("mode", "off")
         h = a.get("interval_hours", CHECK_HOURS)
-        return {"mode": mode if mode in AUTO_MODES else "off", "restart": bool(a.get("restart")),
-                "restart_time": a.get("restart_time", "04:00"),
+        t = a.get("time")
+        return {"mode": mode if mode in AUTO_MODES else "off",
+                "time": t if isinstance(t, str) and TIME_RE.match(t) else AUTO_TIME,
+                # restart right after the night's updates, when one of them needs it
+                "restart": bool(a.get("restart")),
                 "interval_hours": h if h in INTERVAL_CHOICES else CHECK_HOURS}
 
     def set_auto(self, data: dict, actor: str) -> dict:
@@ -245,8 +248,8 @@ class OsUpdate:
         if mode not in AUTO_MODES:
             raise UserError("Invalid choice")
         restart = bool(data.get("restart", cur["restart"])) and mode != "off"
-        t = str(data.get("restart_time", cur["restart_time"]))
-        if not re.match(r"^([01]\d|2[0-3]):[0-5]\d$", t):
+        t = str(data.get("time", cur["time"])).strip()
+        if not TIME_RE.match(t):
             raise UserError("Enter the time as hh:mm (24-hour)")
         try:
             hours = int(data.get("interval_hours", cur["interval_hours"]))
@@ -257,14 +260,16 @@ class OsUpdate:
         if not self.demo:
             self._apply_auto(mode, restart, t)
         self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}),
-                                                                 "auto": {"mode": mode, "restart": restart, "restart_time": t,
+                                                                 "auto": {"mode": mode, "time": t, "restart": restart,
                                                                           "interval_hours": hours}}))
         if mode != cur["mode"]:
             self.state.log_activity(actor, f"Automatic updates: {AUTO_MODES[mode]}", "info", "updates")
         if hours != cur["interval_hours"]:
             self.state.log_activity(actor, "System update checks: " + (f"every {hours} hour(s)" if hours else "only when checked manually"), "info", "updates")
-        if restart != cur["restart"] or (restart and t != cur["restart_time"]):
-            self.state.log_activity(actor, f"Automatic restart after updates: {'at ' + t if restart else 'off'}", "info", "updates")
+        if mode != "off" and t != cur["time"]:
+            self.state.log_activity(actor, f"Automatic updates install at {t}", "info", "updates")
+        if restart != cur["restart"]:
+            self.state.log_activity(actor, f"Restart after automatic updates: {'on' if restart else 'off'}", "info", "updates")
         return self.info()
 
     def _apply_auto(self, mode: str, restart: bool, t: str) -> None:
@@ -278,16 +283,15 @@ class OsUpdate:
             pass
 
     # ------------------------------------------------------------ the nightly run
+    def _auto_window(self) -> tuple:
+        """(due now, next start) of the nightly run at the chosen time."""
+        return daily_window(self.auto_settings()["time"], time.time(), self._saved().get("auto_ran_at", 0.0))
+
     def next_auto(self) -> Optional[float]:
         """When the next automatic install starts, or None when it is off."""
         if self.auto_settings()["mode"] == "off":
             return None
-        lt = time.localtime()
-        start = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, AUTO_HOURS[0], 0, 0, 0, 0, -1))
-        ran_today = self._saved().get("auto_day") == time.strftime("%Y-%m-%d", lt)
-        if not ran_today and time.time() < start + (AUTO_HOURS[1] - AUTO_HOURS[0]) * 3600:
-            return max(start, time.time())
-        return start + 86400
+        return self._auto_window()[1]
 
     def _auto_record(self, **rec) -> None:
         rec = {"at": time.time(), "mode": self.auto_settings()["mode"], **rec}
@@ -299,7 +303,8 @@ class OsUpdate:
         mode = self.auto_settings()["mode"]
         if mode == "off":
             return
-        self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}), "auto_day": time.strftime("%Y-%m-%d")}))
+        ran = time.time()
+        self.state.update(lambda d: d.__setitem__("os_updates", {**(d.get("os_updates") or {}), "auto_ran_at": ran}))
         if self.progress.get("state") == "running":
             self._auto_record(result="skipped", ok=False, count=0, error="Updates were already being installed")
             return
@@ -331,8 +336,8 @@ class OsUpdate:
         if not ok and self.notifier:
             self.notifier.send("os_updates", "Automatic updates failed", f"Installing {count} update(s) failed: {error}\nSee Talon under Updates → System.")
         if ok and a["restart"] and self.restart_needed() and not self.demo:
-            run(["shutdown", "-r", a["restart_time"], "Talon: restart to finish the updates"], check=False)
-            self.state.log_activity("system", f"Restart at {a['restart_time']} to finish the updates", "info", "updates")
+            run(["shutdown", "-r", "+1", "Talon: restart to finish the updates"], check=False)
+            self.state.log_activity("system", "Restarting in a minute to finish the updates", "info", "updates")
 
     def report_automatic(self) -> None:
         """Log (and email) what unattended-upgrades installed since the last look."""
@@ -361,15 +366,13 @@ class OsUpdate:
         if not self.demo:
             try:
                 a = self.auto_settings()
-                self._apply_auto(a["mode"], a["restart"], a["restart_time"])
+                self._apply_auto(a["mode"], a["restart"], a["time"])
             except Exception:   # noqa: BLE001
                 pass
         last_check_loop = 0.0
         while not stop.is_set():
             try:
-                lt = time.localtime()
-                if (self.auto_settings()["mode"] != "off" and AUTO_HOURS[0] <= lt.tm_hour < AUTO_HOURS[1]
-                        and self._saved().get("auto_day") != time.strftime("%Y-%m-%d", lt)):
+                if self.auto_settings()["mode"] != "off" and self._auto_window()[0]:
                     self.run_auto()
             except Exception:   # noqa: BLE001
                 pass

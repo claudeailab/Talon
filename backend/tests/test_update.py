@@ -92,6 +92,20 @@ def test_update_auto_install_and_os_interval(client):
     assert os_["auto"]["interval_hours"] == 24
     assert client.put("/api/os-update/auto", json={"interval_hours": 168}).json()["auto"]["interval_hours"] == 168
     assert client.put("/api/os-update/auto", json={"interval_hours": 5}).status_code == 400
+    # the time Talon updates install at
+    assert client.get("/api/update").json()["auto_time"] == "03:00"
+    assert client.put("/api/update/settings", json={"auto_time": "02:15"}).json()["auto_time"] == "02:15"
+    assert client.put("/api/update/settings", json={"auto_time": "2:15pm"}).status_code == 400
+
+
+def test_daily_window():
+    from talon.util import daily_window
+    at = lambda h, m=0: time.mktime((2026, 11, 27, h, m, 0, 0, 0, -1))
+    assert daily_window("03:00", at(1)) == (False, at(3))                        # before: today at 03:00
+    assert daily_window("03:00", at(3, 30)) == (True, at(3, 30))                 # in the window, not run yet
+    assert daily_window("03:00", at(3, 40), last_run=at(3, 31)) == (False, at(3) + 86400)   # done: tomorrow
+    assert daily_window("03:00", at(6))[0] is False                              # the window has passed
+    assert daily_window("23:30", at(0, 15) + 86400)[0] is True                   # 00:15: still in the window of 23:30
 
 
 def test_parse_changelog():

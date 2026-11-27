@@ -17,12 +17,12 @@ import urllib.request
 from typing import Optional
 
 from . import __version__
-from .util import UserError, read_file, run, write_atomic
+from .util import TIME_RE, UserError, daily_window, read_file, run, write_atomic
 
 CHECK_INTERVAL = 6 * 3600                 # default; changeable under Updates → Settings
 INTERVAL_CHOICES = (0, 1, 6, 12, 24, 168)   # hours; 0 = only when "Check now" is clicked
 HEARTBEAT_TIMEOUT = 180
-AUTO_HOURS = (3, 5)                        # automatic installs start between 03:00 and 05:00
+AUTO_TIME = "03:00"                        # automatic installs start at this time (changeable)
 USER_AGENT = f"Talon-NAS/{__version__}"
 
 
@@ -248,11 +248,22 @@ class Updater:
         self.state.update(lambda d: d.__setitem__("update_auto_install", on))
         return on
 
+    def auto_time(self) -> str:
+        t = self.state.get("update_auto_time")
+        return t if isinstance(t, str) and TIME_RE.match(t) else AUTO_TIME
+
+    def set_auto_time(self, t) -> str:
+        t = str(t or "").strip()
+        if not TIME_RE.match(t):
+            raise UserError("Enter the time as hh:mm (24-hour)")
+        self.state.update(lambda d: d.__setitem__("update_auto_time", t))
+        return t
+
     def _auto_due(self) -> bool:
         """Install by itself at night (03:00-05:00), once per new version."""
         info = self.info()
         return (self.auto_install() and info["available"] and not self.running()
-                and AUTO_HOURS[0] <= time.localtime().tm_hour < AUTO_HOURS[1]
+                and daily_window(self.auto_time(), time.time())[0]
                 and self.state.get("update_auto_tried") != info["latest"])
 
     def background_loop(self, stop: threading.Event) -> None:
@@ -282,7 +293,7 @@ class Updater:
                 "name": c.get("name"), "notes": c.get("notes"), "url": c.get("url"),
                 "published_at": c.get("published_at"), "checked_at": c.get("checked_at"),
                 "error": c.get("error"), "repo": self.cfg.repo, "status": self.status(),
-                "interval_hours": self.interval(), "auto_install": self.auto_install()}
+                "interval_hours": self.interval(), "auto_install": self.auto_install(), "auto_time": self.auto_time()}
 
     # ------------------------------------------------------------ status
     def status(self) -> dict:

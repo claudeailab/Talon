@@ -1,3 +1,7 @@
+## 1.0.166
+- Updates: choose the time Talon updates and system updates install automatically (03:00 by default)
+- System: Restart after updates restarts the NAS right after them, only when one needs it
+
 ## 1.0.165
 - Changelog: Talon asks GitHub only after it was updated, or when a new version is out; otherwise it uses its own copy and never waits
 

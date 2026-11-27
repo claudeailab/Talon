@@ -284,6 +284,8 @@ export interface UpdateInfo {
   current: string;
   interval_hours: number;
   auto_install: boolean;
+  /** when a new version installs by itself (hh:mm) */
+  auto_time: string;
   latest: string | null;
   available: boolean;
   name: string | null;

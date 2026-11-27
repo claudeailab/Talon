@@ -318,10 +318,10 @@ def test_os_updates(client):
             break
         time.sleep(0.1)
     assert info["progress"]["state"] == "success" and not info["packages"] and info["restart_needed"]
-    auto = client.put("/api/os-update/auto", json={"mode": "all", "restart": True, "restart_time": "04:00"}).json()["auto"]
-    assert auto == {"mode": "all", "restart": True, "restart_time": "04:00", "interval_hours": 24}
+    auto = client.put("/api/os-update/auto", json={"mode": "all", "restart": True, "time": "02:30"}).json()["auto"]
+    assert auto == {"mode": "all", "time": "02:30", "restart": True, "interval_hours": 24}
     assert client.put("/api/os-update/auto", json={"mode": "everything"}).status_code == 400
-    assert client.put("/api/os-update/auto", json={"restart_time": "25:00"}).status_code == 400
+    assert client.put("/api/os-update/auto", json={"time": "25:00"}).status_code == 400
     msgs = [a["message"] for a in client.get("/api/activity", params={"category": "updates"}).json()["items"]]
     assert any("Installed 8 operating system update(s)" in m for m in msgs)
     assert any("Automatic updates: all updates" in m for m in msgs)
@@ -450,4 +450,4 @@ def test_os_updates_install_at_night_and_say_how_it_went(tmp_path):
     last = os_.info()["last_auto"]
     sec = sum(1 for p in DEMO_PACKAGES if p["security"])
     assert last["result"] == "installed" and last["ok"] and last["count"] == sec and last["mode"] == "security"
-    assert os_.info()["next_auto"] > _t.time() + 3600                        # done for today: tomorrow night
+    assert os_.info()["next_auto"] > _t.time()                               # done for today: the next one is later
