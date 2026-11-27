@@ -16,6 +16,11 @@ RAID, shared folders, users, OneDrive backup and alerts. One command installs it
 >
 > **Always keep a backup** of your important files on another device or in the cloud. **RAID is not a backup:** it keeps the NAS running when a disk fails, but it does not protect against deleted files, ransomware, theft, fire or a failed NAS.
 
+> [!TIP]
+> 💜 **Made with love**
+>
+> 🤖 Every line of Talon was written by AI, 🧑‍💻 guided, reviewed and tested with great love and care by a systems engineer with 🏗️ **more than 25 years** of infrastructure experience.
+
 ## Install
 
 ```bash
