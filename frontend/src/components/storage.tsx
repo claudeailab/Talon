@@ -177,13 +177,14 @@ export function MemberChips({ members, onRemove }: { members: Member[]; onRemove
           )}
           {m.state !== "active" && <span className={cx("text-xs font-medium", m.state === "faulty" ? "text-rose-600 dark:text-rose-400" : "text-zinc-600 dark:text-zinc-300")}>{m.state}</span>}
           {onRemove && (
-            <IconButton
-              label={`Remove ${m.disk}`}
-              className="-mr-1 size-6 sm:hidden sm:group-hover:inline-flex sm:group-focus-within:inline-flex"
-              onClick={() => onRemove(m)}
-            >
-              <Trash2 className="size-3.5" />
-            </IconButton>
+            // phones: always in the chip. With a mouse it floats over the chip's end when
+            // pointed at, so the chip never changes size (a wider chip could wrap the row,
+            // move the card and take the chip away from the pointer, over and over)
+            <span className="-mr-1 flex sm:pointer-events-none sm:absolute sm:inset-y-0 sm:right-0 sm:mr-0 sm:items-center sm:bg-gradient-to-l sm:from-white sm:from-60% sm:to-transparent sm:pr-0.5 sm:pl-4 sm:opacity-0 sm:transition-opacity sm:group-hover:pointer-events-auto sm:group-hover:opacity-100 sm:group-focus-within:pointer-events-auto sm:group-focus-within:opacity-100 dark:sm:from-zinc-900">
+              <IconButton label={`Remove ${m.disk}`} className="size-6" onClick={() => onRemove(m)}>
+                <Trash2 className="size-3.5" />
+              </IconButton>
+            </span>
           )}
         </span>
         );

@@ -1,3 +1,6 @@
+## 1.0.174
+- RAID: pointing at a disk no longer makes the card jump; its remove button floats over the chip
+
 ## 1.0.173
 - Disks: disks of a RAID array that is building or rebuilding are animated, with the progress
 - RAID: View log shows what Talon did and what Linux reported about the array, live while it syncs
