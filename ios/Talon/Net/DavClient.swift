@@ -15,12 +15,16 @@ struct DavItem: Identifiable, Hashable {
 enum DavError: LocalizedError {
     /// the NAS uses its own certificate; the user can trust it after checking the fingerprint
     case untrusted(fingerprint: String)
+    /// the NAS is behind Cloudflare Access, which wants a sign-in or a service token
+    case cloudflare(denied: Bool)
     case http(Int, String)
     case unreachable(String)
 
     var errorDescription: String? {
         switch self {
         case .untrusted: return "This NAS uses its own certificate."
+        case .cloudflare(denied: true): return "Cloudflare Access refused the connection. Check the service token, or that your account is allowed in the Access policy."
+        case .cloudflare: return "This NAS is behind Cloudflare Access. Sign in with Cloudflare, or add a service token under Settings."
         case let .http(code, text):
             switch code {
             case 401: return "Wrong user name or password."
@@ -28,6 +32,7 @@ enum DavError: LocalizedError {
             case 404 where text.contains("WebDAV"): return text
             case 404: return "Not found. Is this the address of your Talon NAS?"
             case 409: return "The folder does not exist."
+            case 413: return "This file is too large to send through Cloudflare (at most 100 MB per file on its free plan). Send it at home, over the NAS's own address."
             case 429: return text
             default: return text.isEmpty ? "The NAS answered with error \(code)." : text
             }
@@ -39,15 +44,19 @@ enum DavError: LocalizedError {
 /// Talks WebDAV to Talon (https://<nas>/dav/). Signs in with the Talon user name and
 /// password (Basic auth over HTTPS) and accepts the NAS's own certificate only when its
 /// fingerprint matches the one the user trusted.
-final class DavClient: NSObject, URLSessionDelegate {
+final class DavClient: NSObject, URLSessionTaskDelegate {
     let account: Account
+    let access: CloudflareAccess
+    /// called when Cloudflare Access wants a sign-in
+    var onCloudflareSignIn: (() -> Void)?
     private let auth: String
     private var session: URLSession!
     private let lock = NSLock()
     private var untrusted: String?
 
-    init(account: Account, password: String) {
+    init(account: Account, password: String, access: CloudflareAccess = CloudflareAccess()) {
         self.account = account
+        self.access = access
         auth = "Basic " + Data("\(account.user):\(password)".utf8).base64EncodedString()
         super.init()
         let cfg = URLSessionConfiguration.default
@@ -70,6 +79,11 @@ final class DavClient: NSObject, URLSessionDelegate {
         var r = URLRequest(url: url(path, dir: dir))
         r.httpMethod = method
         r.setValue(auth, forHTTPHeaderField: "Authorization")
+        if access.hasToken {
+            r.setValue(access.clientId, forHTTPHeaderField: "CF-Access-Client-Id")
+            r.setValue(access.clientSecret, forHTTPHeaderField: "CF-Access-Client-Secret")
+        }
+        if !access.cookie.isEmpty { r.setValue("CF_Authorization=\(access.cookie)", forHTTPHeaderField: "Cookie") }
         return r
     }
 
@@ -101,6 +115,15 @@ final class DavClient: NSObject, URLSessionDelegate {
     }
 
     private func ok(_ data: Data, _ r: HTTPURLResponse, _ allowed: Set<Int> = []) throws {
+        // Cloudflare Access sends the browser to its sign-in page; it is not followed (see below)
+        if (300..<400).contains(r.statusCode), Self.isAccessLogin(r.value(forHTTPHeaderField: "Location")) {
+            onCloudflareSignIn?()
+            throw DavError.cloudflare(denied: false)
+        }
+        // refused by Cloudflare itself (not by Talon: Talon's WebDAV answers carry a DAV header)
+        if r.statusCode == 403, r.value(forHTTPHeaderField: "DAV") == nil, r.value(forHTTPHeaderField: "cf-ray") != nil {
+            throw DavError.cloudflare(denied: true)
+        }
         if (200..<300).contains(r.statusCode) || allowed.contains(r.statusCode) { return }
         let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         throw DavError.http(r.statusCode, text.count < 300 ? text : "")
@@ -131,7 +154,7 @@ final class DavClient: NSObject, URLSessionDelegate {
         do {
             let (tmp, resp) = try await session.download(for: r)
             guard let h = resp as? HTTPURLResponse else { throw DavError.unreachable("No answer from the NAS.") }
-            if !(200..<300).contains(h.statusCode) { throw DavError.http(h.statusCode, "") }
+            try ok(Data(), h)
             let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
             let dest = dir.appendingPathComponent(item.name)
@@ -173,6 +196,28 @@ final class DavClient: NSObject, URLSessionDelegate {
         if resp.statusCode == 404 { return nil }
         try ok(data, resp)
         return resp.expectedContentLength >= 0 ? resp.expectedContentLength : 0
+    }
+
+    // MARK: Cloudflare Access
+
+    static func isAccessLogin(_ location: String?) -> Bool {
+        guard let l = location?.lowercased() else { return false }
+        return l.contains("cloudflareaccess.com") || l.contains("/cdn-cgi/access/")
+    }
+
+    /// Redirects to Cloudflare Access's sign-in page are not followed: the app signs in
+    /// with its own screen. Other redirects (e.g. http → https) are.
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
+        if Self.isAccessLogin(request.url?.absoluteString) { completionHandler(nil); return }
+        // keep the sign-in headers on the new address of the same NAS
+        var r = request
+        if request.url?.host == account.server.host, let original = task.originalRequest {
+            for h in ["Authorization", "CF-Access-Client-Id", "CF-Access-Client-Secret", "Cookie"] {
+                if let v = original.value(forHTTPHeaderField: h) { r.setValue(v, forHTTPHeaderField: h) }
+            }
+        }
+        completionHandler(r)
     }
 
     // MARK: certificate

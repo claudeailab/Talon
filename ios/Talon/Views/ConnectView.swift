@@ -9,6 +9,9 @@ struct ConnectView: View {
     @State private var busy = false
     @State private var error: String?
     @State private var trust: (account: Account, fingerprint: String)?
+    @State private var access = CloudflareAccess()
+    @State private var showToken = false
+    @State private var cloudflare: URL?
 
     private var ready: Bool { Account.normalize(server) != nil && !user.trimmingCharacters(in: .whitespaces).isEmpty && !password.isEmpty }
 
@@ -41,6 +44,12 @@ struct ConnectView: View {
             } footer: {
                 Text("A user from Users & Groups in Talon. You see the shared folders that user may open. WebDAV must be on under Services.")
             }
+            Section {
+                Toggle("Behind Cloudflare Access", isOn: $showToken)
+            } footer: {
+                Text("Only if Cloudflare asks for a sign-in before Talon. Without a service token, the app shows Cloudflare's sign-in when it is needed.")
+            }
+            if showToken { CloudflareTokenForm(access: $access) }
             if let error {
                 Section { Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red) }
             }
@@ -58,6 +67,13 @@ struct ConnectView: View {
             }
         }
         .navigationTitle("Connect")
+        .sheet(item: $cloudflare) { url in
+            CloudflareSignIn(server: url) { cookie, expires in
+                access.cookie = cookie
+                access.cookieExpires = expires
+                Task { await connect(pin: nil) }
+            }
+        }
         .alert("Trust this NAS?", isPresented: Binding(get: { trust != nil }, set: { if !$0 { trust = nil } })) {
             Button("Trust") {
                 if let t = trust { Task { await connect(pin: t.fingerprint) } }
@@ -74,15 +90,22 @@ struct ConnectView: View {
         error = nil
         defer { busy = false }
         let account = Account(server: url, user: user.trimmingCharacters(in: .whitespaces).lowercased(), pin: pin)
-        let client = DavClient(account: account, password: password)
+        if !showToken { access.clientId = ""; access.clientSecret = "" }
+        let client = DavClient(account: account, password: password, access: access)
         do {
             _ = try await client.list([])
             server = url.absoluteString
-            session.signIn(account, password: password)
+            session.signIn(account, password: password, access: access)
         } catch DavError.untrusted(let fp) {
             trust = (account, fp)
+        } catch DavError.cloudflare(denied: false) where !access.hasToken {
+            cloudflare = url                                  // Cloudflare's sign-in, then connect again
         } catch {
             self.error = error.localizedDescription
         }
     }
+}
+
+extension URL: Identifiable {
+    public var id: String { absoluteString }
 }

@@ -1,3 +1,6 @@
+## 1.0.183
+- iPhone app: works behind Cloudflare Access, with Sign in with Cloudflare or a service token
+
 ## 1.0.182
 - iPhone app: GitHub builds an unsigned Talon.ipa for sideloading, on the ios-app pre-release
 

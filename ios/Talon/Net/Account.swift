@@ -25,6 +25,30 @@ struct Account: Codable, Equatable {
     }
 }
 
+/// Getting through Cloudflare Access, when the NAS is behind it: a service token
+/// (Client ID and secret, sent with every request) and/or the sign-in cookie Cloudflare
+/// gives after "Sign in with Cloudflare". Kept in the Keychain.
+struct CloudflareAccess: Codable, Equatable {
+    var clientId = ""
+    var clientSecret = ""
+    var cookie = ""
+    var cookieExpires: Date?
+
+    var hasToken: Bool { !clientId.isEmpty && !clientSecret.isEmpty }
+    var hasCookie: Bool { !cookie.isEmpty && (cookieExpires.map { $0 > Date() } ?? true) }
+    var isEmpty: Bool { !hasToken && cookie.isEmpty }
+
+    static func load() -> CloudflareAccess {
+        guard let s = Keychain.get("cloudflare"), let a = try? JSONDecoder().decode(CloudflareAccess.self, from: Data(s.utf8)) else { return CloudflareAccess() }
+        return a
+    }
+
+    func save() {
+        if isEmpty { Keychain.delete("cloudflare"); return }
+        if let d = try? JSONEncoder().encode(self), let s = String(data: d, encoding: .utf8) { Keychain.set(s, for: "cloudflare") }
+    }
+}
+
 enum Keychain {
     private static let service = "io.github.claudeailab.talon"
 
@@ -67,27 +91,52 @@ enum Keychain {
 @MainActor
 final class Session: ObservableObject {
     @Published private(set) var account: Account?
-    private(set) var client: DavClient?
+    @Published private(set) var client: DavClient?
+    @Published private(set) var access = CloudflareAccess.load()
+    /// Cloudflare Access asked for a sign-in (none yet, or it expired): shows "Sign in with Cloudflare"
+    @Published var cloudflarePrompt = false
 
     init() {
         if let data = UserDefaults.standard.data(forKey: "account"),
            let a = try? JSONDecoder().decode(Account.self, from: data),
            let pw = Keychain.get("password") {
             account = a
-            client = DavClient(account: a, password: pw)
+            client = makeClient(a, pw)
         }
     }
 
-    func signIn(_ a: Account, password: String) {
+    private func makeClient(_ a: Account, _ password: String) -> DavClient {
+        let c = DavClient(account: a, password: password, access: access)
+        c.onCloudflareSignIn = { [weak self] in
+            Task { @MainActor in
+                guard let self, !self.access.hasToken else { return }
+                self.cloudflarePrompt = true
+            }
+        }
+        return c
+    }
+
+    func signIn(_ a: Account, password: String, access: CloudflareAccess) {
         if let data = try? JSONEncoder().encode(a) { UserDefaults.standard.set(data, forKey: "account") }
         Keychain.set(password, for: "password")
-        client = DavClient(account: a, password: password)
+        self.access = access
+        access.save()
+        client = makeClient(a, password)
         account = a
+    }
+
+    /// New Cloudflare Access settings (a sign-in, a service token): the connection uses them at once.
+    func setAccess(_ access: CloudflareAccess) {
+        self.access = access
+        access.save()
+        if let a = account, let pw = Keychain.get("password") { client = makeClient(a, pw) }
     }
 
     func signOut() {
         UserDefaults.standard.removeObject(forKey: "account")
         Keychain.delete("password")
+        access = CloudflareAccess()
+        access.save()
         client = nil
         account = nil
     }

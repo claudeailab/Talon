@@ -29,6 +29,16 @@ struct RootView: View {
                     .tabItem { Label("Settings", systemImage: "gearshape") }
             }
             .environment(\.dav, client)
+            .sheet(isPresented: $session.cloudflarePrompt) {
+                if let url = session.account?.server {
+                    CloudflareSignIn(server: url) { cookie, expires in
+                        var a = session.access
+                        a.cookie = cookie
+                        a.cookieExpires = expires
+                        session.setAccess(a)
+                    }
+                }
+            }
             .onChange(of: phase) { p in
                 // "back up when the app opens"
                 if p == .active, backup.automatic, !backup.folder.isEmpty { backup.start(client) }

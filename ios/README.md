@@ -46,3 +46,19 @@ Management** the first time.
 
 iPhone stops apps shortly after you leave them, so a large first backup needs Talon to
 stay open; the screen stays on while it runs. Later backups only send the new photos.
+
+## Behind Cloudflare
+
+- **Cloudflare Tunnel without Access:** enter the public address, e.g.
+  `https://nas.example.com`. Cloudflare's certificate is trusted automatically.
+- **With Cloudflare Access** (a sign-in page before Talon), either:
+  - **Sign in with Cloudflare:** the app opens Cloudflare's sign-in page (email code,
+    Microsoft, …) when it is needed and keeps the sign-in until it expires (the
+    session duration of the Access application). It asks again after that.
+  - **Service token** (best for photo backups): in Cloudflare Zero Trust, **Access →
+    Service Auth → Create service token**. On the Access application of your NAS add a
+    policy with action **Service Auth** that includes the token. In the app, turn on
+    **Behind Cloudflare Access** when connecting (or **Settings → Add service token**)
+    and paste the Client ID and secret.
+- Cloudflare's free plan accepts at most **100 MB per upload**, so very large videos
+  only back up at home, over the NAS's own address.
