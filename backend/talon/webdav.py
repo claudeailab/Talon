@@ -34,7 +34,10 @@ from starlette.responses import FileResponse, Response
 
 
 PREFIX = "/dav"
-HIDDEN = {".recycle", ".versions", ".talon-quarantine"}
+HIDDEN = {".recycle", ".versions", ".talon-quarantine", "lost+found"}
+# administrators also see each mounted volume as "Volume <name>" (a shared folder's name
+# cannot contain a space, so it never clashes with one)
+VOLUME_PREFIX = "Volume "
 ORDER = {"none": 0, "ro": 1, "rw": 2}
 AUTH_CACHE_SECONDS = 300
 FAIL_LIMIT, FAIL_WINDOW = 10, 300
@@ -93,7 +96,7 @@ class WebDav:
     def service_info(self) -> dict:
         on = self.enabled()
         return {"id": "webdav", "unit": None, "installed": True, "active": on, "enabled": on,
-                "label": "WebDAV", "description": "Shared folders over HTTPS at /dav, for apps and remote access", "app": True}
+                "label": "WebDAV", "description": "Shared folders (and volumes, for administrators) over HTTPS at /dav, for apps and remote access", "app": True}
 
     # ------------------------------------------------------------ ASGI
     async def __call__(self, scope, receive, send):
@@ -231,6 +234,25 @@ class WebDav:
                 a = self._access(user, s)
                 if a != "none":
                     out[s["name"]] = (s, a)
+        if (self._users().get(user) or {}).get("admin"):
+            out.update(self._volumes())
+        return out
+
+    def _volumes(self) -> Dict[str, Tuple[dict, str]]:
+        """Whole volumes, for administrators: any folder on them, e.g. for a photo backup
+        that is not in a shared folder. Deleted items go to the volume's recycle bin."""
+        out = {}
+        for v in self.nas.files.volumes():
+            if not v["mounted"]:
+                continue
+            try:
+                path = self.nas.files._root(v["name"])
+            except Exception:   # noqa: BLE001 - a volume that is not available right now
+                continue
+            if os.path.isdir(path):
+                name = VOLUME_PREFIX + v["name"]
+                out[name] = ({"name": name, "path": path, "volume": v["name"], "users": {}, "groups": {},
+                              "smb": {"recycle_bin": True}}, "rw")
         return out
 
     def _resolve(self, user: str, parts: List[str], write: bool = False) -> Tuple[str, dict, str]:

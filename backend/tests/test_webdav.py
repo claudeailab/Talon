@@ -78,3 +78,20 @@ def test_folder_permissions(client):
     # renaming keeps the rule
     assert client.post("/api/files/rename", json={"volume": vol["volume"], "path": f"{folder}/Salaries", "name": "Pay"}).status_code == 200
     assert client.get("/api/folder-perms", params={"volume": vol["volume"], "path": f"{folder}/Pay"}).json()["custom"]["users"] == {"zoe": "rw"}
+
+
+def test_administrators_also_see_whole_volumes(client):
+    client.post("/api/services/webdav/enable")
+    vol = client.get("/api/volumes").json()[0]["name"]
+    h = _auth()
+    listing = client.request("PROPFIND", "/dav/", headers={**h, "Depth": "1"}).text
+    assert f"/dav/Volume%20{vol}/" in listing
+    assert client.request("MKCOL", f"/dav/Volume {vol}/iPhone backup", headers=h).status_code == 201
+    assert client.put(f"/dav/Volume {vol}/iPhone backup/IMG_1.HEIC", content=b"x" * 10, headers=h).status_code == 201
+    assert client.get(f"/dav/Volume {vol}/iPhone backup/IMG_1.HEIC", headers=h).content == b"x" * 10
+    assert client.request("DELETE", f"/dav/Volume {vol}/iPhone backup/IMG_1.HEIC", headers=h).status_code == 204
+    # a user who is not an administrator sees only the shared folders
+    assert client.post("/api/users", json={"name": "zoe", "password": "longenough1"}).status_code == 200
+    z = _auth("zoe", "longenough1")
+    assert "/dav/Volume%20" not in client.request("PROPFIND", "/dav/", headers={**z, "Depth": "1"}).text
+    assert client.request("PROPFIND", f"/dav/Volume {vol}/", headers={**z, "Depth": "1"}).status_code == 404

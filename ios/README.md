@@ -5,7 +5,8 @@ Browse the files on your Talon NAS and back up your camera roll to it.
 - **Files:** the shared folders you may open, their folders and files. Tap a file to
   preview it (photos, videos, PDFs, documents) and share it. Upload files and photos,
   create folders, swipe to delete.
-- **Photos:** backs up the camera roll to a folder you choose, sorted into
+- **Photos:** backs up the camera roll to a folder you choose (administrators: any
+  folder on a volume, listed as **Volume <name>**; others: a shared folder), sorted into
   `<folder>/<year>/<year-month>/`, as the original files with their original dates.
   Each photo is uploaded once. Optionally videos too, and every time the app opens.
 

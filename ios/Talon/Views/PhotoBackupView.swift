@@ -143,10 +143,13 @@ struct FolderPicker: View {
                     NavigationLink {
                         FolderPicker(path: f.path, title: f.name, onPick: onPick)
                     } label: {
-                        Label(f.name, systemImage: path.isEmpty ? "externaldrive.connected.to.line.below" : "folder.fill")
+                        Label(f.name, systemImage: path.isEmpty ? FolderView.topIcon(f.name) : "folder.fill")
                     }
                 }
                 if folders.isEmpty { Text(path.isEmpty ? "No shared folders you may open." : "No folders here.").foregroundStyle(.secondary) }
+                if path.isEmpty {
+                    Text("Administrators also see each volume, to back up to any folder on it.").font(.footnote).foregroundStyle(.secondary)
+                }
             } else if let error {
                 Text(error).foregroundStyle(.red)
             } else {

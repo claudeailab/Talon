@@ -666,6 +666,9 @@
       "p": "You see the shared folders you have access to, with the same **Read** or **Read & write** permissions as over SMB. Deleted files go to the shared folder's recycle bin when it is on. Entra ID users cannot use WebDAV: Talon does not know their password."
      },
      {
+      "p": "Administrators also see each mounted volume as **Volume <name>**, with every folder on it, for example to back up a phone's photos to a folder that is not shared. Items deleted there go to the volume's recycle bin."
+     },
+     {
       "warn": "Through Cloudflare's free plan, a single upload can be at most 100 MB, so very large videos may fail to upload. Over your home network there is no limit."
      }
     ]
@@ -683,7 +686,7 @@
        "In the app, enter the address you open Talon with, and a Talon user name and password.",
        "The first time, the app shows the fingerprint of Talon's certificate. Check that it matches **Certificate fingerprint** under [Settings → Network](/settings?tab=network), then tap **Trust**.",
        "**Files**: open the shared folders, preview and share files, upload files and photos, create folders, swipe to delete.",
-       "**Photos**: choose a folder, then **Back up now**. Photos go into a folder per year and month, as the original files with their dates; each photo is uploaded once. Turn on **Back up when the app opens** to send new photos each time."
+       "**Photos**: choose a folder, then **Back up now**. Administrators can choose any folder on a volume (listed as **Volume <name>**), others a folder in a shared folder they may change. Photos go into a folder per year and month, as the original files with their dates; each photo is uploaded once. Turn on **Back up when the app opens** to send new photos each time."
       ]
      },
      {

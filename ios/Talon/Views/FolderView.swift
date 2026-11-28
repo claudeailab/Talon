@@ -105,7 +105,7 @@ struct FolderView: View {
                         if let m = item.modified, inShare { Text(m, style: .date).font(.caption).foregroundStyle(.secondary) }
                     }
                 } icon: {
-                    Image(systemName: path.isEmpty ? "externaldrive.connected.to.line.below" : "folder.fill").foregroundStyle(.tint)
+                    Image(systemName: path.isEmpty ? Self.topIcon(item.name) : "folder.fill").foregroundStyle(.tint)
                 }
             }
         } else {
@@ -131,6 +131,11 @@ struct FolderView: View {
         if let s = item.size { parts.append(ByteCountFormatter.string(fromByteCount: s, countStyle: .file)) }
         if let m = item.modified { parts.append(m.formatted(date: .abbreviated, time: .shortened)) }
         return parts.joined(separator: " · ")
+    }
+
+    /// the top level: a whole volume (administrators) or a shared folder
+    static func topIcon(_ name: String) -> String {
+        name.hasPrefix("Volume ") ? "internaldrive" : "externaldrive.connected.to.line.below"
     }
 
     static func icon(_ name: String) -> String {
