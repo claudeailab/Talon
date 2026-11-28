@@ -1,3 +1,6 @@
+## 1.0.190
+- iPhone app: Photos asks for access when it opens; if access was refused, a button opens Settings
+
 ## 1.0.189
 - iPhone app: shorter text when there are no folders
 

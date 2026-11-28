@@ -1,5 +1,6 @@
 import Photos
 import SwiftUI
+import UIKit
 
 /// Back up the camera roll to a folder on the NAS.
 struct PhotoBackupView: View {
@@ -60,8 +61,17 @@ struct PhotoBackupView: View {
             .environment(\.dav, dav)
         }
         .task {
-            allowed = PHPhotoLibrary.authorizationStatus(for: .readWrite).allowsReading
+            // ask for the photos right away (once); the counts need them
+            allowed = await PhotoBackup.authorize()
             await backup.refreshCounts(session.account)
+        }
+        // back from the iPhone's Settings: access may have been allowed there
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            let now = PHPhotoLibrary.authorizationStatus(for: .readWrite).allowsReading
+            if now != allowed {
+                allowed = now
+                Task { await backup.refreshCounts(session.account) }
+            }
         }
     }
 
@@ -74,6 +84,13 @@ struct PhotoBackupView: View {
                     Text(headline).font(.headline)
                     Text(subline).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
                 }
+            }
+            if !allowed {
+                // refused earlier: only the iPhone's Settings can change it
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+                }
+                .buttonStyle(.bordered)
             }
             if backup.state == .running {
                 ProgressView(value: Double(backup.done), total: Double(max(backup.total, 1)))
@@ -107,7 +124,7 @@ struct PhotoBackupView: View {
         case .running: return "Uploading \(min(backup.done + 1, backup.total)) of \(backup.total)"
         case .failed: return "The backup stopped"
         default:
-            if !allowed { return "Allow access to your photos" }
+            if !allowed { return "No access to your photos" }
             if backup.folder.isEmpty { return "Choose a folder on the NAS" }
             return backup.backedUp >= backup.inLibrary ? "All photos are backed up" : "\(backup.inLibrary - backup.backedUp) not backed up yet"
         }
@@ -117,7 +134,7 @@ struct PhotoBackupView: View {
         if case let .failed(text) = backup.state { return text }
         var s = "\(backup.backedUp) of \(backup.inLibrary) backed up"
         if let last = backup.lastRun { s += " · last \(last.formatted(date: .abbreviated, time: .shortened))" }
-        return allowed ? s : "Tap Back up now, then allow access."
+        return allowed ? s : "Allow it under Settings → Talon → Photos."
     }
 
     private func centered(_ text: String) -> some View {
