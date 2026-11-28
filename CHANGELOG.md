@@ -1,3 +1,6 @@
+## 1.0.189
+- iPhone app: shorter text when there are no folders
+
 ## 1.0.188
 - iPhone app: the Cloudflare Access card shows only behind Access, without a sign-in button (it signs in by itself)
 

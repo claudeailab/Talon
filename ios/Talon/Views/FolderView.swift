@@ -152,8 +152,8 @@ struct FolderView: View {
     private var empty: some View {
         VStack(spacing: 10) {
             Image(systemName: path.isEmpty ? "externaldrive" : "folder").font(.system(size: 40)).foregroundStyle(.secondary)
-            Text(path.isEmpty ? "No shared folders" : "This folder is empty").font(.headline)
-            Text(path.isEmpty ? "This user may not open any shared folder yet. An administrator can give access under Shared Folders in Talon." : "Upload files or photos with +.")
+            Text(path.isEmpty ? "No folders yet" : "This folder is empty").font(.headline)
+            Text(path.isEmpty ? "Ask an administrator for access." : "Add files with +.")
                 .font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
         }
         .padding(32)
