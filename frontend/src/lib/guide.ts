@@ -552,7 +552,7 @@ export const GUIDE: Topic[] = [
             ],
           },
           { tip: "Keep the app open during a large first backup: iPhone pauses apps soon after you leave them. The screen stays on while it runs." },
-          { p: "**Behind Cloudflare**: with a Cloudflare Tunnel, enter its public address. When Cloudflare Access asks for a sign-in first, the app opens Cloudflare's sign-in page itself and keeps the sign-in until it expires. For photo backups a **service token** is better: create one in Cloudflare Zero Trust under **Access → Service Auth**, add a **Service Auth** policy with it to the Access application of the NAS, and enter its Client ID and secret in the app under **Settings → Add service token**. Cloudflare's free plan takes at most 100 MB per upload, so very large videos only back up at home." },
+          { p: "**Behind Cloudflare**: with a Cloudflare Tunnel, enter its public address. When Cloudflare Access asks for a sign-in first, the app opens Cloudflare's sign-in page itself and keeps the sign-in until it expires. For photo backups a **service token** is better: create one in Cloudflare Zero Trust under **Access → Service Auth**, add a **Service Auth** policy with it to the Access application of the NAS, and enter its Client ID and secret in the app under **Settings → Use a service token instead**. Cloudflare's free plan takes at most 100 MB per upload, so very large videos only back up at home." },
         ],
       },
     ],

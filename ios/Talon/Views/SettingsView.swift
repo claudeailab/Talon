@@ -4,7 +4,6 @@ struct SettingsView: View {
     @EnvironmentObject private var session: Session
     @EnvironmentObject private var backup: PhotoBackup
     @State private var confirm = false
-    @State private var signIn = false
     @State private var editToken = false
     @State private var token = CloudflareAccess()
 
@@ -21,17 +20,18 @@ struct SettingsView: View {
                         }
                     }
                 }
-                Section {
-                    LabeledContent("Status", value: cloudflareStatus)
-                    Button { signIn = true } label: { Label(session.access.cookie.isEmpty ? "Sign in with Cloudflare" : "Sign in with Cloudflare again", systemImage: "person.badge.key") }
-                    Button { token = session.access; editToken = true } label: { Label(session.access.hasToken ? "Change service token" : "Add service token", systemImage: "key") }
-                    if !session.access.isEmpty {
-                        Button("Stop using Cloudflare Access", role: .destructive) { session.setAccess(CloudflareAccess()) }
+                // only for a NAS behind Cloudflare Access: the app signs in there by itself
+                if !session.access.isEmpty {
+                    Section {
+                        LabeledContent("Status", value: cloudflareStatus)
+                        Button { token = session.access; editToken = true } label: {
+                            Text(session.access.hasToken ? "Change service token" : "Use a service token instead").font(.subheadline)
+                        }
+                    } header: {
+                        Text("Cloudflare Access")
+                    } footer: {
+                        Text("The app signs in to Cloudflare by itself whenever it is needed. A service token is optional: it never expires, so long photo backups away from home are not interrupted by a new sign-in.")
                     }
-                } header: {
-                    Text("Cloudflare Access")
-                } footer: {
-                    Text("The app signs in to Cloudflare by itself when it is needed; the sign-in lasts as long as the Access application allows. A service token never expires, so long photo backups are not interrupted.")
                 }
                 Section {
                     Link(destination: a.server) { Label("Open Talon in Safari", systemImage: "safari") }
@@ -44,16 +44,6 @@ struct SettingsView: View {
             }
         }
         .navigationTitle("Settings")
-        .sheet(isPresented: $signIn) {
-            if let url = session.account?.server {
-                CloudflareSignIn(server: url) { cookie, expires in
-                    var a = session.access
-                    a.cookie = cookie
-                    a.cookieExpires = expires
-                    session.setAccess(a)
-                }
-            }
-        }
         .sheet(isPresented: $editToken) {
             NavigationStack {
                 Form { CloudflareTokenForm(access: $token) }

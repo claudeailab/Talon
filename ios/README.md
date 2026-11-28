@@ -58,6 +58,6 @@ stay open; the screen stays on while it runs. Later backups only send the new ph
     session duration of the Access application). It asks again after that.
   - **Service token** (best for photo backups): in Cloudflare Zero Trust, **Access →
     Service Auth → Create service token**. On the Access application of your NAS add a
-    policy with action **Service Auth** that includes the token. In the app, paste the Client ID and secret under **Settings → Add service token**.
+    policy with action **Service Auth** that includes the token. In the app, paste the Client ID and secret under **Settings → Use a service token instead**.
 - Cloudflare's free plan accepts at most **100 MB per upload**, so very large videos
   only back up at home, over the NAS's own address.

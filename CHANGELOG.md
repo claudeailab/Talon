@@ -1,3 +1,6 @@
+## 1.0.188
+- iPhone app: the Cloudflare Access card shows only behind Access, without a sign-in button (it signs in by itself)
+
 ## 1.0.187
 - WebDAV and the iPhone app: administrators also see each volume, so photos can back up to any folder on it
 - WebDAV: a newly added user can sign in at once
