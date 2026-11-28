@@ -297,10 +297,10 @@ function GroupDialog({ group, users, onClose }: { group: Group | null; users: Us
       title={isNew ? "New group" : `Edit ${group!.name}`}
       footer={
         <>
+          <FormHint text={changed ? missing : null} />
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <FormHint text={changed ? missing : null} />
           <Button variant="primary" disabled={!!missing || !changed} loading={save.isPending} onClick={() => save.mutate()}>
             {isNew ? "Create group" : "Save"}
           </Button>
@@ -384,10 +384,10 @@ function UserDialog({ user, groups, isSelf, onClose }: { user: User | null; grou
       title={isNew ? "Add user" : `Edit ${user!.name}`}
       footer={
         <>
+          <FormHint text={changed ? missing : null} />
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <FormHint text={changed ? missing : null} />
           <Button variant="primary" disabled={!valid || !changed} loading={save.isPending} onClick={() => save.mutate()}>
             {isNew ? "Create user" : "Save"}
           </Button>

@@ -337,7 +337,7 @@ export function TimeInput({
       onChange={(e) => {
         const t = e.target.value.replace(/[^\d:]/g, "");
         setDraft(t);
-        if (/^\d{2}:\d{2}$/.test(t)) commit(t);
+        if (/^(\d{1,2}:\d{2}|\d{4})$/.test(t)) commit(t);
       }}
       onBlur={() => commit(draft) || setDraft(value)}
       className={cx(inputCls, "tabular", className)}

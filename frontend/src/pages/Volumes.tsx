@@ -16,6 +16,7 @@ import { useAction } from "../lib/hooks";
 import { Link, navigate } from "../lib/router";
 import type { Job, Volume, VolumeSources } from "../lib/types";
 import { JobDialog } from "../components/jobs";
+import { FormHint } from "../components/rows";
 import {
   DiskRow,
   Detail,
@@ -326,7 +327,8 @@ function CreateVolumeDialog({
       onSuccess: (j) => onJob(j.id),
     },
   );
-  const ok = !!src && !nameErr && (!erasesDisk || agree);
+  const [sizeErr, setSizeErr] = useState<string | null>(null);
+  const ok = !!src && !nameErr && !sizeErr && (!erasesDisk || agree);
 
   return (
     <Modal
@@ -337,6 +339,7 @@ function CreateVolumeDialog({
       description="On a RAID array, next to its other volumes, or on a single disk"
       footer={
         <>
+          <FormHint text={sizeErr} />
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
@@ -450,6 +453,7 @@ function CreateVolumeDialog({
             min={Math.min(GB, arr.free)}
             max={arr.free}
             onChange={setSize}
+            onError={setSizeErr}
             hint={
               sizeBytes < arr.free
                 ? `${bytes(arr.free - sizeBytes)} stays free for other volumes. ${fs === "ext4" ? "The size can change later." : "XFS can grow later, not shrink."}`
@@ -479,14 +483,32 @@ function CreateVolumeDialog({
 
 const GB = 2 ** 30;
 
-/** A size between min and max: a slider and the number in GB. */
-function SizePicker({ value, min, max, onChange, hint, label = "Size" }: { value: number; min: number; max: number; onChange: (b: number) => void; hint?: string; label?: string }) {
+/** A size between min and max: a slider and the number in GB. A typed number counts at
+ *  once (no need to leave the field); one outside the range is reported with onError. */
+function SizePicker({ value, min, max, onChange, onError, hint, label = "Size" }: { value: number; min: number; max: number; onChange: (b: number) => void; onError?: (msg: string | null) => void; hint?: string; label?: string }) {
   const [text, setText] = useState(String(Math.round(value / GB)));
-  useEffect(() => setText(String(Math.round(value / GB))), [value]);
-  const commit = (t: string) => {
-    const n = Number(t.replace(",", "."));
-    if (!Number.isFinite(n) || n <= 0) return setText(String(Math.round(value / GB)));
-    onChange(Math.max(min, Math.min(max, Math.round(n * GB))));
+  const parse = (t: string) => Number(t.trim().replace(",", "."));
+  // the slider or "Use all" moved: show the new number (not while it matches what is typed)
+  useEffect(() => {
+    if (Math.round(parse(text)) !== Math.round(value / GB)) setText(String(Math.round(value / GB)));
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+  const type = (t: string) => {
+    setText(t);
+    const n = parse(t);
+    const b = Math.round(n * GB);
+    if (!t.trim() || !Number.isFinite(n) || n <= 0) return onError?.(`Enter a size in GB`);
+    if (b < min - GB / 2 || b > max + GB / 2) return onError?.(`Enter a size from ${bytes(min)} to ${bytes(max)}`);
+    onError?.(null);
+    onChange(Math.max(min, Math.min(max, b)));
+  };
+  const commit = () => {
+    setText(String(Math.round(value / GB)));      // an unfinished number goes back to the size
+    onError?.(null);
+  };
+  const slide = (b: number) => {
+    onError?.(null);
+    setText(String(Math.round(b / GB)));
+    onChange(b);
   };
   return (
     <div>
@@ -503,7 +525,7 @@ function SizePicker({ value, min, max, onChange, hint, label = "Size" }: { value
           max={max}
           step={GB}
           value={value}
-          onChange={(e) => onChange(Math.min(max, Number(e.target.value)))}
+          onChange={(e) => slide(Math.min(max, Number(e.target.value)))}
           className="h-2 min-w-0 flex-1 cursor-pointer accent-brand-600"
           aria-label={label}
         />
@@ -511,9 +533,9 @@ function SizePicker({ value, min, max, onChange, hint, label = "Size" }: { value
           <input
             value={text}
             inputMode="decimal"
-            onChange={(e) => setText(e.target.value)}
-            onBlur={(e) => commit(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && commit((e.target as HTMLInputElement).value)}
+            onChange={(e) => type(e.target.value)}
+            onBlur={commit}
+            onKeyDown={(e) => e.key === "Enter" && commit()}
             className="tabular min-w-0 flex-1 bg-transparent px-3 py-2 text-right text-sm outline-none"
             aria-label={`${label} in GB`}
           />
@@ -523,7 +545,7 @@ function SizePicker({ value, min, max, onChange, hint, label = "Size" }: { value
       <div className="mt-1.5 flex flex-wrap justify-between gap-x-3 text-xs text-zinc-500">
         <span>{hint}</span>
         {value < max && (
-          <button type="button" className="font-medium text-brand-600 hover:underline dark:text-brand-400" onClick={() => onChange(max)}>
+          <button type="button" className="font-medium text-brand-600 hover:underline dark:text-brand-400" onClick={() => slide(max)}>
             Use all ({bytes(max)})
           </button>
         )}
@@ -535,6 +557,7 @@ function SizePicker({ value, min, max, onChange, hint, label = "Size" }: { value
 /** Grow a volume into the RAID's free space, or shrink an ext4 volume to free some. */
 function ResizeDialog({ v, onClose, onJob }: { v: Volume; onClose: () => void; onJob: (id: string) => void }) {
   const [size, setSize] = useState(v.lv_size);
+  const [sizeErr, setSizeErr] = useState<string | null>(null);
   const grow = size > v.lv_size;
   const same = Math.abs(size - v.lv_size) < 8 * 2 ** 20;
   const resize = useAction(() => api.post<Job>(`/volumes/${v.name}/resize`, { size }), {
@@ -549,10 +572,11 @@ function ResizeDialog({ v, onClose, onJob }: { v: Volume; onClose: () => void; o
       description={`Now ${bytes(v.lv_size)} on RAID ${v.array}, ${bytes(v.used)} used`}
       footer={
         <>
+          <FormHint text={sizeErr} />
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <Button variant="primary" disabled={same} loading={resize.isPending} onClick={() => resize.mutate()}>
+          <Button variant="primary" disabled={same || !!sizeErr} loading={resize.isPending} onClick={() => resize.mutate()}>
             {grow ? "Grow" : "Shrink"} to {bytes(size)}
           </Button>
         </>
@@ -565,9 +589,10 @@ function ResizeDialog({ v, onClose, onJob }: { v: Volume; onClose: () => void; o
           min={v.min_size}
           max={v.max_size}
           onChange={setSize}
+          onError={setSizeErr}
           hint={v.fs === "xfs" ? "XFS volumes can only grow." : "The smallest size leaves room for the files on it."}
         />
-        {!same &&
+        {!same && !sizeErr &&
           (grow ? (
             <Callout tone="info">Grows while it stays in use; shared folders keep working.</Callout>
           ) : (

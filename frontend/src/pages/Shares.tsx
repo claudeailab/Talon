@@ -29,6 +29,8 @@ import {
 
 const USERS_GROUP = "nasusers";
 
+const CLIENT_RE = /^(\*|[A-Za-z0-9*?.:_-]+(\/[0-9]{1,3})?)$/;
+
 function blank(volume: string): Share {
   return {
     name: "",
@@ -226,7 +228,12 @@ function ShareEditor({ initial, isNew, volumes, onClose }: { initial: Share; isN
   const users = useQuery({ queryKey: ["users"], queryFn: () => api.get<User[]>("/users") });
   const groups = useQuery({ queryKey: ["groups"], queryFn: () => api.get<Group[]>("/groups") });
   const toast = useToast();
-  const save = useAction(() => (isNew ? api.post("/shares", s) : api.put(`/shares/${initial.name}`, s)), {
+  // an NFS client typed but not added with Add yet is saved too
+  const body = () => {
+    const h = client.trim();
+    return h && s.nfs.enabled && CLIENT_RE.test(h) ? { ...s, nfs: { ...s.nfs, clients: [...s.nfs.clients, { host: h, access: "rw" as const }] } } : s;
+  };
+  const save = useAction(() => (isNew ? api.post("/shares", body()) : api.put(`/shares/${initial.name}`, body())), {
     success: isNew ? `Share ${s.name} created` : "Share saved",
     invalidate: ["shares", "volumes"],
     onSuccess: onClose,
@@ -240,10 +247,18 @@ function ShareEditor({ initial, isNew, volumes, onClose }: { initial: Share; isN
       return { ...x, [kind]: m };
     });
   const nameErr = s.name && !/^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$/.test(s.name) ? "Letters, digits, . _ - only (no spaces)" : null;
+  const pendingClient = s.nfs.enabled ? client.trim() : "";
+  const problem = !s.name
+    ? "Enter a name for the shared folder"
+    : nameErr
+      ? "The name is not valid"
+      : pendingClient && !CLIENT_RE.test(pendingClient)
+        ? "The NFS client is not valid: an IP, a network like 192.168.1.0/24, a hostname or *"
+        : null;
   const addClient = () => {
     const h = client.trim();
     if (!h) return;
-    if (!/^(\*|[A-Za-z0-9*?.:_-]+(\/[0-9]{1,3})?)$/.test(h)) {
+    if (!CLIENT_RE.test(h)) {
       toast("error", "Enter an IP, a network like 192.168.1.0/24, a hostname or *");
       return;
     }
@@ -259,14 +274,14 @@ function ShareEditor({ initial, isNew, volumes, onClose }: { initial: Share; isN
       title={isNew ? "New shared folder" : `Edit ${initial.name}`}
       footer={
         <>
+          <FormHint text={problem} />
           <Button variant="ghost" onClick={onClose}>
             Cancel
           </Button>
-          <FormHint text={!s.name ? "Enter a name for the shared folder" : nameErr ? "The name is not valid" : null} />
           <Button
             variant="primary"
             loading={save.isPending}
-            disabled={!s.name || !!nameErr || (!isNew && sameValue(s, initial))}
+            disabled={!!problem || (!isNew && sameValue(s, initial) && !pendingClient)}
             onClick={() => save.mutate()}
           >
             {isNew ? "Create share" : "Save"}

@@ -1,3 +1,7 @@
+## 1.0.180
+- Buttons turn on as soon as you type: volume sizes and times no longer need Tab or Enter
+- Shared folders: an NFS client typed but not added is saved with Save
+
 ## 1.0.179
 - README: one short bullet per feature
 
