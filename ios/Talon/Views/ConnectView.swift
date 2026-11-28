@@ -10,7 +10,6 @@ struct ConnectView: View {
     @State private var error: String?
     @State private var trust: (account: Account, fingerprint: String)?
     @State private var access = CloudflareAccess()
-    @State private var showToken = false
     @State private var cloudflare: URL?
 
     private var ready: Bool { Account.normalize(server) != nil && !user.trimmingCharacters(in: .whitespaces).isEmpty && !password.isEmpty }
@@ -33,7 +32,7 @@ struct ConnectView: View {
             } header: {
                 Text("NAS address")
             } footer: {
-                Text("The address you open Talon with in a browser.")
+                Text("The address you open Talon with in a browser. Behind Cloudflare Access, the app shows Cloudflare's sign-in when it is needed.")
             }
             Section {
                 TextField("User name", text: $user)
@@ -44,12 +43,6 @@ struct ConnectView: View {
             } footer: {
                 Text("A user from Users & Groups in Talon. You see the shared folders that user may open. WebDAV must be on under Services.")
             }
-            Section {
-                Toggle("Behind Cloudflare Access", isOn: $showToken)
-            } footer: {
-                Text("Only if Cloudflare asks for a sign-in before Talon. Without a service token, the app shows Cloudflare's sign-in when it is needed.")
-            }
-            if showToken { CloudflareTokenForm(access: $access) }
             if let error {
                 Section { Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red) }
             }
@@ -90,7 +83,6 @@ struct ConnectView: View {
         error = nil
         defer { busy = false }
         let account = Account(server: url, user: user.trimmingCharacters(in: .whitespaces).lowercased(), pin: pin)
-        if !showToken { access.clientId = ""; access.clientSecret = "" }
         let client = DavClient(account: account, password: password, access: access)
         do {
             _ = try await client.list([])

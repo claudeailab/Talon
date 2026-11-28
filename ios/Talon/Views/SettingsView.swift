@@ -31,7 +31,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Cloudflare Access")
                 } footer: {
-                    Text("Only when the NAS is behind Cloudflare Access. A service token also works for long backups; a sign-in lasts as long as the Access policy allows.")
+                    Text("The app signs in to Cloudflare by itself when it is needed; the sign-in lasts as long as the Access application allows. A service token never expires, so long photo backups are not interrupted.")
                 }
                 Section {
                     Link(destination: a.server) { Label("Open Talon in Safari", systemImage: "safari") }

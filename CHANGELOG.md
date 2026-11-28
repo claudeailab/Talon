@@ -1,3 +1,6 @@
+## 1.0.185
+- iPhone app: no Cloudflare switch when connecting; it signs in to Cloudflare by itself, the service token is under Settings
+
 ## 1.0.184
 - iPhone app: the build publishes Talon.ipa directly on its release
 
