@@ -77,10 +77,10 @@ class WebDav:
         self._counts_flushed = time.time()
         self._users_cache: Tuple[float, Dict[str, dict]] = (0.0, {})
 
-    def _users(self) -> Dict[str, dict]:
+    def _users(self, fresh: bool = False) -> Dict[str, dict]:
         """The local users, refreshed every 30 seconds (each request needs them)."""
         at, users = self._users_cache
-        if time.time() - at > 30:
+        if fresh or time.time() - at > 30:
             users = {u["name"]: u for u in self.nas.users()}
             self._users_cache = (time.time(), users)
         return users
@@ -175,6 +175,8 @@ class WebDav:
             raise DavError(401, "Invalid sign-in") from None
         user = user.strip().lower()
         known = self._users()
+        if user not in known:                  # a user added in the last 30 seconds
+            known = self._users(fresh=True)
         ok = user in known and not known[user].get("disabled") and await _threaded(self.p.authenticate, user, password)
         if not ok:
             with self._lock:

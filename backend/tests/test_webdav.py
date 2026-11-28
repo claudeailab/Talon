@@ -90,7 +90,7 @@ def test_administrators_also_see_whole_volumes(client):
     assert client.put(f"/dav/Volume {vol}/iPhone backup/IMG_1.HEIC", content=b"x" * 10, headers=h).status_code == 201
     assert client.get(f"/dav/Volume {vol}/iPhone backup/IMG_1.HEIC", headers=h).content == b"x" * 10
     assert client.request("DELETE", f"/dav/Volume {vol}/iPhone backup/IMG_1.HEIC", headers=h).status_code == 204
-    # a user who is not an administrator sees only the shared folders
+    # a user who is not an administrator sees only the shared folders (and can sign in at once)
     assert client.post("/api/users", json={"name": "zoe", "password": "longenough1"}).status_code == 200
     z = _auth("zoe", "longenough1")
     assert "/dav/Volume%20" not in client.request("PROPFIND", "/dav/", headers={**z, "Depth": "1"}).text

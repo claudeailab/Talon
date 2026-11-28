@@ -1,5 +1,6 @@
-## 1.0.186
+## 1.0.187
 - WebDAV and the iPhone app: administrators also see each volume, so photos can back up to any folder on it
+- WebDAV: a newly added user can sign in at once
 
 ## 1.0.185
 - iPhone app: no Cloudflare switch when connecting; it signs in to Cloudflare by itself, the service token is under Settings
