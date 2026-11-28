@@ -40,10 +40,6 @@ jobs:
           cp -R build/Build/Products/Release-iphoneos/Talon.app Payload/
           zip -qry Talon.ipa Payload
           ls -l Talon.ipa
-      - uses: actions/upload-artifact@v4
-        with:
-          name: Talon-ipa
-          path: ios/Talon.ipa
       - name: Publish on the ios-app pre-release
         if: github.ref == 'refs/heads/main'
         env:

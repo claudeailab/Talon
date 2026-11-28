@@ -1,3 +1,6 @@
+## 1.0.184
+- iPhone app: the build publishes Talon.ipa directly on its release
+
 ## 1.0.183
 - iPhone app: works behind Cloudflare Access, with Sign in with Cloudflare or a service token
 
