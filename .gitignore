@@ -4,3 +4,5 @@ __pycache__/
 .pytest_cache/
 .venv/
 frontend/dist/
+ios/Talon.xcodeproj/
+ios/build/

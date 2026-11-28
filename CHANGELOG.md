@@ -1,3 +1,7 @@
+## 1.0.181
+- iPhone app (ios/): browse your files and back up the camera roll over WebDAV
+- Settings → Network shows the HTTPS certificate fingerprint the app asks you to check
+
 ## 1.0.180
 - Buttons turn on as soon as you type: volume sizes and times no longer need Tab or Enter
 - Shared folders: an NFS client typed but not added is saved with Save

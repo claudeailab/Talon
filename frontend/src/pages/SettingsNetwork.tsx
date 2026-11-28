@@ -243,7 +243,7 @@ export default function NetworkTab() {
 
 /* ---------------------------------------------------------------- HTTPS on/off */
 
-type Web = { https: boolean; port: number; https_port: number; serving_https: boolean };
+type Web = { https: boolean; port: number; https_port: number; serving_https: boolean; fingerprint?: string };
 
 /** HTTPS on or off, in a card of its own: it applies on its own, not with the Save button of the network settings. */
 function WebCard() {
@@ -282,6 +282,11 @@ function WebCard() {
       >
         <Switch checked={next} onChange={(v) => setWant(v === on ? null : v)} label="HTTPS" />
       </Row>
+      {on && q.data.fingerprint && (
+        <Row label="Certificate fingerprint" hint="SHA-256. The Talon iPhone app shows it when it connects the first time: they must match.">
+          <span className="font-mono text-[11px] break-all text-zinc-500 sm:max-w-[22rem] sm:text-right">{q.data.fingerprint}</span>
+        </Row>
+      )}
       <SaveBar dirty={next !== on} note="Talon restarts to apply this" onDiscard={() => setWant(null)} onSave={() => setAsk(true)} />
       <ConfirmDialog
         open={ask}

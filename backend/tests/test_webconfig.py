@@ -53,3 +53,8 @@ def test_web_api(client):
     r = client.put("/api/settings/web", json={"https": False}).json()
     assert r == {"https": False, "port": 80, "restarting": False}        # demo: no restart
     assert client.get("/api/settings/web").json()["https"] is False
+
+
+def test_fingerprint_of_missing_certificate(tmp_path):
+    from talon import webconfig
+    assert webconfig.fingerprint(str(tmp_path / "none.pem")) == ""

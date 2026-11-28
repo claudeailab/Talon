@@ -84,6 +84,7 @@ https://<nas-ip>/
 - **Notifications:** email alerts with thresholds
 - **SD cards:** fewer writes to flash system disks
 - **Mobile:** phones, tablets, light and dark mode
+- **iPhone app:** files and camera roll backup
 - **Documentation:** built-in searchable guide
 
 ## Screenshots

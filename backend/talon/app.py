@@ -978,7 +978,8 @@ def create_app(cfg, platform) -> FastAPI:
     def web_get(request: Request, _u: str = Depends(current_user)):
         serving = getattr(app.state, "serving", {"https": request.url.scheme == "https", "port": cfg.port})
         return {"https": cfg.https, "port": cfg.port, "https_port": cfg.https_port,
-                "serving_https": serving["https"]}
+                "serving_https": serving["https"],
+                "fingerprint": webconfig.fingerprint(cfg.tls_cert) if cfg.https else ""}
 
     @app.put("/api/settings/web")
     def web_put(body: dict = Body(...), user: str = Depends(current_user)):

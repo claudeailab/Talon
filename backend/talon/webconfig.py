@@ -32,6 +32,18 @@ def _port_free(port: int) -> bool:
         s.close()
 
 
+def fingerprint(path: str) -> str:
+    """SHA-256 of Talon's HTTPS certificate, as "AB:CD:…" (what the iPhone app shows to check it)."""
+    import hashlib
+    import ssl
+    try:
+        with open(path) as f:
+            der = ssl.PEM_cert_to_DER_cert(f.read())
+    except (OSError, ValueError):
+        return ""
+    return ":".join(f"{b:02X}" for b in hashlib.sha256(der).digest())
+
+
 def set_https(cfg, on: bool, user: str, state) -> dict:
     if on == cfg.https:
         return {"https": cfg.https, "port": cfg.port, "restarting": False}

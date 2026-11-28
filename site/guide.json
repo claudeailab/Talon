@@ -669,6 +669,27 @@
       "warn": "Through Cloudflare's free plan, a single upload can be at most 100 MB, so very large videos may fail to upload. Over your home network there is no limit."
      }
     ]
+   },
+   {
+    "id": "iphone",
+    "title": "iPhone app",
+    "blocks": [
+     {
+      "p": "The Talon app for iPhone browses your shared folders and backs up your camera roll to the NAS, over WebDAV. Its source is in the **ios** folder of the Talon project on GitHub; install it on your iPhone from a Mac with Xcode (see the README there)."
+     },
+     {
+      "steps": [
+       "In Talon, turn on **WebDAV** on the [Services](/services) page.",
+       "In the app, enter the address you open Talon with, and a Talon user name and password.",
+       "The first time, the app shows the fingerprint of Talon's certificate. Check that it matches **Certificate fingerprint** under [Settings → Network](/settings?tab=network), then tap **Trust**.",
+       "**Files**: open the shared folders, preview and share files, upload files and photos, create folders, swipe to delete.",
+       "**Photos**: choose a folder, then **Back up now**. Photos go into a folder per year and month, as the original files with their dates; each photo is uploaded once. Turn on **Back up when the app opens** to send new photos each time."
+      ]
+     },
+     {
+      "tip": "Keep the app open during a large first backup: iPhone pauses apps soon after you leave them. The screen stays on while it runs."
+     }
+    ]
    }
   ]
  },
