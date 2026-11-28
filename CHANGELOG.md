@@ -1,3 +1,6 @@
+## 1.0.182
+- iPhone app: GitHub builds an unsigned Talon.ipa for sideloading, on the ios-app pre-release
+
 ## 1.0.181
 - iPhone app (ios/): browse your files and back up the camera roll over WebDAV
 - Settings → Network shows the HTTPS certificate fingerprint the app asks you to check

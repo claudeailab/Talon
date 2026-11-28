@@ -16,7 +16,18 @@ read & write. Turn **WebDAV** on under **Services** in Talon first.
 Talon's own HTTPS certificate is trusted once: the app shows its SHA-256 fingerprint
 when you connect for the first time.
 
-## Install it on your iPhone
+## Install it from Windows (sideloading)
+
+Download the unsigned app: **https://github.com/claudeailab/Talon/releases/download/ios-app/Talon.ipa**
+(rebuilt by GitHub each time the app changes).
+
+Open it with a sideloading tool such as **Sideloadly** (Windows or Mac), connect the
+iPhone with a cable, sign in with your Apple ID and start. A free Apple ID keeps the app
+working for 7 days; sideload it again to renew. On the iPhone, trust your Apple ID under
+**Settings → General → VPN & Device Management**, and on iOS 16 or later turn on
+**Settings → Privacy & Security → Developer Mode**.
+
+## Install it from a Mac with Xcode
 
 You need a Mac with Xcode 15 or later.
 

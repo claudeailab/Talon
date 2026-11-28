@@ -1,13 +1,20 @@
-# Builds the iPhone app (ios/) on a Mac whenever it changes, so a broken build shows up
-# at once. It is not signed: install it from Xcode (see ios/README.md).
+# Builds the iPhone app (ios/) on a Mac whenever it changes:
+# - a Simulator build, so a broken build shows up at once;
+# - an unsigned Talon.ipa for sideloading (Sideloadly, AltStore and similar sign it with
+#   your own Apple ID), published on the "ios-app" pre-release:
+#   https://github.com/claudeailab/Talon/releases/download/ios-app/Talon.ipa
+# A pre-release is never "latest", so installed Talon systems do not see it as an update.
 name: iOS app
 on:
   push:
     branches: [main]
     paths: ["ios/**", ".github/workflows/ios.yml"]
   workflow_dispatch:
+concurrency:
+  group: ios
+  cancel-in-progress: true
 permissions:
-  contents: read
+  contents: write
 jobs:
   build:
     runs-on: macos-15
@@ -18,7 +25,34 @@ jobs:
       - name: Build for the iOS Simulator
         run: |
           cd ios
+          set -o pipefail
           xcodebuild build -project Talon.xcodeproj -scheme Talon \
             -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO | tail -n 60
-          exit ${PIPESTATUS[0]}
+            CODE_SIGNING_ALLOWED=NO | tail -n 40
+      - name: Build the unsigned IPA
+        run: |
+          cd ios
+          set -o pipefail
+          xcodebuild build -project Talon.xcodeproj -scheme Talon -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" | tail -n 40
+          rm -rf Payload && mkdir Payload
+          cp -R build/Build/Products/Release-iphoneos/Talon.app Payload/
+          zip -qry Talon.ipa Payload
+          ls -l Talon.ipa
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Talon-ipa
+          path: ios/Talon.ipa
+      - name: Publish on the ios-app pre-release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="Talon for iPhone, unsigned, for sideloading (Sideloadly, AltStore). Built $(date -u '+%Y-%m-%d %H:%M UTC') from ${GITHUB_SHA::7}. See ios/README.md."
+          if ! gh release view ios-app >/dev/null 2>&1; then
+            gh release create ios-app --prerelease --target "$GITHUB_SHA" --title "Talon for iPhone" --notes "$notes"
+          else
+            gh release edit ios-app --prerelease --notes "$notes"
+          fi
+          gh release upload ios-app ios/Talon.ipa --clobber
