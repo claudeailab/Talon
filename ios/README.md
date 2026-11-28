@@ -7,7 +7,7 @@ Browse the files on your Talon NAS and back up your camera roll to it.
   create folders, swipe to delete.
 - **Photos:** backs up the camera roll to a folder you choose (administrators: any
   folder on a volume, listed as **Volume <name>**; others: a shared folder), sorted into
-  `<folder>/<year>/<year-month>/`, as the original files with their original dates.
+  `<folder>/<year>/<month>/` (the month written like the NAS's date format, e.g. `2026/11-2026`), as the original files with their original dates.
   Each photo is uploaded once. Optionally videos too, and every time the app opens.
 
 It talks to Talon over WebDAV (`https://<nas>/dav/`) with a Talon user name and

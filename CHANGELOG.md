@@ -1,3 +1,7 @@
+## 1.0.191
+- iPhone app: photo backup folders follow the date format set in Talon (e.g. 2026/11-2026)
+- iPhone app: shorter texts under Photos
+
 ## 1.0.190
 - iPhone app: Photos asks for access when it opens; if access was refused, a button opens Settings
 

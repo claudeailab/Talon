@@ -114,6 +114,8 @@ class WebDav:
         except FileNotFoundError:
             resp = Response("Not found", status_code=404)
         resp.headers["DAV"] = "1, 2"
+        # Settings → Date format, so apps name folders the same way (the iPhone app's photo backup)
+        resp.headers["X-Talon-Date-Format"] = (self.nas.state.get("settings") or {}).get("date_format") or "dd-mm-yyyy"
         resp.headers["MS-Author-Via"] = "DAV"
         await resp(scope, receive, send)
 

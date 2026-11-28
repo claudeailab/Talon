@@ -548,7 +548,7 @@ export const GUIDE: Topic[] = [
               "In the app, enter the address you open Talon with, and a Talon user name and password.",
               "The first time, the app shows the fingerprint of Talon's certificate. Check that it matches **Certificate fingerprint** under [Settings → Network](/settings?tab=network), then tap **Trust**.",
               "**Files**: open the shared folders, preview and share files, upload files and photos, create folders, swipe to delete.",
-              "**Photos**: choose a folder, then **Back up now**. Administrators can choose any folder on a volume (listed as **Volume <name>**), others a folder in a shared folder they may change. Photos go into a folder per year and month, as the original files with their dates; each photo is uploaded once. Turn on **Back up when the app opens** to send new photos each time.",
+              "**Photos**: choose a folder, then **Back up now**. Administrators can choose any folder on a volume (listed as **Volume <name>**), others a folder in a shared folder they may change. Photos go into a folder per year and month (the month written like **Settings → General → Format**, e.g. 2026/11-2026), as the original files with their dates; each photo is uploaded once. Turn on **Back up when the app opens** to send new photos each time.",
             ],
           },
           { tip: "Keep the app open during a large first backup: iPhone pauses apps soon after you leave them. The screen stays on while it runs." },

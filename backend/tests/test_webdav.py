@@ -95,3 +95,12 @@ def test_administrators_also_see_whole_volumes(client):
     z = _auth("zoe", "longenough1")
     assert "/dav/Volume%20" not in client.request("PROPFIND", "/dav/", headers={**z, "Depth": "1"}).text
     assert client.request("PROPFIND", f"/dav/Volume {vol}/", headers={**z, "Depth": "1"}).status_code == 404
+
+
+def test_webdav_tells_the_date_format(client):
+    client.post("/api/services/webdav/enable")
+    r = client.request("PROPFIND", "/dav/", headers={**_auth(), "Depth": "0"})
+    assert r.headers["X-Talon-Date-Format"] == "dd-mm-yyyy"
+    assert client.put("/api/settings", json={"date_format": "yyyy-mm-dd"}).status_code == 200
+    r = client.request("PROPFIND", "/dav/", headers={**_auth(), "Depth": "0"})
+    assert r.headers["X-Talon-Date-Format"] == "yyyy-mm-dd"

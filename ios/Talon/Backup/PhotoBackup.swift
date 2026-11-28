@@ -114,6 +114,12 @@ final class PhotoBackup: ObservableObject {
         }
         account = client.account
         load(client.account)
+        // the folder is there, and the NAS's date format is known
+        do { _ = try await client.list(folder) } catch {
+            state = .failed(error.localizedDescription)
+            return
+        }
+        let format = client.dateFormat
         let todo = assets().filter { !uploaded.contains($0.localIdentifier) }
         total = todo.count
         state = .running
@@ -126,16 +132,13 @@ final class PhotoBackup: ObservableObject {
             bg = .invalid
         }
         var made = Set<String>()
-        let months = DateFormatter()
-        months.locale = Locale(identifier: "en_US_POSIX")
-        months.dateFormat = "yyyy-MM"
         do {
             for asset in todo {
                 try Task.checkCancellation()
                 guard let resource = Self.original(asset) else { done += 1; continue }
                 let date = asset.creationDate ?? Date()
                 let year = String(Calendar.current.component(.year, from: date))
-                let dir = folder + [year, months.string(from: date)]
+                let dir = folder + [year, Self.monthFolder(date, format: format)]
                 for i in folder.count..<dir.count {
                     let p = Array(dir[0...i])
                     let key = p.joined(separator: "/")
@@ -176,6 +179,19 @@ final class PhotoBackup: ObservableObject {
             state = (error as? URLError)?.code == .cancelled ? .idle : .failed(error.localizedDescription)
         }
         current = ""
+    }
+
+    /// The month's folder, written like Settings → Date format on the NAS without the day:
+    /// dd-mm-yyyy → 11-2026, dd.mm.yyyy → 11.2026, yyyy-mm-dd → 2026-11 ("/" becomes "-").
+    static func monthFolder(_ date: Date, format: String) -> String {
+        let c = Calendar.current.dateComponents([.year, .month], from: date)
+        let y = String(format: "%04d", c.year ?? 0)
+        let m = String(format: "%02d", c.month ?? 0)
+        switch format {
+        case "yyyy-mm-dd": return "\(y)-\(m)"
+        case "dd.mm.yyyy": return "\(m).\(y)"
+        default: return "\(m)-\(y)"
+        }
     }
 
     /// The original photo or video (not an edited version, not the video half of a Live Photo).

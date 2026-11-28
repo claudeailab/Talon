@@ -31,7 +31,7 @@ struct PhotoBackupView: View {
             } header: {
                 Text("Settings")
             } footer: {
-                Text("Photos go into a folder per year and month, e.g. \((backup.folder.isEmpty ? ["Photos"] : backup.folder).joined(separator: "/"))/2026/2026-11, as the original files with their dates. Each photo is uploaded once.")
+                Text("Sorted by year and month, in the NAS's date format.")
             }
             Section {
                 if backup.running {
@@ -46,7 +46,7 @@ struct PhotoBackupView: View {
                     .disabled(backup.folder.isEmpty)
                 }
             } footer: {
-                Text("Keep Talon open until it finishes: iPhone pauses apps soon after you leave them. The screen stays on meanwhile.")
+                Text("Keep the app open while it backs up.")
             }
         }
         .navigationTitle("Photo backup")

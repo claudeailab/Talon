@@ -53,6 +53,8 @@ final class DavClient: NSObject, URLSessionTaskDelegate {
     private var session: URLSession!
     private let lock = NSLock()
     private var untrusted: String?
+    /// Settings → Date format on the NAS ("dd-mm-yyyy", "yyyy-mm-dd", …), from its answers
+    private(set) var dateFormat = "dd-mm-yyyy"
 
     init(account: Account, password: String, access: CloudflareAccess = CloudflareAccess()) {
         self.account = account
@@ -91,6 +93,9 @@ final class DavClient: NSObject, URLSessionTaskDelegate {
         do {
             let (d, rsp) = try await session.data(for: r)
             guard let h = rsp as? HTTPURLResponse else { throw DavError.unreachable("No answer from the NAS.") }
+            if let f = h.value(forHTTPHeaderField: "X-Talon-Date-Format"), !f.isEmpty {
+                lock.lock(); dateFormat = f; lock.unlock()
+            }
             return (d, h)
         } catch {
             throw mapped(error)
