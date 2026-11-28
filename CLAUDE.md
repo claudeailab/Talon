@@ -6,8 +6,11 @@
   `main`, push `main`, then delete that branch locally and on `origin`.
 - After every push, delete **all** leftover non-`main` branches on `origin` (including ones from
   other sessions) once their commits are contained in `main`.
-- Raise `__version__` in `backend/talon/__init__.py` with **every** change (patch bump, e.g.
-  1.0.1 → 1.0.2), so each change is published as a release.
+- Raise `__version__` in `backend/talon/__init__.py` with **every** change to Talon (patch bump,
+  e.g. 1.0.1 → 1.0.2), so each change is published as a release. Changes that only touch the
+  iPhone app (`ios/`) do **not** bump Talon's version or CHANGELOG.md: they build in
+  `.github/workflows/ios.yml` only, and CI skips them. Keep GitHub Actions runs few (the owner's
+  minutes are limited): group related changes into one push instead of pushing every small fix.
 - Add a `## <version>` section to the top of `CHANGELOG.md` with 1–3 short bullet points
   ("- Shorter install command"). They become the GitHub release notes.
 - The project is named **Talon** and lives at `claudeailab/Talon`. Never use the old names.

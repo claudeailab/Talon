@@ -1,6 +1,5 @@
-# Builds the iPhone app (ios/) on a Mac whenever it changes:
-# - a Simulator build, so a broken build shows up at once;
-# - an unsigned Talon.ipa for sideloading (Sideloadly, AltStore and similar sign it with
+# Builds the iPhone app (ios/) on a Mac whenever it changes (one build, so a broken
+# build shows up at once): an unsigned Talon.ipa for sideloading (Sideloadly, AltStore and similar sign it with
 #   your own Apple ID), published on the "ios-app" pre-release:
 #   https://github.com/claudeailab/Talon/releases/download/ios-app/Talon.ipa
 # A pre-release is never "latest", so installed Talon systems do not see it as an update.
@@ -22,13 +21,6 @@ jobs:
       - uses: actions/checkout@v4
       - name: Generate the Xcode project
         run: brew install xcodegen && cd ios && xcodegen
-      - name: Build for the iOS Simulator
-        run: |
-          cd ios
-          set -o pipefail
-          xcodebuild build -project Talon.xcodeproj -scheme Talon \
-            -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO | tail -n 40
       - name: Build the unsigned IPA
         run: |
           cd ios

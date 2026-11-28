@@ -10,6 +10,7 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore: ["ios/**", ".github/workflows/ios.yml"]   # the iPhone app builds in ios.yml only
   workflow_run:            # merges done by auto-merge.yml use GITHUB_TOKEN, which
     workflows: [Auto-merge to main]   # does not trigger push workflows by itself
     types: [completed]
